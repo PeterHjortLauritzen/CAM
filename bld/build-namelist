@@ -3402,7 +3402,7 @@ if (($do_gw_rdg_beta or $do_gw_rdg_gamma)) {
 #    be .true., to get a QBO.
 # 3. If only orographic waves are on, we can't get a QBO regardless, so
 #    use tau_0_ubc = .false. to avoid changing answers.
-if ((not $waccm_phys) and
+if ((not $waccm_phys) and (not $dyn =~ /se/) and
     ($do_gw_front or $do_gw_front_igw or
      $do_gw_convect_dp or $do_gw_convect_sh)) {
     add_default($nl, 'tau_0_ubc', 'val'=>'.true.');
