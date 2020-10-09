@@ -1749,6 +1749,70 @@ subroutine read_inidat(dyn_in)
             ntrac,elem(ie)%metdet,dyn_in%fvm(ie)%inv_se_area_sphere(1:nc,1:nc))
       end do
 
+
+      if (analytic_ic_active()) then
+        !
+        ! initialize tracers
+        !
+        allocate(latvals(nc*nc*nelemd))
+        allocate(lonvals(nc*nc*nelemd))
+        indx = 1
+        do ie = 1, nelemd
+          do j = 1, nc
+            do i = 1, nc
+              latvals(indx) = dyn_in%fvm(ie)%center_cart(i,j)%lat
+              lonvals(indx) = dyn_in%fvm(ie)%center_cart(i,j)%lon
+              indx = indx + 1
+            end do
+          end do
+        end do
+
+        allocate(pmask(nc*nc*nelemd))
+        pmask(:) = .true.
+        
+        allocate(dbuf4(nc*nc, nlev, nelemd, ntrac))!         allocate(m_ind(ntrac))
+        allocate(glob_ind(nc*nc*nelemd))
+        j = 1
+        do ie = 1, nelemd
+          do i = 1, nc*nc
+            ! Create a global(ish) column index
+            glob_ind(j) = elem(ie)%GlobalId
+            j = j + 1
+          end do
+        end do
+
+        dbuf4 = 0.0_r8
+        allocate(m_ind(ntrac))
+        do m_cnst = 1, ntrac
+          m_ind(m_cnst) = m_cnst
+        end do
+        call analytic_ic_set_ic(vcoord, latvals, lonvals, glob_ind, Q=dbuf4, m_cnst=m_ind, mask=pmask)
+        
+        ! it is more balanced to use dyn2fvm for Q than to use the "analytical" value
+        ! on the fvm grid
+        
+        do m_cnst = 2, ntrac
+          if (cnst_is_a_water_species(cnst_name(m_cnst))) cycle
+          do ie = 1, nelemd
+            indx = 1
+            do j = 1, nc
+              do i = 1, nc
+                dyn_in%fvm(ie)%c(i,j,:,m_cnst) = dbuf4(indx, :, ie, m_cnst)
+                indx = indx + 1
+              end do
+            end do
+          end do
+        end do
+        deallocate(dbuf4)
+        deallocate(m_ind)
+        deallocate(latvals)
+        deallocate(lonvals)
+        deallocate(glob_ind)
+        deallocate(pmask)
+      end if
+
+
+      
       if(par%masterproc) then
          write(iulog,*) 'FVM tracers, FVM pressure variables and se_area_sphere initialized.'
       end if
