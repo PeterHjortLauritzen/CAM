@@ -566,7 +566,7 @@ contains
       do k=1,nlev
         press = pmid(k)
 !        scale1 = 0.5_r8*(1.0_r8+tanh(2.0_r8*log(0.1_r8/press)))!stable
-        scale1        = 0.5_r8*(1.0_r8+tanh(2.0_r8*log(pmid(9)/press)))!
+        scale1        = 0.5_r8*(1.0_r8+tanh(2.0_r8*log(pmid(10)/press)))!
         nu_div_lev(k) = (1.0_r8-scale1)*nu_div+scale1*nu_div_max
         nu_lev(k)     = (1.0_r8-scale1)*nu    +scale1*nu_max
         nu_s_lev(k)   = (1.0_r8-scale1)*nu_p  +scale1*nu_max
