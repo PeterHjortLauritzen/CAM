@@ -554,14 +554,23 @@ contains
     if (nu_q<0) nu_q = nu_p ! necessary for consistency
     if (nu_s<0) nu_s = nu_p ! temperature damping is always equal to nu_p
 
+    nu_div_lev(:) = nu_div
+    nu_lev(:)     = nu
+    nu_s_lev(:)   = nu_p
+    
     if (ptop>100.0_r8) then
       !
       ! CAM setting
       !
-      nu_div_lev(:) = nu_div
-      nu_lev(:)     = nu
-      nu_lev(:)     = nu 
-      nu_s_lev(:)   = nu_p
+      nu_div_max =  4.5_r8*nu_p
+      do k=1,nlev
+        press = pmid(k)
+        scale1        = 0.5_r8*(1.0_r8+tanh(2.0_r8*log(pmid(3)/press)))!
+        nu_div_lev(k) = (1.0_r8-scale1)*nu_div+scale1*nu_div_max
+
+        if (hybrid%masterthread) write(iulog,*) "nu_s_lev     =",k,nu_s_lev(k)
+        if (hybrid%masterthread) write(iulog,*) "nu,nu_div_lev=",k,nu_lev(k),nu_div_lev(k)
+      end do
     else
       !
       ! high top setting
@@ -571,7 +580,6 @@ contains
       nu_div_max =  7.5_r8*nu_p
       do k=1,nlev
         press = pmid(k)
-!        scale1 = 0.5_r8*(1.0_r8+tanh(2.0_r8*log(0.1_r8/press)))!stable
         scale1        = 0.5_r8*(1.0_r8+tanh(2.0_r8*log(pmid(10)/press)))!
         nu_div_lev(k) = (1.0_r8-scale1)*nu_div+scale1*nu_div_max
         nu_lev(k)     = (1.0_r8-scale1)*nu    +scale1*nu_max

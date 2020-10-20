@@ -2573,7 +2573,7 @@
 
 <se_hypervis_scaling se_refined_mesh="1" hypervis_type="tensor" >3.0D0 </se_hypervis_scaling>
 
-<se_hypervis_subcycle                                            > 3 </se_hypervis_subcycle>
+<se_hypervis_subcycle                                            > 4 </se_hypervis_subcycle>
 <se_hypervis_subcycle  waccm_phys="1"                            > 2 </se_hypervis_subcycle>
 <se_hypervis_subcycle  hgrid="ne16np4"                           > 4 </se_hypervis_subcycle>
 <se_hypervis_subcycle  se_refined_mesh="1"                       > 2 </se_hypervis_subcycle>
