@@ -990,7 +990,7 @@ end subroutine check_energy_get_integrals
         end do
       end do
       call outfld(name_out1  ,mr, pcols,lchnk   )
-      call outfld(name_out1  ,mo, pcols,lchnk   )
+      call outfld(name_out2  ,mo, pcols,lchnk   )
     end if
   end subroutine calc_te_and_aam_budgets
 
