@@ -620,9 +620,6 @@ contains
       write(iulog,*) rk_str
       write(iulog,'(a)') '   * Spectral-element advection uses SSP preservation RK3'
       write(iulog,'(a)') '   * Viscosity operators use forward Euler'
-      if (ntrac>0) then
-        write(iulog,'(a)') '   * CSLAM uses two time-levels backward trajectory method'
-      end if
     end if
     S_laplacian = 2.0_r8 !using forward Euler for sponge diffusion
     S_hypervis  = 2.0_r8 !using forward Euler for hyperviscosity

@@ -738,7 +738,7 @@ subroutine derived_phys_dry(phys_state, phys_tend, pbuf2d)
    ! Finally compute energy and water column integrals of the physics input state.
 
    use constituents,  only: qmin
-   use physconst,     only: cpair, cpairv, gravit, zvir, cappa, rairv, physconst_update
+   use physconst,     only: cpair, cpairv, gravit, zvir, cappav, rairv, physconst_update
    use shr_const_mod, only: shr_const_rwv
    use phys_control,  only: waccmx_is
    use geopotential,  only: geopotential_t
@@ -853,11 +853,6 @@ subroutine derived_phys_dry(phys_state, phys_tend, pbuf2d)
       do k = 1, nlev
          do i = 1, ncol
             phys_state(lchnk)%rpdel(i,k)  = 1._r8/phys_state(lchnk)%pdel(i,k)
-            !
-            ! CHECK - use cappav here?
-            !           
-            phys_state(lchnk)%exner (i,k) = (phys_state(lchnk)%pint(i,pver+1) &
-                                            / phys_state(lchnk)%pmid(i,k))**cappa
          end do
       end do
 
@@ -919,6 +914,14 @@ subroutine derived_phys_dry(phys_state, phys_tend, pbuf2d)
       else
         zvirv(:,:) = zvir
       endif
+
+      do k = 1, nlev
+         do i = 1, ncol           
+            phys_state(lchnk)%exner (i,k) = (phys_state(lchnk)%pint(i,pver+1) &
+                                            / phys_state(lchnk)%pmid(i,k))**cappav(i,k,lchnk)
+         end do
+      end do
+
 
       ! Compute initial geopotential heights - based on full pressure
       call geopotential_t (phys_state(lchnk)%lnpint, phys_state(lchnk)%lnpmid  , phys_state(lchnk)%pint  , &
