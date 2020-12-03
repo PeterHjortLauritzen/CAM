@@ -1046,17 +1046,6 @@ contains
                    vtens(i,j,:,k,ie)
               elem(ie)%state%T(i,j,k,nt)=elem(ie)%state%T(i,j,k,nt) &
                    +ttens(i,j,k,ie)
-
-!xxx              v1new=elem(ie)%state%v(i,j,1,k,nt)
-!xxx              v2new=elem(ie)%state%v(i,j,2,k,nt)
-!xxx              v1   =elem(ie)%state%v(i,j,1,k,nt)- vtens(i,j,1,k,ie)
-!xxx              v2   =elem(ie)%state%v(i,j,2,k,nt)- vtens(i,j,2,k,ie)
-              !
-              ! frictional heating
-              !
-!xxx              heating = 0.5_r8*(v1new*v1new+v2new*v2new-(v1*v1+v2*v2))
-!xxx              elem(ie)%state%T(i,j,k,nt)=elem(ie)%state%T(i,j,k,nt) &
-!xxx                   -heating*inv_cp_full(i,j,k,ie)
             enddo
           enddo
         enddo
