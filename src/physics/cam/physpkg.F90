@@ -1293,7 +1293,11 @@ contains
     use cam_snapshot,       only: cam_snapshot_all_outfld_tphysac
     use cam_snapshot,       only: cam_snapshot_ptend_outfld
     use lunar_tides,        only: lunar_tides_tend
-
+#define te_analysis
+#ifdef te_analysis
+    use cam_history,    only: outfld
+    use physconst,    only: cpair
+#endif
     !
     ! Arguments
     !
@@ -1679,7 +1683,41 @@ contains
     end if
 
     call calc_te_and_aam_budgets(state, 'pAP')
+#ifdef te_analysis
+    call outfld('SE_AP1',state%te_cur_diag(:,1), pcols   ,lchnk   )
+    call outfld('KE_AP1',ztodt*tend%te_tnd_diag(:,1) , pcols   ,lchnk   )
+    call outfld('SE_AP2',state%te_cur_diag(:,2), pcols   ,lchnk   )
+    call outfld('KE_AP2',ztodt*tend%te_tnd_diag(:,2) , pcols   ,lchnk   )
+    call outfld('SE_AP3',state%te_cur_diag(:,3), pcols   ,lchnk   )
+    call outfld('KE_AP3',ztodt*tend%te_tnd_diag(:,3) , pcols   ,lchnk   )
+    call outfld('SE_AP4',state%te_cur_diag(:,4), pcols   ,lchnk   )
+    call outfld('KE_AP4',ztodt*tend%te_tnd_diag(:,4) , pcols   ,lchnk   )
+    call outfld('SE_AP5',state%te_cur_diag(:,5), pcols   ,lchnk   )
+    call outfld('KE_AP5',ztodt*tend%te_tnd_diag(:,5) , pcols   ,lchnk   )
+    call outfld('SE_AP6',state%te_cur_diag(:,6), pcols   ,lchnk   )
+    call outfld('KE_AP6',ztodt*tend%te_tnd_diag(:,6) , pcols   ,lchnk   )
+    call outfld('SE_AP7',state%te_cur_diag(:,7), pcols   ,lchnk   )
+    call outfld('KE_AP7',ztodt*tend%te_tnd_diag(:,7) , pcols   ,lchnk   )
+    call outfld('SE_AP8',state%te_cur_diag(:,8), pcols   ,lchnk   )
+    call outfld('KE_AP8',ztodt*tend%te_tnd_diag(:,8) , pcols   ,lchnk   )
+    call outfld('SE_AP9',state%te_cur_diag(:,9), pcols   ,lchnk   )
+    call outfld('KE_AP9',ztodt*tend%te_tnd_diag(:,9) , pcols   ,lchnk   )
 
+    call outfld('FTURB',tend%te_tnd_diag(:,10), pcols   ,lchnk   ) !radiative and sensible heat flux
+    call outfld('FLAT',tend%te_tnd_diag(:,11), pcols   ,lchnk   )  !latent heat flux terms
+    call outfld('FLATE',tend%te_tnd_diag(:,13), pcols   ,lchnk   )  !latent heat flux terms
+    call outfld('FLATP',tend%te_tnd_diag(:,14), pcols   ,lchnk   )  !latent heat flux terms
+    call outfld('FH2O',tend%te_tnd_diag(:,12), pcols   ,lchnk   )  !water flux
+    call outfld('FMISS',tend%te_tnd_diag(:,12)*cam_in%ts, pcols   ,lchnk   )!missing enthalpy flux
+    call outfld('FMISS2',tend%te_tnd_diag(:,12)*state%t(:,pver), pcols   ,lchnk   )!missing enthalpy flux
+    call outfld('FKE',tend%te_tnd_diag(:,15), pcols   ,lchnk   )!kinetic energy
+    call outfld('FPHIS',tend%te_tnd_diag(:,16), pcols   ,lchnk   )!PHIS term
+    call outfld('FTAU',cam_in%wsx(:)*state%u(:,pver)+cam_in%wsy(:)*state%v(:,pver), pcols   ,lchnk   )!surfface wind stress
+
+    call outfld('WV_AP1',zero                  , pcols   ,lchnk   )
+    call outfld('WL_AP1',zero                  , pcols   ,lchnk   )
+    call outfld('WI_AP1',zero                  , pcols   ,lchnk   )
+#endif
     !---------------------------------------------------------------------------------
     ! Enforce charge neutrality after O+ change from ionos_tend
     !---------------------------------------------------------------------------------
@@ -2065,6 +2103,32 @@ contains
        call outfld( 'EFIX', flx_heat    , pcols, lchnk   )
     end if
     call calc_te_and_aam_budgets(state, 'pBP')
+#ifdef te_analysis
+    call outfld('SE_BP1',state%te_ini_diag(:,1), pcols   ,lchnk   )
+    call outfld('KE_BP1',zero                       , pcols   ,lchnk   )
+    call outfld('SE_BP2',state%te_ini_diag(:,2), pcols   ,lchnk   )
+    call outfld('KE_BP2',zero                       , pcols   ,lchnk   )
+    call outfld('SE_BP3',state%te_ini_diag(:,3), pcols   ,lchnk   )
+    call outfld('KE_BP3',zero                       , pcols   ,lchnk   )
+    call outfld('SE_BP4',state%te_ini_diag(:,4), pcols   ,lchnk   )
+    call outfld('KE_BP4',zero                       , pcols   ,lchnk   )
+    call outfld('SE_BP5',state%te_ini_diag(:,5), pcols   ,lchnk   )
+    call outfld('KE_BP5',zero                       , pcols   ,lchnk   )
+    call outfld('SE_BP6',state%te_ini_diag(:,6), pcols   ,lchnk   )
+    call outfld('KE_BP6',zero                       , pcols   ,lchnk   )
+    call outfld('SE_BP7',state%te_ini_diag(:,7), pcols   ,lchnk   )
+    call outfld('KE_BP7',zero                       , pcols   ,lchnk   )
+    call outfld('SE_BP8',state%te_ini_diag(:,8), pcols   ,lchnk   )
+    call outfld('KE_BP8',zero                       , pcols   ,lchnk   )
+    call outfld('SE_BP9',state%te_ini_diag(:,9), pcols   ,lchnk   )
+    call outfld('KE_BP9',zero                       , pcols   ,lchnk   )
+
+
+    call outfld('WV_BP1',zero                       , pcols   ,lchnk   )
+    call outfld('WL_BP1',zero                       , pcols   ,lchnk   )
+    call outfld('WI_BP1',zero                       , pcols   ,lchnk   )
+#endif
+
     ! Save state for convective tendency calculations.
     call diag_conv_tend_ini(state, pbuf)
 

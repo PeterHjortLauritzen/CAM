@@ -51,7 +51,10 @@ module physics_types
   public physics_tend_dealloc  ! deallocate individual components within tend
   public physics_ptend_alloc   ! allocate individual components within tend
   public physics_ptend_dealloc ! deallocate individual components within tend
-
+#define te_analysis
+#ifdef te_analysis
+  integer, parameter :: num_te=18
+#endif
 !-------------------------------------------------------------------------------
   type physics_state
      integer                                     :: &
@@ -99,6 +102,16 @@ module physics_types
           te_cur,  &! vertically integrated total (kinetic + static) energy of current state
           tw_ini,  &! vertically integrated total water of initial state
           tw_cur    ! vertically integrated total water of new state
+#define te_analysis
+#ifdef te_analysis
+     real(r8), dimension(:,:),allocatable          :: &
+          te_ini_diag,  &! vertically integrated total (kinetic + static) energy of initial state
+          te_cur_diag,  &! vertically integrated total (kinetic + static) energy of current state
+          tw_ini_diag,  &! vertically integrated total water of initial state
+          tw_cur_diag    ! vertically integrated total water of new state
+     real(r8), dimension(:,:,:)  ,allocatable          :: h2O_diag
+     real(r8), dimension(:,:,:,:),allocatable          :: m_diag
+#endif
      integer :: count ! count of values with significant energy or water imbalances
      integer, dimension(:),allocatable           :: &
           latmapback, &! map from column to unique lat for that column
@@ -119,6 +132,11 @@ module physics_types
      real(r8), dimension(:),  allocatable        :: &
           te_tnd,  &! cumulative boundary flux of total energy
           tw_tnd    ! cumulative boundary flux of total water
+#ifdef te_analysis
+     real(r8), dimension(:,:),  allocatable        :: &
+          te_tnd_diag,  &! cumulative boundary flux of total energy
+          tw_tnd_diag    ! cumulative boundary flux of total water
+#endif
   end type physics_tend
 
 !-------------------------------------------------------------------------------
@@ -1300,6 +1318,17 @@ end subroutine physics_ptend_copy
        state_out%te_cur(i) = state_in%te_cur(i)
        state_out%tw_ini(i) = state_in%tw_ini(i)
        state_out%tw_cur(i) = state_in%tw_cur(i)
+#define te_analysis
+#ifdef te_analysis
+       state_out%te_ini_diag(i,:) = state_in%te_ini_diag(i,:)
+       state_out%te_cur_diag(i,:) = state_in%te_cur_diag(i,:)
+       state_out%tw_ini_diag(i,:) = state_in%tw_ini_diag(i,:)
+       state_out%tw_cur_diag(i,:) = state_in%tw_cur_diag(i,:)
+       do k = 1, pver
+         state_out%h2O_diag(i,k,:) = state_in%h2O_diag(i,k,:)
+         state_out%m_diag(i,k,:,:) = state_in%m_diag(i,k,:,:)
+       end do
+#endif
     end do
 
     do k = 1, pver
@@ -1379,7 +1408,11 @@ end subroutine physics_ptend_copy
     tend%flx_net = 0._r8
     tend%te_tnd  = 0._r8
     tend%tw_tnd  = 0._r8
-
+#define te_analysis
+#ifdef te_analysis
+    tend%te_tnd_diag  = 0._r8
+    tend%tw_tnd_diag  = 0._r8
+#endif
 end subroutine physics_tend_init
 
 !===============================================================================
@@ -1586,6 +1619,26 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
 
   allocate(state%tw_cur(psetcols), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%tw_cur')
+#define te_diags
+#ifdef te_diags
+  allocate(state%te_ini_diag(psetcols,num_te), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%te_ini')
+
+  allocate(state%te_cur_diag(psetcols,num_te), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%te_cur')
+
+  allocate(state%tw_ini_diag(psetcols,num_te), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%tw_ini')
+
+  allocate(state%tw_cur_diag(psetcols,num_te), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%tw_cur')
+
+  allocate(state%h2O_diag(psetcols,pver,num_te), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%h2O_diag')
+
+  allocate(state%m_diag(psetcols,pver,6,2), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%m_diag')
+#endif
 
   allocate(state%latmapback(psetcols), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%latmapback')
@@ -1630,7 +1683,15 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   state%te_cur(:) = inf
   state%tw_ini(:) = inf
   state%tw_cur(:) = inf
-
+#define te_analysis
+#ifdef te_analysis
+  state%te_ini_diag(:,:) = inf
+  state%te_cur_diag(:,:) = inf
+  state%tw_ini_diag(:,:) = inf
+  state%tw_cur_diag(:,:) = inf
+  state%h2O_diag(:,:,:)  = inf
+  state%m_diag(:,:,:,:)  = inf
+#endif
 end subroutine physics_state_alloc
 
 !===============================================================================
@@ -1737,7 +1798,26 @@ subroutine physics_state_dealloc(state)
 
   deallocate(state%tw_cur, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%tw_cur')
+#define te_analysis
+#ifdef te_analysis
+  deallocate(state%te_ini_diag, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%te_ini_diag')
 
+  deallocate(state%te_cur_diag, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%te_cur_diag')
+
+  deallocate(state%tw_ini_diag, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%tw_ini_diag')
+
+  deallocate(state%tw_cur_diag, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%tw_cur_diag')
+
+  deallocate(state%h2O_diag, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%h2O_diag')
+
+  deallocate(state%m_diag, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%m_diag')
+#endif
   deallocate(state%latmapback, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%latmapback')
 
@@ -1781,6 +1861,14 @@ subroutine physics_tend_alloc(tend,psetcols)
 
   allocate(tend%tw_tnd(psetcols), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%tw_tnd')
+#define te_analysis
+#ifdef te_analysis
+  allocate(tend%te_tnd_diag(psetcols,num_te), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%te_tnd')
+
+  allocate(tend%tw_tnd_diag(psetcols,num_te), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%tw_tnd')
+#endif
 
   tend%dtdt(:,:) = inf
   tend%dudt(:,:) = inf
@@ -1788,7 +1876,10 @@ subroutine physics_tend_alloc(tend,psetcols)
   tend%flx_net(:) = inf
   tend%te_tnd(:) = inf
   tend%tw_tnd(:) = inf
-
+#ifdef te_analysis
+  tend%te_tnd_diag(:,:) = inf
+  tend%tw_tnd_diag(:,:) = inf
+#endif
 end subroutine physics_tend_alloc
 
 !===============================================================================
@@ -1817,6 +1908,14 @@ subroutine physics_tend_dealloc(tend)
 
   deallocate(tend%tw_tnd, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%tw_tnd')
+#define te_analysis
+#ifdef te_analysis
+  deallocate(tend%te_tnd_diag, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%te_tnd_diag')
+
+  deallocate(tend%tw_tnd_diag, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%tw_tnd_diag')
+#endif
 end subroutine physics_tend_dealloc
 
 !===============================================================================

@@ -1,4 +1,5 @@
-
+#define ref_liq
+#define te_analysis
 module check_energy
 
 !---------------------------------------------------------------------------------
@@ -26,6 +27,9 @@ module check_energy
 
   use gmean_mod,       only: gmean
   use physconst,       only: gravit, latvap, latice, cpair, cpairv
+#ifdef te_analysis
+  use physconst,       only: cpliq,cpice,cpwv
+#endif
   use physics_types,   only: physics_state, physics_tend, physics_ptend, physics_ptend_init
   use constituents,    only: cnst_get_ind, pcnst, cnst_name, cnst_get_type_byind
   use time_manager,    only: is_first_step
@@ -234,6 +238,15 @@ end subroutine check_energy_get_integrals
     integer :: ixcldice, ixcldliq                  ! CLDICE and CLDLIQ indices
     integer :: ixrain, ixsnow                      ! RAINQM and SNOWQM indices
     integer :: ixgrau                              ! GRAUQM index
+#ifdef te_analysis
+    integer :: idx
+    real(r8):: pdel,ps(pcols)
+!    if (masterproc) then
+!      write(iulog,*) "phl latvap, latice: ",latvap, latice
+!      write(iulog,*) "phl cpair,cpwv :     ",cpair,cpwv
+!      write(iulog,*) "phl cpliq,cpice:     ",cpliq,cpice
+!    end if
+#endif
 !-----------------------------------------------------------------------
 
     lchnk = state%lchnk
@@ -323,6 +336,508 @@ end subroutine check_energy_get_integrals
     if (is_first_step()) then
        call pbuf_set_field(pbuf, teout_idx, state%te_ini, col_type=col_type)
     end if
+#define te_analysis
+#ifdef te_analysis
+    !
+    !**************************************************************************************************
+    !
+    ! CAM DEFAULT ENERGY COMPUTATION
+    !
+    !**************************************************************************************************
+    idx=1
+    !
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+    wv = 0._r8
+    wl = 0._r8
+    wi = 0._r8
+    do k = 1, pver
+       do i = 1, ncol
+          wv(i) = wv(i) +         state%q(i,k,1)                    *state%pdel(i,k)/gravit
+          state%h2O_diag(i,k,idx) = state%q(i,k,1)
+       end do
+    end do
+    ! Don't require cloud liq/ice to be present.  Allows for adiabatic/ideal phys.
+    if (ixcldliq > 1  .and.  ixcldice > 1) then
+       do k = 1, pver
+          do i = 1, ncol
+             wl(i) = wl(i) + state%q(i,k,ixcldliq)*state%pdel(i,k)/gravit
+             wi(i) = wi(i) + state%q(i,k,ixcldice)*state%pdel(i,k)/gravit
+!             state%h2O_diag(i,k,idx) = state%h2O_diag(i,k,idx)+state%q(i,k,ixcldliq)+state%q(i,k,ixcldice)
+          end do
+       end do
+    end if
+
+    ! Don't require precip either, if microphysics doesn't add it.
+    if (ixrain > 1  .and.  ixsnow > 1) then
+       do k = 1, pver
+          do i = 1, ncol
+             wl(i) = wl(i) + state%q(i,k,ixrain)*state%pdel(i,k)/gravit
+             wi(i) = wi(i) + state%q(i,k,ixsnow)*state%pdel(i,k)/gravit
+!             state%h2O_diag(i,k,idx) = state%h2O_diag(i,k,idx)+state%q(i,k,ixrain)+state%q(i,k,ixsnow)
+          end do
+       end do
+    end if
+
+    ! Don't require graupel/hail either, if microphysics doesn't add it.
+    if (ixgrau > 1) then
+       do k = 1, pver
+          do i = 1, ncol
+             wi(i) = wi(i) + state%q(i,k,ixgrau)*state%pdel(i,k)/gravit
+!             state%h2O_diag(i,k,idx) = state%h2O_diag(i,k,idx)+state%q(i,k,ixgrau)
+          end do
+       end do
+    end if
+
+    do k = 1, pver
+       do i = 1, ncol
+          ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*state%pdel(i,k)/gravit
+          se(i) = se(i) +         state%t(i,k)*cpairv_loc(i,k,lchnk)*state%pdel(i,k)/gravit
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*state%ps(i)/gravit
+    end do
+
+! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + (latvap+latice)*wv(i) + latice*wl(i)
+       state%tw_ini_diag(i,idx) = wv(i) + wl(i) + wi(i)
+
+       state%te_cur_diag(i,idx) = state%te_ini_diag(i,idx)
+       state%tw_cur_diag(i,idx) = state%tw_ini_diag(i,idx)
+    end do
+    !
+    !==================================================================================================================================
+    !
+    ! COMPUTE DRY MIXING RATIOS
+    !
+    !==================================================================================================================================
+    !
+    state%m_diag = 0.0_r8
+    do k = 1, pver
+       do i = 1, ncol
+          state%m_diag(i,k,1,1) = state%q(i,k,1)/(1.0_r8-state%h2O_diag(i,k,1))
+       end do
+    end do
+    ! Don't require cloud liq/ice to be present.  Allows for adiabatic/ideal phys.
+    if (ixcldliq > 1  .and.  ixcldice > 1) then
+       do k = 1, pver
+          do i = 1, ncol
+            state%m_diag(i,k,2,1) = state%q(i,k,ixcldliq)/(1.0_r8-state%h2O_diag(i,k,1))
+            state%m_diag(i,k,3,1) = state%q(i,k,ixcldice)/(1.0_r8-state%h2O_diag(i,k,1))
+          end do
+       end do
+    end if
+
+    ! Don't require precip either, if microphysics doesn't add it.
+    if (ixrain > 1  .and.  ixsnow > 1) then
+       do k = 1, pver
+          do i = 1, ncol
+            state%m_diag(i,k,4,1) = state%q(i,k,ixrain)/(1.0_r8-state%h2O_diag(i,k,1))
+            state%m_diag(i,k,5,1) = state%q(i,k,ixsnow)/(1.0_r8-state%h2O_diag(i,k,1))
+          end do
+       end do
+    end if
+
+    ! Don't require graupel/hail either, if microphysics doesn't add it.
+    if (ixgrau > 1) then
+       do k = 1, pver
+          do i = 1, ncol
+            state%m_diag(i,k,6,1) = state%q(i,k,ixgrau)/(1.0_r8-state%h2O_diag(i,k,1))
+          end do
+       end do
+    end if
+    !
+    !
+    !
+
+    !
+    !**************************************************************************************************
+    !
+    ! CAM DEFAULT ENERGY COMPUTATION USING (57)
+    !
+    !**************************************************************************************************
+    idx=2
+    !
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+
+    ps(:) = 0.0_r8
+    do k = 1, pver
+       do i = 1, ncol
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:1,1)))*state%pdeldry(i,k)/gravit
+         ps(i) = ps(i)+pdel
+         ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
+         se(i) = se(i) +         state%t(i,k)*cpairv_loc(i,k,lchnk)*pdel
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+#ifdef ref_wv
+       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+       state%tw_ini_diag(i,idx) = wv(i) + wl(i) + wi(i)
+
+       state%te_cur_diag(i,idx) = state%te_ini_diag(i,idx)
+       state%tw_cur_diag(i,idx) = state%tw_ini_diag(i,idx)
+    end do
+    !
+    !**************************************************************************************************
+    !
+    ! CAM DEFAULT ENERGY COMPUTATION USING (57) + cpwv
+    !
+    !**************************************************************************************************
+    idx=3
+    !
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+
+    ps(:) = 0.0_r8
+    do k = 1, pver
+       do i = 1, ncol
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:1,1)))*state%pdeldry(i,k)/gravit
+         ps(i) = ps(i)+pdel
+         ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
+         se(i) = se(i) +         state%t(i,k)*cpair*state%pdeldry(i,k)/gravit !dry air
+         se(i) = se(i) +         state%t(i,k)*cpwv*state%m_diag(i,k,1,1)*state%pdeldry(i,k)/gravit !water vapor
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+#ifdef ref_wv
+       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+!       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i)+&
+!            (SUM(state%pdeldry(i,1:pver))+wv(i)+wl(i)+wi(i))*(latice+latvap)
+       state%tw_ini_diag(i,idx) = wv(i) + wl(i) + wi(i)
+
+       state%te_cur_diag(i,idx) = state%te_ini_diag(i,idx)
+       state%tw_cur_diag(i,idx) = state%tw_ini_diag(i,idx)
+    end do
+
+    !
+    !**************************************************************************************************
+    !
+    ! CAM DEFAULT ENERGY COMPUTATION USING (57) BUT INCL. ALL FORMS OF WATER IN PDEL
+    !
+    !**************************************************************************************************
+    idx=4
+    !
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+ 
+    ps(:) = 0.0_r8
+    do k = 1, pver
+       do i = 1, ncol
+         ! sum over all water species
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:6,1)))*state%pdeldry(i,k)/gravit
+         ps(i) = ps(i)+pdel
+          ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
+          se(i) = se(i) +         state%t(i,k)*cpairv_loc(i,k,lchnk)*pdel
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+#ifdef ref_wv
+       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+!       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i)+&
+!                        (SUM(state%pdeldry(i,1:pver))+wv(i)+wl(i)+wi(i))*(latice+latvap)!(latvap+latice)*wv(i) + latice*wl(i)
+       state%tw_ini_diag(i,idx) = wv(i) + wl(i) + wi(i)
+
+       state%te_cur_diag(i,idx) = state%te_ini_diag(i,idx)
+       state%tw_cur_diag(i,idx) = state%tw_ini_diag(i,idx)
+    end do
+
+    !
+    !**************************************************************************************************
+    !
+    ! idx=5 CAM DEFAULT ENERGY COMPUTATION USING (57) BUT INCL. ALL FORMS OF WATER IN PDEL JUST FOR K
+    !
+    !**************************************************************************************************
+    idx=5
+    !
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+
+    ps(:) = 0.0_r8
+    do k = 1, pver
+       do i = 1, ncol
+         ! sum over all water species
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:1,1)))*state%pdeldry(i,k)/gravit
+         ps(i)=ps(i)+pdel
+         se(i) = se(i) +         state%t(i,k)*cpair*pdel         
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:6,1)))*state%pdeldry(i,k)/gravit         
+         ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel         
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+#ifdef ref_wv
+       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+!       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i)+&
+!                        (SUM(state%pdeldry(i,1:pver))+wv(i)+wl(i)+wi(i))*(latice+latvap)!(latvap+latice)*wv(i) + latice*wl(i)
+       state%tw_ini_diag(i,idx) = wv(i) + wl(i) + wi(i)
+
+       state%te_cur_diag(i,idx) = state%te_ini_diag(i,idx)
+       state%tw_cur_diag(i,idx) = state%tw_ini_diag(i,idx)
+    end do    !
+    !
+    !**************************************************************************************************
+    !
+    ! idx=6 CAM DEFAULT ENERGY COMPUTATION USING (57) BUT INCL. ALL FORMS OF WATER IN PDEL JUST FOR CPT
+    !
+    !**************************************************************************************************
+    idx=6
+    !
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+
+    ps(:) = 0.0_r8
+    do k = 1, pver
+      do i = 1, ncol
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:1,1)))*state%pdeldry(i,k)/gravit
+         ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel        
+         ps(i)=ps(i)+pdel
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:6,1)))*state%pdeldry(i,k)/gravit                  
+         se(i) = se(i) +         state%t(i,k)*cpair*pdel                  
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+#ifdef ref_wv
+       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+!       state%te_ini_diag(i,idx) =   - latvap*wl(i) - (latice+latvap)*wi(i)+&
+!                        (SUM(state%pdeldry(i,1:pver))+wv(i)+wl(i)+wi(i))*(latice+latvap)!(latvap+latice)*wv(i) + latice*wl(i)
+!       state%tw_ini_diag(i,idx) = wv(i) + wl(i) + wi(i)
+
+       state%te_cur_diag(i,idx) = state%te_ini_diag(i,idx)
+       state%tw_cur_diag(i,idx) = state%tw_ini_diag(i,idx)
+    end do
+
+    !
+    !**************************************************************************************************
+    !
+    ! idx=7 CAM DEFAULT ENERGY COMPUTATION  BUT INCL. ALL FORMS OF WATER IN PDEL JUST FOR PHIS
+    !
+    !**************************************************************************************************
+    idx=7
+    !
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+
+    ps(:) = 0.0_r8
+    do k = 1, pver
+       do i = 1, ncol
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:1,1)))*state%pdeldry(i,k)/gravit
+         ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel        
+         se(i) = se(i) +         state%t(i,k)*cpair*pdel  
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:6,1)))*state%pdeldry(i,k)/gravit                  
+         ps(i)=ps(i)+pdel
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+#ifdef ref_wv
+       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+!       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i)+&
+!                        (SUM(state%pdeldry(i,1:pver))+wv(i)+wl(i)+wi(i))*(latice+latvap)!(latvap+latice)*wv(i) + latice*wl(i)
+       state%tw_ini_diag(i,idx) = wv(i) + wl(i) + wi(i)
+
+       state%te_cur_diag(i,idx) = state%te_ini_diag(i,idx)
+       state%tw_cur_diag(i,idx) = state%tw_ini_diag(i,idx)
+    end do
+    !
+    !**************************************************************************************************
+    !
+    ! idx=8 L(T)
+    !
+    !**************************************************************************************************
+    idx=8
+    !
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+
+    ps(:) = 0.0_r8
+    do k = 1, pver
+       do i = 1, ncol
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:1,1)))*state%pdeldry(i,k)/gravit
+         ps(i) = ps(i)+pdel
+         ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
+         se(i) = se(i) +         state%t(i,k)*cpair*state%pdeldry(i,k)/gravit 
+         se(i) = se(i) +         state%t(i,k)*cpice*state%m_diag(i,k,1,1)*state%pdeldry(i,k)/gravit !water vapor
+#ifdef ref_ice
+         se(i) = se(i) + (state%m_diag(i,k,1,1)*state%pdeldry(i,k)/gravit)*&  !wv
+              ((latice+latvap)+(cpwv-cpice)*state%t(i,k)) !assume T_00=0, h^ice_00=0
+         se(i) = se(i) + ((state%m_diag(i,k,2,1)+state%m_diag(i,k,4,1))*state%pdeldry(i,k)/gravit)*&  !cldliq
+              (latice+(cpliq-cpice)*state%t(i,k))
+#endif
+!xxx other ref states missing
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+#ifdef ref_wv
+       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+!       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i)+&
+!                        (SUM(state%pdeldry(i,1:pver))+wv(i)+wl(i)+wi(i))*(latice+latvap)!(latvap+latice)*wv(i) + latice*wl(i)
+       state%tw_ini_diag(i,idx) = wv(i) + wl(i) + wi(i)
+
+       state%te_cur_diag(i,idx) = state%te_ini_diag(i,idx)
+       state%tw_cur_diag(i,idx) = state%tw_ini_diag(i,idx)
+     end do
+         !
+    !**************************************************************************************************
+    !
+    ! idx=9 CAM DEFAULT ENERGY COMPUTATION USING (57)
+    !
+    !**************************************************************************************************
+    idx=9
+    !
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+
+    ps(:) = 0.0_r8
+    do k = 1, pver
+       do i = 1, ncol
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:1,1)))*state%pdeldry(i,k)/gravit
+         ps(i) = ps(i)+pdel
+          ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
+          se(i) = se(i) +         state%t(i,k)*cpairv_loc(i,k,lchnk)*pdel
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+#ifdef ref_wv
+       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       state%te_ini_diag(i,idx) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+!       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i)+&
+!                        (SUM(state%pdeldry(i,1:pver))+wv(i)+wl(i)+wi(i))*(latice+latvap)!(latvap+latice)*wv(i) + latice*wl(i)
+       state%tw_ini_diag(i,idx) = wv(i) + wl(i) + wi(i)
+
+       state%te_cur_diag(i,idx) = state%te_ini_diag(i,idx)
+       state%tw_cur_diag(i,idx) = state%tw_ini_diag(i,idx)
+    end do
+ 
+!**************************************************************************************************
+!
+! wrap-up stuff - same for all cases
+!
+!**************************************************************************************************
+
+! zero cummulative boundary fluxes
+    tend%te_tnd_diag(:ncol,:) = 0._r8
+    tend%tw_tnd_diag(:ncol,:) = 0._r8
+
+! initialize physics buffer
+    if (is_first_step()) then
+!      do i=1,SIZE(state%te_ini_diag(1,:))
+!       call pbuf_set_field(pbuf, teout_idx, state%te_ini_diag(:,i), col_type=col_type) !leads to error
+!     end do
+    end if
+#endif
 
     deallocate(cpairv_loc)
 
@@ -384,6 +899,11 @@ end subroutine check_energy_get_integrals
     integer :: ixcldice, ixcldliq                  ! CLDICE and CLDLIQ indices
     integer :: ixrain, ixsnow                      ! RAINQM and SNOWQM indices
     integer :: ixgrau                              ! GRAUQM index
+#define te_analysis
+#ifdef te_analysis
+    integer :: idx
+    real(r8):: pdel,ps(pcols)
+#endif
 !-----------------------------------------------------------------------
 
     lchnk = state%lchnk
@@ -518,7 +1038,706 @@ end subroutine check_energy_get_integrals
        state%te_cur(i) = te(i)
        state%tw_cur(i) = tw(i)
     end do
+#define te_diags
+#ifdef te_diags
+    !
+    !**************************************************************************************************
+    !
+    ! CAM DEFAULT ENERGY COMPUTATION
+    !
+    !**************************************************************************************************
+    idx=1
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+    wv = 0._r8
+    wl = 0._r8
+    wi = 0._r8
+    do k = 1, pver
+      do i = 1, ncol
+        wv(i) = wv(i) +         state%q(i,k,1)*state%pdel(i,k)/gravit
+      end do
+    end do
+    ! Don't require cloud liq/ice to be present.  Allows for adiabatic/ideal phys.
+    if (ixcldliq > 1  .and.  ixcldice > 1) then
+       do k = 1, pver
+          do i = 1, ncol
+             wl(i) = wl(i) + state%q(i,k,ixcldliq)*state%pdel(i,k)/gravit
+             wi(i) = wi(i) + state%q(i,k,ixcldice)*state%pdel(i,k)/gravit
+          end do
+       end do
+    end if
 
+    ! Don't require precip either, if microphysics doesn't add it.
+    if (ixrain > 1  .and.  ixsnow > 1) then
+       do k = 1, pver
+          do i = 1, ncol
+             wl(i) = wl(i) + state%q(i,k,ixrain)*state%pdel(i,k)/gravit
+             wi(i) = wi(i) + state%q(i,k,ixsnow)*state%pdel(i,k)/gravit
+          end do
+       end do
+    end if
+
+    ! Don't require graupel/hail either, if microphysics doesn't add it.
+    if (ixgrau > 1) then
+       do k = 1, pver
+          do i = 1, ncol
+             wi(i) = wi(i) + state%q(i,k,ixgrau)*state%pdel(i,k)/gravit
+          end do
+       end do
+    end if
+
+    do k = 1, pver
+       do i = 1, ncol
+          ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*state%pdel(i,k)/gravit
+          se(i) = se(i) +         state%t(i,k)*cpair*state%pdel(i,k)/gravit
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*state%ps(i)/gravit
+    end do
+
+
+    ! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+#ifdef ref_wv
+       te(i) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       te(i) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       te(i) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+       tw(i) = wv(i) + wl(i) + wi(i)
+    end do
+
+    ! compute expected values and tendencies
+    do i = 1, ncol
+       ! expected tendencies from boundary fluxes for last process
+#ifdef ref_wv
+       te_tnd(i) =  (flx_cnd(i) - flx_ice(i))*1000._r8*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_liq
+       te_tnd(i) = flx_vap(i)*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_ice
+! \dot{m}^{(liq)} = -(flx_cnd(i) - flx_ice(i))*1000._r8
+       te_tnd(i) = flx_vap(i)*(latvap+latice) - (flx_cnd(i) - flx_ice(i))*1000._r8*latice + flx_sen(i)
+#endif
+       tw_tnd(i) = flx_vap(i) - flx_cnd(i) *1000._r8
+
+       ! cummulative tendencies from boundary fluxes
+       tend%te_tnd_diag(i,idx) = tend%te_tnd_diag(i,idx) + te_tnd(i)
+       tend%tw_tnd_diag(i,idx) = tend%tw_tnd_diag(i,idx) + tw_tnd(i)
+    end do
+
+
+    ! copy new value to state
+    do i = 1, ncol
+       state%te_cur_diag(i,idx) = te(i)
+       state%tw_cur_diag(i,idx) = tw(i)
+    end do
+    !
+    !==================================================================================================================================
+    !
+    ! COMPUTE DRY MIXING RATIOS
+    !
+    !==================================================================================================================================
+    !
+    do k = 1, pver
+       do i = 1, ncol
+          state%m_diag(i,k,1,2) = state%q(i,k,1)/(1.0_r8-state%h2O_diag(i,k,1))
+       end do
+    end do
+    ! Don't require cloud liq/ice to be present.  Allows for adiabatic/ideal phys.
+    if (ixcldliq > 1  .and.  ixcldice > 1) then
+       do k = 1, pver
+          do i = 1, ncol
+            state%m_diag(i,k,2,2) = state%q(i,k,ixcldliq)/(1.0_r8-state%h2O_diag(i,k,1))
+            state%m_diag(i,k,3,2) = state%q(i,k,ixcldice)/(1.0_r8-state%h2O_diag(i,k,1))
+          end do
+       end do
+    end if
+
+    ! Don't require precip either, if microphysics doesn't add it.
+    if (ixrain > 1  .and.  ixsnow > 1) then
+       do k = 1, pver
+          do i = 1, ncol
+            state%m_diag(i,k,4,2) = state%q(i,k,ixrain)/(1.0_r8-state%h2O_diag(i,k,1))
+            state%m_diag(i,k,5,2) = state%q(i,k,ixsnow)/(1.0_r8-state%h2O_diag(i,k,1))
+          end do
+       end do
+    end if
+
+    ! Don't require graupel/hail either, if microphysics doesn't add it.
+    if (ixgrau > 1) then
+       do k = 1, pver
+          do i = 1, ncol
+            state%m_diag(i,k,6,2) = state%q(i,k,ixgrau)/(1.0_r8-state%h2O_diag(i,k,1))
+          end do
+       end do
+    end if
+    !
+    !**************************************************************************************************
+    !
+    ! CAM DEFAULT ENERGY COMPUTATION USING MY FORMULATION
+    !
+    !**************************************************************************************************
+    idx=2
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+
+    ps = 0.0_r8
+    do k = 1, pver
+       do i = 1, ncol
+         pdel = (1.0_r8+state%m_diag(i,k,1,1))*state%pdeldry(i,k)/gravit         
+
+         ps(i)=ps(i)+pdel
+          ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
+          se(i) = se(i) +         state%t(i,k)*cpair*pdel
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+
+    ! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+       tw(i) = wv(i) + wl(i) + wi(i)
+#ifdef ref_wv
+       te(i) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       te(i) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       te(i) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+    end do
+
+    ! compute expected values and tendencies
+    do i = 1, ncol
+       ! expected tendencies from boundary fluxes for last process
+#ifdef ref_wv
+       te_tnd(i) =  (flx_cnd(i) - flx_ice(i))*1000._r8*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_liq
+       te_tnd(i) = flx_vap(i)*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_ice
+! \dot{m}^{(liq)} = -(flx_cnd(i) - flx_ice(i))*1000._r8
+       te_tnd(i) = flx_vap(i)*(latvap+latice) - (flx_cnd(i) - flx_ice(i))*1000._r8*latice + flx_sen(i)
+#endif
+       tw_tnd(i) = flx_vap(i) - flx_cnd(i) *1000._r8
+
+
+       ! cummulative tendencies from boundary fluxes
+       tend%te_tnd_diag(i,idx) = tend%te_tnd_diag(i,idx) + te_tnd(i)
+       tend%tw_tnd_diag(i,idx) = tend%tw_tnd_diag(i,idx) + tw_tnd(i)
+
+       tend%te_tnd_diag(i,10) = tend%te_tnd_diag(i,10) + flx_sen(i)
+       tend%te_tnd_diag(i,11) = tend%te_tnd_diag(i,11) + te_tnd(i)-flx_sen(i) !   (flx_cnd(i) - flx_ice(i))*1000._r8*latvap+ flx_ice(i)*1000._r8*(latice+latvap)
+       tend%te_tnd_diag(i,12) = tend%te_tnd_diag(i,12) + tw_tnd(i)
+#ifdef ref_wv
+       tend%te_tnd_diag(i,13) = tend%te_tnd_diag(i,13) + (flx_cnd(i) - flx_ice(i))*1000._r8*latvap 
+       tend%te_tnd_diag(i,14) = tend%te_tnd_diag(i,14) + flx_ice(i)*1000._r8*latice
+#endif
+#ifdef ref_liq
+       tend%te_tnd_diag(i,13) = tend%te_tnd_diag(i,13) + flx_vap(i)*latvap
+       tend%te_tnd_diag(i,14) = tend%te_tnd_diag(i,14) + flx_ice(i)*1000._r8*latice
+#endif
+#ifdef ref_ice
+       tend%te_tnd_diag(i,13) = tend%te_tnd_diag(i,13) + flx_vap(i)*(latvap+latice)
+       tend%te_tnd_diag(i,14) = tend%te_tnd_diag(i,14) - (flx_cnd(i) - flx_ice(i))*1000._r8*latice
+#endif
+       tend%te_tnd_diag(i,15) = tend%te_tnd_diag(i,15) + tw_tnd(i)*0.5_r8*(state%u(i,pver)**2 + state%v(i,pver)**2)
+       tend%te_tnd_diag(i,16) = tend%te_tnd_diag(i,16) + tw_tnd(i)*state%phis(i)
+    end do
+
+
+    ! copy new value to state
+    do i = 1, ncol
+       state%te_cur_diag(i,idx) = te(i)
+       state%tw_cur_diag(i,idx) = tw(i)
+    end do
+    !
+    !**************************************************************************************************
+    !
+    ! CAM DEFAULT ENERGY COMPUTATION USING MY FORMULATION + cpwv
+    !
+    !**************************************************************************************************
+    idx=3
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+
+    ps = 0.0_r8
+    do k = 1, pver
+       do i = 1, ncol
+         pdel = (1.0_r8+state%m_diag(i,k,1,1))*state%pdeldry(i,k)/gravit         
+
+         ps(i)=ps(i)+pdel
+          ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
+          se(i) = se(i) +         state%t(i,k)*cpair*state%pdeldry(i,k)/gravit !dry air
+          se(i) = se(i) +         state%t(i,k)*cpwv*state%m_diag(i,k,1,1)*state%pdeldry(i,k)/gravit !water vapor
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+
+    ! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+       tw(i) = wv(i) + wl(i) + wi(i)
+#ifdef ref_wv
+       te(i) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       te(i) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       te(i) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+     end do
+
+    ! compute expected values and tendencies
+    do i = 1, ncol
+       ! expected tendencies from boundary fluxes for last process
+#ifdef ref_wv
+       te_tnd(i) =  (flx_cnd(i) - flx_ice(i))*1000._r8*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_liq
+       te_tnd(i) = flx_vap(i)*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_ice
+! \dot{m}^{(liq)} = -(flx_cnd(i) - flx_ice(i))*1000._r8
+       te_tnd(i) = flx_vap(i)*(latvap+latice) - (flx_cnd(i) - flx_ice(i))*1000._r8*latice + flx_sen(i)
+#endif
+       tw_tnd(i) = flx_vap(i) - flx_cnd(i) *1000._r8
+
+       ! cummulative tendencies from boundary fluxes
+       tend%te_tnd_diag(i,idx) = tend%te_tnd_diag(i,idx) + te_tnd(i)
+       tend%tw_tnd_diag(i,idx) = tend%tw_tnd_diag(i,idx) + tw_tnd(i)
+    end do
+
+
+    ! copy new value to state
+    do i = 1, ncol
+       state%te_cur_diag(i,idx) = te(i)
+       state%tw_cur_diag(i,idx) = tw(i)
+    end do
+
+    !
+    !**************************************************************************************************
+    !
+    ! CAM DEFAULT ENERGY COMPUTATION USING (57) BUT INCL. ALL FORMS OF WATER IN PDEL
+    !
+    !**************************************************************************************************
+    idx=4
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+
+    ps = 0.0_r8
+    do k = 1, pver
+       do i = 1, ncol
+         ! sum over all water species
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:6,1)))*state%pdeldry(i,k)/gravit
+         ps(i)=ps(i)+pdel
+         ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
+         se(i) = se(i) +         state%t(i,k)*cpair*pdel
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+
+    ! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+       tw(i) = wv(i) + wl(i) + wi(i)
+#ifdef ref_wv
+       te(i) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       te(i) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       te(i) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+    end do
+
+    ! compute expected values and tendencies
+    do i = 1, ncol
+       ! expected tendencies from boundary fluxes for last process
+#ifdef ref_wv
+       te_tnd(i) =  (flx_cnd(i) - flx_ice(i))*1000._r8*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_liq
+       te_tnd(i) = flx_vap(i)*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_ice
+! \dot{m}^{(liq)} = -(flx_cnd(i) - flx_ice(i))*1000._r8
+       te_tnd(i) = flx_vap(i)*(latvap+latice) - (flx_cnd(i) - flx_ice(i))*1000._r8*latice + flx_sen(i)
+#endif
+       tw_tnd(i) = flx_vap(i) - flx_cnd(i) *1000._r8
+
+       ! cummulative tendencies from boundary fluxes
+       tend%te_tnd_diag(i,idx) = tend%te_tnd_diag(i,idx) + te_tnd(i)
+       tend%tw_tnd_diag(i,idx) = tend%tw_tnd_diag(i,idx) + tw_tnd(i)
+    end do
+
+
+    ! copy new value to state
+    do i = 1, ncol
+       state%te_cur_diag(i,idx) = te(i)
+       state%tw_cur_diag(i,idx) = tw(i)
+    end do
+
+    !
+    !**************************************************************************************************
+    !
+    ! CAM DEFAULT ENERGY COMPUTATION USING (57) BUT INCL. ALL FORMS OF WATER IN PDEL JUST FOR K    
+    !
+    !**************************************************************************************************
+    idx=5
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+
+
+    ps = 0.0_r8
+    do k = 1, pver
+       do i = 1, ncol
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:1,1)))*state%pdeldry(i,k)/gravit
+         ps(i)=ps(i)+pdel
+         se(i) = se(i) +         state%t(i,k)*cpair*pdel         
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:6,2)))*state%pdeldry(i,k)/gravit         
+         ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+
+    ! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+       tw(i) = wv(i) + wl(i) + wi(i)
+#ifdef ref_wv
+       te(i) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       te(i) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       te(i) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+    end do
+
+    ! compute expected values and tendencies
+    do i = 1, ncol
+       ! expected tendencies from boundary fluxes for last process
+#ifdef ref_wv
+       te_tnd(i) =  (flx_cnd(i) - flx_ice(i))*1000._r8*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_liq
+       te_tnd(i) = flx_vap(i)*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_ice
+! \dot{m}^{(liq)} = -(flx_cnd(i) - flx_ice(i))*1000._r8
+       te_tnd(i) = flx_vap(i)*(latvap+latice) - (flx_cnd(i) - flx_ice(i))*1000._r8*latice + flx_sen(i)
+#endif
+       tw_tnd(i) = flx_vap(i) - flx_cnd(i) *1000._r8
+
+       ! cummulative tendencies from boundary fluxes
+       tend%te_tnd_diag(i,idx) = tend%te_tnd_diag(i,idx) + te_tnd(i)
+       tend%tw_tnd_diag(i,idx) = tend%tw_tnd_diag(i,idx) + tw_tnd(i)
+    end do
+
+
+    ! copy new value to state
+    do i = 1, ncol
+       state%te_cur_diag(i,idx) = te(i)
+       state%tw_cur_diag(i,idx) = tw(i)
+    end do
+
+    !
+    !**************************************************************************************************
+    !
+    ! CAM DEFAULT ENERGY COMPUTATION USING (57) BUT INCL. ALL FORMS OF WATER IN PDEL JUST FOR CPT
+    !
+    !**************************************************************************************************
+    idx=6
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+ 
+    ps = 0.0_r8
+    do k = 1, pver
+      do i = 1, ncol
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:1,1)))*state%pdeldry(i,k)/gravit
+         ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel        
+         ps(i)=ps(i)+pdel
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:6,2)))*state%pdeldry(i,k)/gravit                  
+         se(i) = se(i) +         state%t(i,k)*cpair*pdel        
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+
+    ! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+       tw(i) = wv(i) + wl(i) + wi(i)
+#ifdef ref_wv
+       te(i) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       te(i) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       te(i) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+    end do
+
+    ! compute expected values and tendencies
+    do i = 1, ncol
+       ! expected tendencies from boundary fluxes for last process
+!       te_tnd(i) = flx_vap(i)*(latvap+latice) - (flx_cnd(i) - flx_ice(i))*1000._r8*latice + flx_sen(i)
+       tw_tnd(i) = flx_vap(i) - flx_cnd(i) *1000._r8
+#ifdef ref_wv
+       te_tnd(i) =  (flx_cnd(i) - flx_ice(i))*1000._r8*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_liq
+       te_tnd(i) = flx_vap(i)*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_ice
+! \dot{m}^{(liq)} = -(flx_cnd(i) - flx_ice(i))*1000._r8
+       te_tnd(i) = flx_vap(i)*(latvap+latice) - (flx_cnd(i) - flx_ice(i))*1000._r8*latice + flx_sen(i)
+#endif
+
+       ! cummulative tendencies from boundary fluxes
+       tend%te_tnd_diag(i,idx) = tend%te_tnd_diag(i,idx) + te_tnd(i)
+       tend%tw_tnd_diag(i,idx) = tend%tw_tnd_diag(i,idx) + tw_tnd(i)
+    end do
+
+
+    ! copy new value to state
+    do i = 1, ncol
+       state%te_cur_diag(i,idx) = te(i)
+       state%tw_cur_diag(i,idx) = tw(i)
+    end do
+
+    !
+    !**************************************************************************************************
+    !
+    ! idx=7 CAM DEFAULT ENERGY COMPUTATION  BUT INCL. ALL FORMS OF WATER IN PDEL JUST FOR PHIS
+    !
+    !**************************************************************************************************
+    idx=7
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+
+    ps = 0.0_r8
+    do k = 1, pver
+       do i = 1, ncol
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:1,1)))*state%pdeldry(i,k)/gravit
+         ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel        
+         se(i) = se(i) +         state%t(i,k)*cpair*pdel  
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:6,2)))*state%pdeldry(i,k)/gravit                  
+         ps(i)=ps(i)+pdel
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+
+    ! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+       tw(i) = wv(i) + wl(i) + wi(i)
+#ifdef ref_wv
+       te(i) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       te(i) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       te(i) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+    end do
+
+    ! compute expected values and tendencies
+    do i = 1, ncol
+       ! expected tendencies from boundary fluxes for last process
+#ifdef ref_wv
+       te_tnd(i) =  (flx_cnd(i) - flx_ice(i))*1000._r8*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_liq
+       te_tnd(i) = flx_vap(i)*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_ice
+! \dot{m}^{(liq)} = -(flx_cnd(i) - flx_ice(i))*1000._r8
+       te_tnd(i) = flx_vap(i)*(latvap+latice) - (flx_cnd(i) - flx_ice(i))*1000._r8*latice + flx_sen(i)
+#endif
+       tw_tnd(i) = flx_vap(i) - flx_cnd(i) *1000._r8
+
+       ! cummulative tendencies from boundary fluxes
+       tend%te_tnd_diag(i,idx) = tend%te_tnd_diag(i,idx) + te_tnd(i)
+       tend%tw_tnd_diag(i,idx) = tend%tw_tnd_diag(i,idx) + tw_tnd(i)
+    end do
+
+
+    ! copy new value to state
+    do i = 1, ncol
+       state%te_cur_diag(i,idx) = te(i)
+       state%tw_cur_diag(i,idx) = tw(i)
+    end do
+    !
+    !**************************************************************************************************
+    !
+    ! idx=8 L(T)
+    !
+    !**************************************************************************************************
+    idx=8
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+
+    ps = 0.0_r8
+    do k = 1, pver
+      do i = 1, ncol
+         pdel = (1.0_r8+SUM(state%m_diag(i,k,1:1,1)))*state%pdeldry(i,k)/gravit
+         ps(i) = ps(i)+pdel
+         ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
+         se(i) = se(i) +         state%t(i,k)*cpair*state%pdeldry(i,k)/gravit !water vapor
+         se(i) = se(i) +         state%t(i,k)*cpice*state%m_diag(i,k,1,1)*state%pdeldry(i,k)/gravit !water vapor
+#ifdef ref_ice
+         se(i) = se(i) + (state%m_diag(i,k,1,1)*state%pdeldry(i,k)/gravit)*&  !wv
+              ((latice+latvap)+(cpwv-cpice)*state%t(i,k)) !assume T_00=0, h^ice_00=0
+         se(i) = se(i) + ((state%m_diag(i,k,2,1)+state%m_diag(i,k,4,1))*state%pdeldry(i,k)/gravit)*&  !cldliq
+              (latice+(cpliq-cpice)*state%t(i,k))
+#endif
+      end do
+    end do
+    do i = 1, ncol
+      se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+
+    ! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+       tw(i) = wv(i) + wl(i) + wi(i)
+#ifdef ref_wv
+       te(i) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       te(i) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       te(i) = se(i) + ke(i) 
+#endif
+    end do
+
+    ! compute expected values and tendencies
+    do i = 1, ncol
+       ! expected tendencies from boundary fluxes for last process
+#ifdef ref_wv
+       te_tnd(i) =  (flx_cnd(i) - flx_ice(i))*1000._r8*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_liq
+       te_tnd(i) = flx_vap(i)*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_ice
+! \dot{m}^{(liq)} = -(flx_cnd(i) - flx_ice(i))*1000._r8
+       te_tnd(i) = flx_vap(i)*(latvap+latice) - (flx_cnd(i) - flx_ice(i))*1000._r8*latice + flx_sen(i)
+#endif
+       tw_tnd(i) = flx_vap(i) - flx_cnd(i) *1000._r8
+
+       ! cummulative tendencies from boundary fluxes
+       tend%te_tnd_diag(i,idx) = tend%te_tnd_diag(i,idx) + te_tnd(i)
+       tend%tw_tnd_diag(i,idx) = tend%tw_tnd_diag(i,idx) + tw_tnd(i)
+     end do
+
+    ! copy new value to state
+    do i = 1, ncol
+       state%te_cur_diag(i,idx) = te(i)
+       state%tw_cur_diag(i,idx) = tw(i)
+    end do
+         !
+    !**************************************************************************************************
+    !
+    ! idx=9 CAM DEFAULT ENERGY COMPUTATION USING (57)
+    !
+    !**************************************************************************************************
+    idx=9
+    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+    ke = 0._r8
+    se = 0._r8
+
+    ps = 0.0_r8
+    do k = 1, pver
+       do i = 1, ncol
+         pdel = (1.0_r8+state%m_diag(i,k,1,1))*state%pdeldry(i,k)/gravit         
+
+         ps(i)=ps(i)+pdel
+          ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
+          se(i) = se(i) +         state%t(i,k)*cpair*pdel
+       end do
+    end do
+    do i = 1, ncol
+       se(i) = se(i) + state%phis(i)*ps(i)
+    end do
+
+
+    ! Compute vertical integrals of frozen static energy and total water.
+    do i = 1, ncol
+       tw(i) = wv(i) + wl(i) + wi(i)
+#ifdef ref_wv
+       te(i) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+#endif
+#ifdef ref_liq
+       te(i) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+#endif
+#ifdef ref_ice
+       te(i) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+#endif
+    end do
+
+    ! compute expected values and tendencies
+    do i = 1, ncol
+       ! expected tendencies from boundary fluxes for last process
+#ifdef ref_wv
+       te_tnd(i) =  (flx_cnd(i) - flx_ice(i))*1000._r8*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_liq
+       te_tnd(i) = flx_vap(i)*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+#endif
+#ifdef ref_ice
+! \dot{m}^{(liq)} = -(flx_cnd(i) - flx_ice(i))*1000._r8
+       te_tnd(i) = flx_vap(i)*(latvap+latice) - (flx_cnd(i) - flx_ice(i))*1000._r8*latice + flx_sen(i)
+#endif
+       tw_tnd(i) = flx_vap(i) - flx_cnd(i) *1000._r8
+
+       ! cummulative tendencies from boundary fluxes
+       tend%te_tnd_diag(i,idx) = tend%te_tnd_diag(i,idx) + te_tnd(i)
+       tend%tw_tnd_diag(i,idx) = tend%tw_tnd_diag(i,idx) + tw_tnd(i)
+    end do
+
+
+    ! copy new value to state
+    do i = 1, ncol
+       state%te_cur_diag(i,idx) = te(i)
+       state%tw_cur_diag(i,idx) = tw(i)
+    end do
+#endif
     deallocate(cpairv_loc)
 
   end subroutine check_energy_chng

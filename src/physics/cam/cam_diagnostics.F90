@@ -363,6 +363,130 @@ contains
     !
     ! energy diagnostics
     !
+#define te_analysis
+#ifdef te_analysis
+    call addfld ('FTURB',   horiz_only, 'A', 'J/m2','Latent heat terms')!radiative and sensible heat flux
+    call addfld ('FLAT',   horiz_only, 'A', 'J/m2','Latent heat terms') !latent heat flux
+    call addfld ('FLATE',   horiz_only, 'A', 'J/m2','Latent heat terms') !latent heat flux
+    call addfld ('FLATP',   horiz_only, 'A', 'J/m2','Latent heat terms') !latent heat flux
+    call addfld ('FMISS',   horiz_only, 'A', 'J/m2','Latent heat terms')!missing enthalpy flux
+    call addfld ('FMISS2',   horiz_only, 'A', 'J/m2','Latent heat terms')!missing enthalpy flux
+    call addfld ('FH2O' ,   horiz_only, 'A', 'J/m2','Latent heat terms')!water flux
+    call addfld ('FKE'  ,   horiz_only, 'A', 'J/m2','Latent heat terms')!Kinetic energy
+    call addfld ('FPHIS',   horiz_only, 'A', 'J/m2','Latent heat terms')!PHIS term
+    call addfld ('FTAU',    horiz_only, 'A', 'J/m2','Latent heat terms')!PHIS term
+
+    call addfld ('SE_BP1',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_BP1',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_BP1',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_BP1',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_BP1',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_BP2',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_BP2',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_BP2',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_BP2',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_BP2',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_BP3',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_BP3',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_BP3',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_BP3',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_BP3',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_BP4',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_BP4',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_BP4',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_BP4',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_BP4',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_BP5',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_BP5',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_BP5',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_BP5',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_BP5',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_BP6',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_BP6',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_BP6',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_BP6',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_BP6',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_BP7',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_BP7',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_BP7',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_BP7',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_BP7',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_BP8',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_BP8',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_BP8',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_BP8',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_BP8',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_BP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_BP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_BP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_BP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_BP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+
+
+    call addfld ('SE_AP1',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_AP1',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_AP1',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_AP1',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_AP1',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_AP2',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_AP2',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_AP2',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_AP2',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_AP2',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_AP3',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_AP3',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_AP3',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_AP3',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_AP3',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_AP4',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_AP4',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_AP4',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_AP4',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_AP4',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_AP5',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_AP5',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_AP5',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_AP5',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_AP5',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_AP6',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_AP6',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_AP6',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_AP6',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_AP6',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_AP7',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_AP7',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_AP7',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_AP7',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_AP7',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_AP8',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_AP8',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_AP8',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_AP8',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_AP8',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_AP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_AP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_AP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_AP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_AP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
+#endif
+
     call addfld ('SE_pBF',   horiz_only, 'A', 'J/m2','Dry Static Energy before energy fixer')
     call addfld ('SE_pBP',   horiz_only, 'A', 'J/m2','Dry Static Energy before parameterizations')
     call addfld ('SE_pAP',   horiz_only, 'A', 'J/m2','Dry Static Energy after parameterizations')
