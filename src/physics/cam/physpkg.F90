@@ -1705,13 +1705,19 @@ contains
 
     call outfld('FTURB',tend%te_tnd_diag(:,10), pcols   ,lchnk   ) !radiative and sensible heat flux
     call outfld('FLAT',tend%te_tnd_diag(:,11), pcols   ,lchnk   )  !latent heat flux terms
-    call outfld('FLATE',tend%te_tnd_diag(:,13), pcols   ,lchnk   )  !latent heat flux terms
-    call outfld('FLATP',tend%te_tnd_diag(:,14), pcols   ,lchnk   )  !latent heat flux terms
-    call outfld('FH2O',tend%te_tnd_diag(:,12), pcols   ,lchnk   )  !water flux
-    call outfld('FMISS',tend%te_tnd_diag(:,12)*cam_in%ts, pcols   ,lchnk   )!missing enthalpy flux
-    call outfld('FMISS2',tend%te_tnd_diag(:,12)*state%t(:,pver), pcols   ,lchnk   )!missing enthalpy flux
-    call outfld('FKE',tend%te_tnd_diag(:,15), pcols   ,lchnk   )!kinetic energy
-    call outfld('FPHIS',tend%te_tnd_diag(:,16), pcols   ,lchnk   )!PHIS term
+    call outfld('FLATE',tend%te_tnd_diag(:,13), pcols   ,lchnk   ) !latent heat flux term 1 (for wv reference state: F(wv)*LS)
+    call outfld('FLATP',tend%te_tnd_diag(:,14), pcols   ,lchnk   ) !latent heat flux term 2 (for wv reference state: F(liq)*LF)
+    call outfld('FNH2O',tend%te_tnd_diag(:,12), pcols   ,lchnk   )  !total net water flux
+    call outfld('FNWV',tend%te_tnd_diag(:,17), pcols   ,lchnk   )  !total net water flux
+    call outfld('FNLIQ',tend%te_tnd_diag(:,18), pcols   ,lchnk   )  !total net liq flux
+    call outfld('FNICE',tend%te_tnd_diag(:,19), pcols   ,lchnk   )  !total net ice flux    
+
+    call outfld('FNET_TS',tend%te_tnd_diag(:,12)*cam_in%ts, pcols   ,lchnk   )       !Fnet*TS
+    call outfld('FNET_TBOT',tend%te_tnd_diag(:,20), pcols   ,lchnk   )!Fnet*t(nlev)
+    call outfld('FLAT_T',tend%te_tnd_diag(:,21), pcols   ,lchnk   )!'sum(cp*FN*TBOT') !part of latent heat flux terms with temperature dependence!enthalpy flux with L(T)
+
+    call outfld('FKE',tend%te_tnd_diag(:,15), pcols   ,lchnk   )                   !kinetic energy flux at the surface
+    call outfld('FPHIS',tend%te_tnd_diag(:,16), pcols   ,lchnk   )                 !PHIS energy flux at the surface
     call outfld('FTAU',cam_in%wsx(:)*state%u(:,pver)+cam_in%wsy(:)*state%v(:,pver), pcols   ,lchnk   )!surfface wind stress
 
     call outfld('WV_AP1',zero                  , pcols   ,lchnk   )

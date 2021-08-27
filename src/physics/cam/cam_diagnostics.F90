@@ -369,9 +369,22 @@ contains
     call addfld ('FLAT',   horiz_only, 'A', 'J/m2','Latent heat terms') !latent heat flux
     call addfld ('FLATE',   horiz_only, 'A', 'J/m2','Latent heat terms') !latent heat flux
     call addfld ('FLATP',   horiz_only, 'A', 'J/m2','Latent heat terms') !latent heat flux
-    call addfld ('FMISS',   horiz_only, 'A', 'J/m2','Latent heat terms')!missing enthalpy flux
-    call addfld ('FMISS2',   horiz_only, 'A', 'J/m2','Latent heat terms')!missing enthalpy flux
-    call addfld ('FH2O' ,   horiz_only, 'A', 'J/m2','Latent heat terms')!water flux
+    call addfld ('FLAT_T',   horiz_only, 'A', 'J/m2','sum(cp*FN*TBOT') !part of latent heat flux terms with temperature dependence
+    !
+    ! enthalpy flux (different versions)
+    !
+    call addfld ('FNET_TS',     horiz_only, 'A', 'J/m2','Latent heat terms') !Fnet*TS 
+    call addfld ('FNET_TBOT',   horiz_only, 'A', 'J/m2','Latent heat terms')!Fnet*T(nlev)
+    !
+    ! water fluxes
+    !
+    call addfld ('FNH2O' ,   horiz_only, 'A', '(kg/kg)/(s*m^2)','Net total water surface flux')!water flux
+    call addfld ('FNWV' ,   horiz_only, 'A', '(kg/kg)/(s*m^2)','Net water vapor surface flux')!water flux
+    call addfld ('FNLIQ' ,   horiz_only, 'A', '(kg/kg)/(s*m^2)','Net ice surface flux')!water flux
+    call addfld ('FNICE' ,   horiz_only, 'A', '(kg/kg)/(s*m^2)','Net ice surface flux')!water flux
+
+
+
     call addfld ('FKE'  ,   horiz_only, 'A', 'J/m2','Latent heat terms')!Kinetic energy
     call addfld ('FPHIS',   horiz_only, 'A', 'J/m2','Latent heat terms')!PHIS term
     call addfld ('FTAU',    horiz_only, 'A', 'J/m2','Latent heat terms')!PHIS term

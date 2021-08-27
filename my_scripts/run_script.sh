@@ -29,17 +29,24 @@ set cset="F2000climo"
 #set stopoption="nmonths"
 #set steps="13"
 #set pecount="2700"
-set walltime = "00:15:00"
-set stopoption="nsteps"
+
+set pecount="1800"
+set walltime = "00:45:00"
+set stopoption="nmonths"
 set steps="2"
-set pecount="360"
+
+#set walltime = "00:15:00"
+#set stopoption="nsteps"
+#set steps="2"
+#set pecount="360"
 
 set pw=`pwd`
 source machine_settings.sh startup
 set PBS_ACCOUNT="P93300642"
+set queue="premium"
 echo $PBS_ACCOUNT
 
-set caze=access_terms_long_${cset}_${src}_${res}
+set caze=cam_energy_long
 $homedir/$USER/src/$src/cime/scripts/create_newcase --case $scratch/$USER/$caze --compset $cset --res $res  --q $queue --walltime $walltime --pecount $pecount  --project $PBS_ACCOUNT --compiler $compiler --run-unsupported
 #set caze=energy_${cset}_adam_${res}
 #/glade/u/home/aherring/src/cam6_2_017/cime/scripts/create_newcase --case $scratch/$USER/$caze --compset $cset --res $res  --q $queue --walltime $walltime --pecount $pecount  --project $PBS_ACCOUNT --compiler $compiler --run-unsupported
@@ -105,8 +112,12 @@ echo "        'WV_BP5','WL_BP5','WI_BP5','SE_BP5','KE_BP5',  ">> user_nl_cam
 echo "        'WV_BP6','WL_BP6','WI_BP6','SE_BP6','KE_BP6',  ">> user_nl_cam  
 echo "        'WV_BP7','WL_BP7','WI_BP7','SE_BP7','KE_BP7',  ">> user_nl_cam  
 echo "        'WV_BP8','WL_BP8','WI_BP8','SE_BP8','KE_BP8',  ">> user_nl_cam  
-echo "        'WV_BP9','WL_BP9','WI_BP9','SE_BP9','KE_BP9',  ">> user_nl_cam  
-echo "        'TS','FTURB','FLAT','FH2O','FMISS' ,'T','TBOT','FMISS2','SST','PRECT'">> user_nl_cam  
+echo "        'WV_BP9','WL_BP9','WI_BP9','SE_BP9','KE_BP9',  ">> user_nl_cam 
+
+echo "        'TS','FTURB','FLAT','FNH2O','FNET_TBOT' ,'T','TBOT','FNET_TS','SST','PRECT',">> user_nl_cam 
+echo "        'FLATE','FLATP','FTAU','FKE','FTAU','FPHIS'">> user_nl_cam 
+echo "        'FNWV','FNLIQ','FNICE','FLAT_T'">> user_nl_cam 
+ 
 
 
 echo "inithist           = 'YEARLY'"   >> user_nl_cam
@@ -127,5 +138,5 @@ source $pw/machine_settings.sh cleanup
 #if(`hostname` == 'cheyenne2.ib0.cheyenne.ucar.edu' || `hostname` == 'cheyenne1.ib0.cheyenne.ucar.edu' ||`hostname` == 'cheyenne3.ib0.cheyenne.ucar.edu' ) then
 qcmd -- ./case.build
 #endif
-#./case.submit
+./case.submit
 
