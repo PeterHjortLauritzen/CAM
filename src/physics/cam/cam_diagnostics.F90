@@ -365,23 +365,23 @@ contains
     !
 #define te_analysis
 #ifdef te_analysis
-    call addfld ('FTURB',   horiz_only, 'A', 'J/m2','Latent heat terms')!radiative and sensible heat flux
-    call addfld ('FLAT',   horiz_only, 'A', 'J/m2','Latent heat terms') !latent heat flux
+    call addfld ('FTURB',   horiz_only, 'A', 'J/m2','Radiative and sensible heat flux')!radiative and sensible heat flux
+    call addfld ('FLAT',   horiz_only, 'A', 'J/m2','Latent heat flux (total)') !latent heat flux
     call addfld ('FLATE',   horiz_only, 'A', 'J/m2','Latent heat terms') !latent heat flux
     call addfld ('FLATP',   horiz_only, 'A', 'J/m2','Latent heat terms') !latent heat flux
-    call addfld ('FLAT_T',   horiz_only, 'A', 'J/m2','sum(cp*FN*TBOT') !part of latent heat flux terms with temperature dependence
+    call addfld ('FLAT_T',   horiz_only, 'A', 'J/m2','sum(cp*FN*TBOT')   !enthalpy flux assuming L(T)
     !
     ! enthalpy flux (different versions)
     !
-    call addfld ('FNET_TS',     horiz_only, 'A', 'J/m2','Latent heat terms') !Fnet*TS 
-    call addfld ('FNET_TBOT',   horiz_only, 'A', 'J/m2','Latent heat terms')!Fnet*T(nlev)
+    call addfld ('FNET_TS',     horiz_only, 'A', 'J/m2','Enthalpy flux: Fnet*TS') !Fnet*TS 
+    call addfld ('FNET_TBOT',   horiz_only, 'A', 'J/m2','Enthalpy flux: Fnet*TBOT')!Fnet*T(nlev)
     !
     ! water fluxes
     !
-    call addfld ('FNH2O' ,   horiz_only, 'A', '(kg/kg)/(s*m^2)','Net total water surface flux')!water flux
-    call addfld ('FNWV' ,   horiz_only, 'A', '(kg/kg)/(s*m^2)','Net water vapor surface flux')!water flux
-    call addfld ('FNLIQ' ,   horiz_only, 'A', '(kg/kg)/(s*m^2)','Net ice surface flux')!water flux
-    call addfld ('FNICE' ,   horiz_only, 'A', '(kg/kg)/(s*m^2)','Net ice surface flux')!water flux
+    call addfld ('FNH2O' ,   horiz_only, 'A', 'm/s','Net total water surface flux')!water flux
+    call addfld ('FNWV' ,   horiz_only, 'A', 'm/s','Net water vapor surface flux')!water flux
+    call addfld ('FNLIQ' ,   horiz_only, 'A', 'm/s','Net liquid surface flux')!water flux
+    call addfld ('FNICE' ,   horiz_only, 'A', 'm/s','Net ice surface flux')!water flux
 
 
 
@@ -443,7 +443,23 @@ contains
     call addfld ('WL_BP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
     call addfld ('WI_BP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
 
+    call addfld ('SE_BP10',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_BP10',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_BP10',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_BP10',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_BP10',   horiz_only, 'A', 'J/m2','Latent heat terms')
 
+    call addfld ('SE_BP11',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_BP11',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_BP11',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_BP11',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_BP11',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_BP12',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_BP12',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_BP12',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_BP12',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_BP12',   horiz_only, 'A', 'J/m2','Latent heat terms')
 
     call addfld ('SE_AP1',   horiz_only, 'A', 'J/m2','Latent heat terms')
     call addfld ('KE_AP1',   horiz_only, 'A', 'J/m2','Latent heat terms')
@@ -498,6 +514,24 @@ contains
     call addfld ('WV_AP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
     call addfld ('WL_AP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
     call addfld ('WI_AP9',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_AP10',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_AP10',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_AP10',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_AP10',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_AP10',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_AP11',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_AP11',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_AP11',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_AP11',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_AP11',   horiz_only, 'A', 'J/m2','Latent heat terms')
+
+    call addfld ('SE_AP12',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('KE_AP12',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WV_AP12',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WL_AP12',   horiz_only, 'A', 'J/m2','Latent heat terms')
+    call addfld ('WI_AP12',   horiz_only, 'A', 'J/m2','Latent heat terms')
 #endif
 
     call addfld ('SE_pBF',   horiz_only, 'A', 'J/m2','Dry Static Energy before energy fixer')

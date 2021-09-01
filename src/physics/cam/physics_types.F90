@@ -53,7 +53,7 @@ module physics_types
   public physics_ptend_dealloc ! deallocate individual components within tend
 #define te_analysis
 #ifdef te_analysis
-  integer, parameter :: num_te=25
+  integer, parameter :: num_te=30
 #endif
 !-------------------------------------------------------------------------------
   type physics_state

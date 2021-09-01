@@ -25,8 +25,6 @@ begin
   FLHE     = fall->FLATE(:,:)
   FLHP     = fall->FLATP(:,:)
   FH2O     = fall->FNH2O(:,:)
-  FH2O     = fall->FNH2O(:,:)
-  FH2O     = fall->FNH2O(:,:)
   FWV      = fall->FNWV(:,:)
   FLIQ     = fall->FNLIQ(:,:)
   FICE     = fall->FNICE(:,:)
@@ -285,8 +283,8 @@ begin
         subcycle      = (/1.0D0,1.0D0,1.0D0,1.0D0,1.0D0,1.0D0,1.0D0,1.0D0,nsplit,nsplit,nsplit,1.0D0/)
 ;        subcycle      = (/1D0  ,1D0  ,1D0  ,1D0  ,1.0D0,1.0D0,1.0D0,1D0,1D0,1D0,1D0/)	;averaging is not being done by CAM history
       else
-        str_stage     = (/"pBF","pBP","pAP","pAM","dED","dAF","dBD"  ,"dAD" ,"dAR" ,"dBF","dBH","dCH","dAH","dBS","dAS","AP1","BP1","AP2","BP2","AP3","BP3","AP4","BP4","AP5","BP5","AP6","BP6","AP7","BP7","AP8","BP8","AP9","BP9"/);,"dX1","dX2","dX3"/);,"dBZ","dAZ"/)
-        subcycle    =     (/1D0,1D0  ,1D0  ,1D0  ,1.0D0,nsplit,nsplit,nsplit,nsplit,1.0D0,nsplit*rsplit*hypervis_subcycle,nsplit*rsplit*hypervis_subcycle,nsplit*rsplit*hypervis_subcycle,nsplit*rsplit,nsplit*rsplit,1D0  ,1D0,1D0  ,1D0,1D0  ,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0/)
+        str_stage     = (/"pBF","pBP","pAP","pAM","dED","dAF","dBD"  ,"dAD" ,"dAR" ,"dBF","dBH","dCH","dAH","dBS","dAS","AP1","BP1","AP2","BP2","AP3","BP3","AP4","BP4","AP5","BP5","AP6","BP6","AP7","BP7","AP8","BP8","AP9","BP9","AP10","BP10","AP11","BP11","AP12","BP12"/);,"dX1","dX2","dX3"/);,"dBZ","dAZ"/)
+        subcycle    =     (/1D0,1D0  ,1D0  ,1D0  ,1.0D0,nsplit,nsplit,nsplit,nsplit,1.0D0,nsplit*rsplit*hypervis_subcycle,nsplit*rsplit*hypervis_subcycle,nsplit*rsplit*hypervis_subcycle,nsplit*rsplit,nsplit*rsplit,1D0  ,1D0,1D0  ,1D0,1D0  ,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0,1D0/)
       end if	
       dycoreDiags = True
     else
@@ -309,6 +307,9 @@ begin
 ;    subcycle    = (/1.0D0,nsplit,nsplit,nsplit,nsplit,1.0D0,nsplit*rsplit*hypervis_subcycle,nsplit*rsplit*hypervis_subcycle,nsplit*rsplit*hypervis_subcycle/)    
     dycoreDiags = True
   end if
+
+   print("wwwww="+ dimsizes(str_vars))
+   print("wwwww="+ dimsizes(subcycle))
 
   nvars       = dimsizes(str_vars)
   nstage      = dimsizes(str_stage)
@@ -411,7 +412,7 @@ begin
   end if
 
   if (isfilevar(fall,"SE_AP1")) then
-    iAP1 = str_match_ind(str_stage,"AP1")
+    iAP1 = 15; hard code since AP1 matches AP10, AP11, AP12; str_match_ind(str_stage,"AP1")
   else
     iAP1 = -1
   end if
@@ -455,12 +456,28 @@ begin
   else
     iAP9 = -1
   end if
+  if (isfilevar(fall,"SE_AP10")) then
+    iAP10 = str_match_ind(str_stage,"AP10")
+  else
+    iAP10 = -1
+  end if
+  if (isfilevar(fall,"SE_AP11")) then
+    iAP11 = str_match_ind(str_stage,"AP11")
+  else
+    iAP11 = -1
+  end if
+  if (isfilevar(fall,"SE_AP12")) then
+    iAP12 = str_match_ind(str_stage,"AP12")
+  else
+    iAP12 = -1
+  end if
 
 
 
 
   if (isfilevar(fall,"SE_BP1")) then
-    iBP1 = str_match_ind(str_stage,"BP1")
+    iBP1 = 16; str_match_ind(str_stage,"BP1")
+
   else
     iBP1 = -1
   end if
@@ -503,6 +520,21 @@ begin
     iBP9 = str_match_ind(str_stage,"BP9")
   else
     iBP9 = -1
+  end if
+  if (isfilevar(fall,"SE_BP10")) then
+    iBP10 = str_match_ind(str_stage,"BP10")
+  else
+    iBP10 = -1
+  end if
+  if (isfilevar(fall,"SE_BP11")) then
+    iBP11 = str_match_ind(str_stage,"BP11")
+  else
+    iBP11 = -1
+  end if
+  if (isfilevar(fall,"SE_BP12")) then
+    iBP12 = str_match_ind(str_stage,"BP12")
+  else
+    iBP12 = -1
   end if
 
 
@@ -679,12 +711,20 @@ begin
       end do
       diff_DME = pDMEA(0)      
 
-      pDEFAULT(1,1) = (tot_energy(1,t,iAP1)-tot_energy(1,t,iBP1))/dtime
-      pDEFAULT(2,1) = (tot_energy(2,t,iAP1)-tot_energy(2,t,iBP1))/dtime
-      
-
-      pDEFAULT(1,2) = (tot_energy(1,t,iAP2)-tot_energy(1,t,iBP2))/dtime
-      pDEFAULT(2,2) = (tot_energy(2,t,iAP2)-tot_energy(2,t,iBP2))/dtime
+      print("t="+t)
+      print("iAP1="+iAP1)
+      print("iBP1="+iBP1)
+      ;
+      ;	 idx=1: default CAM energy computation (for sanity checks)
+      ;	
+      ;       
+      pDEFAULT(1,1) = (tot_energy(1,t,iAP1)-tot_energy(1,t,iBP1))/dtime ; left-hand side of energy equation
+      pDEFAULT(2,1) = (tot_energy(2,t,iAP1)-tot_energy(2,t,iBP1))/dtime ; right-hand side of energy equations
+      ;
+      ; idx=2: default CAM energy equation but using dry mixing ratio formulation consistent with manuscript
+      ;
+      pDEFAULT(1,2) = (tot_energy(1,t,iAP2)-tot_energy(1,t,iBP2))/dtime ; left-hand side of energy equation
+      pDEFAULT(2,2) = (tot_energy(2,t,iAP2)-tot_energy(2,t,iBP2))/dtime ; right-hand side of energy equations
 
       CAM_LHS_ave = pDEFAULT(1,2)
       CAM_RHS_ave = pDEFAULT(2,2)
@@ -707,17 +747,27 @@ begin
       pDEFAULT(1,5) = (tot_energy(1,t,iAP5)-tot_energy(1,t,iBP5))/dtime
       pDEFAULT(2,5) = (tot_energy(2,t,iAP5)-tot_energy(2,t,iBP5))/dtime
 
-      K_2d = (tot_energy_2d(1,t,iAP5,:)-tot_energy_2d(1,t,iBP5,:)-(tot_energy_2d(2,t,iAP5,:)-tot_energy_2d(2,t,iBP5,:)))/dtime
+      K_2d_allwater = (tot_energy_2d(1,t,iAP5,:)-tot_energy_2d(1,t,iBP5,:)-(tot_energy_2d(2,t,iAP5,:)-tot_energy_2d(2,t,iBP5,:)))/dtime
+      K_2d_CAM      = (tot_energy_2d(1,t,iAP10,:)-tot_energy_2d(1,t,iBP10,:)-(tot_energy_2d(2,t,iAP10,:)-tot_energy_2d(2,t,iBP10,:)))/dtime
+
 
       pDEFAULT(1,6) = (tot_energy(1,t,iAP6)-tot_energy(1,t,iBP6))/dtime
       pDEFAULT(2,6) = (tot_energy(2,t,iAP6)-tot_energy(2,t,iBP6))/dtime
 
-      cpT_2d = (tot_energy_2d(1,t,iAP6,:)-tot_energy_2d(1,t,iBP6,:)-(tot_energy_2d(2,t,iAP6,:)-tot_energy_2d(2,t,iBP6,:)))/dtime
+      cpT_2d_allwater = (tot_energy_2d(1,t,iAP6,:)-tot_energy_2d(1,t,iBP6,:)-(tot_energy_2d(2,t,iAP6,:)-tot_energy_2d(2,t,iBP6,:)))/dtime
+      cpT_2d_CAM      = (tot_energy_2d(1,t,iAP11,:)-tot_energy_2d(1,t,iBP11,:)-(tot_energy_2d(2,t,iAP11,:)-tot_energy_2d(2,t,iBP11,:)))/dtime
 
       pDEFAULT(1,7) = (tot_energy(1,t,iAP7)-tot_energy(1,t,iBP7))/dtime
       pDEFAULT(2,7) = (tot_energy(2,t,iAP7)-tot_energy(2,t,iBP7))/dtime
 
-      PHIS_2d = (tot_energy_2d(1,t,iAP7,:)-tot_energy_2d(1,t,iBP7,:))/dtime - (tot_energy_2d(2,t,iAP7,:)-tot_energy_2d(2,t,iBP7,:))/dtime
+      PHIS_2d_allwater = (tot_energy_2d(1,t,iAP7,:)-tot_energy_2d(1,t,iBP7,:))/dtime - (tot_energy_2d(2,t,iAP7,:)-tot_energy_2d(2,t,iBP7,:))/dtime
+      PHIS_2d_CAM      = (tot_energy_2d(1,t,iAP12,:)-tot_energy_2d(1,t,iBP12,:))/dtime - (tot_energy_2d(2,t,iAP12,:)-tot_energy_2d(2,t,iBP12,:))/dtime
+
+
+      ;
+      ; DME_adjust with all water     
+      ;
+      DME_adjust_2d_with_all_water = K_2d_allwater+cpT_2d_allwater+PHIS_2d_allwater-all_water
 
       pDEFAULT(1,8) = (tot_energy(1,t,iAP8)-tot_energy(1,t,iBP8))/dtime
       pDEFAULT(2,8) = (tot_energy(2,t,iAP8)-tot_energy(2,t,iBP8))/dtime
@@ -726,6 +776,7 @@ begin
 
       pDEFAULT(1,9) = (tot_energy(1,t,iAP9)-tot_energy(1,t,iBP9))/dtime
       pDEFAULT(2,9) = (tot_energy(2,t,iAP9)-tot_energy(2,t,iBP9))/dtime
+      print("dddddd"+iAP9+iBP9)
 
       lvariableL_2d = (tot_energy_2d(1,t,iAP9,:)-tot_energy_2d(1,t,iBP9,:))/dtime - ((tot_energy_2d(2,t,iAP9,:)-tot_energy_2d(2,t,iBP9,:))/dtime )
 
@@ -844,524 +895,24 @@ begin
       print(" ")      
     end if
 
-    if (dycore.eq."FV3") then
-      print(" ")
-      print("=================================================================================")
-      print("|                                                                               |")
-      print("| ANALYSIS OF ENERGY DIAGNOSTICS IN DYNAMICS - specific for FV3 dycore          |")
-      print("|                                                                               |")
-      print("=================================================================================")
-      print(" ")
-      diff1 = (tot_energy(0,t,ipAM)-tot_energy(0,t,ipBF))/dtime
-      diff2 = (tot_energy(0,t,idAP)-tot_energy(0,t,idED))/dtime
-      
-      diff  = diff2-diff1
-      
-      param_dyn= (tot_energy(0,t,idAP)-tot_energy(0,t,idED))/dtime	
-      print("dE/dt parameterizations (param) in dyn on A-grid (dAP-dED) "+sprintf("%6.3g",param_dyn)     +" W/M^2")
-      param_dyn_D= (tot_energy(0,t,idBD)-tot_energy(0,t,idED))/dtime	
-      print("dE/dt parameterizations (param) in dyn on D-grid (dBD-dED) "+sprintf("%6.3g",param_dyn_D)     +" W/M^2")
-      param_dyn_DA = (tot_energy(0,t,idBD)-tot_energy(0,t,idAP))/dtime
-      print("dE/dt mapping wind tendencies from A to D grid (and back to A-grid for TE computations (dBD-dAP) "+sprintf("%6.3g",param_dyn_DA)     +" W/M^2")
-
-
-      print(" Physics-dynamics coupling error (should be zero) : "+diff)
-      print(" (dE/dt physics increment minus dE/dt physics increment in dynamics)")
-      print(" ")
-
-
-      dDycore = (tot_energy(0,t,idBF)-tot_energy(0,t,idBD))/dtime      
-      dadiab  = (tot_energy_2d(0,t,idBF,:)-tot_energy_2d(0,t,idBD,:))/dtime      
-
-      print(" dE/dt dynamical core total (dBF-dBD) = "+dDycore)
-      print(" ")
-      print(" Breakdown of dycore dE/dt:")
-      print(" ")      
-
-      Rayleigh = (tot_energy(0,t,idAT)-tot_energy(0,t,idBD))/dtime      
-      print(" dE/dt Rayleigh friction (dAT-dBD) = "+Rayleigh)
-
-
-      dDycore2d = (tot_energy(0,t,idAD)-tot_energy(0,t,idAF))/dtime
-      print(" dE/dt 2D dynamical core (dAD-dAF) = "+dDycore2d)      
-
-      dRemap = (tot_energy(0,t,idAR)-tot_energy(0,t,idAD))/dtime
-      remap  = (tot_energy_2d(0,t,idAR,:)-tot_energy_2d(0,t,idAD,:))/dtime
-      print(" dE/dt vertical remapping(dAR-dAD) = "+dRemap)      
-      print(" ")
-      diff = dDycore-(dDycore2d+dRemap+Rayleigh)
-      print("Check that dE/dt 2D dynamics + vertical remapping + Rayleigh friction - dE/dt dynamical core total (should be zero)="+diff)
-
-      hvis = remap
-      hvis = 0.0
-
-      fheat = remap
-      fheat = 0.0
-      
-    end if
-
-    if (dycore.eq."SE".and.dycoreDiags) then
-      print(" ")
-      print("=================================================================================")
-      print("|                                                                               |")
-      print("| ANALYSIS OF ENERGY DIAGNOSTICS IN DYNAMICS - specific for SE dycore           |")
-      print("|                                                                               |")
-      print("=================================================================================")
-      print(" ")
-
-
-      rate_of_change_2D_dyn = (tot_energy(0,t,idAD)-tot_energy(0,t,idBD))/dtime
-
-      rate_of_change_vertical_remapping = (tot_energy(0,t,idAR)-tot_energy(0,t,idAD))/dtime
-
-      remap = (tot_energy_2d(0,t,idAR,:)-tot_energy_2d(0,t,idAD,:))/dtime
-
-      dADIA = rate_of_change_2D_dyn+rate_of_change_vertical_remapping
-
-      dadiab = (tot_energy_2d(0,t,idAR,:)-tot_energy_2d(0,t,idBD,:))/dtime
-
-
-;      x1       = (tot_energy(0,t,idX2)-tot_energy(0,t,idX1))/dtime
-;      x2       = (tot_energy(0,t,idX3)-tot_energy(0,t,idX2))/dtime
-;      print("dE/dt x1 "+sprintf("%6.3g",x1)+" W/M^2")
-;      print("dE/dt x2 "+sprintf("%6.3g",x2)+" W/M^2")
-
-
-      diffusion_del4       = (tot_energy(0,t,idCH)-tot_energy(0,t,idBH))/dtime
-      diffusion_fric       = (tot_energy(0,t,idAH)-tot_energy(0,t,idCH))/dtime
-      diffusion_del4_tot   = (tot_energy(0,t,idAH)-tot_energy(0,t,idBH))/dtime
-      diffusion_sponge     = (tot_energy(0,t,idAS)-tot_energy(0,t,idBS))/dtime
-      diffusion_total      = diffusion_del4_tot+diffusion_sponge
-
-      print("dE/dt dyn total (dycore+phys tendency   (dBF-dED) "+sprintf("%6.3g",dyn_total)+" W/M^2")
-
-      print("dE/dt total adiabatic dynamics (adiab)            "+sprintf("%6.3g",dADIA)+" W/M^2")    
-      print("dE/dt 2D dynamics (2D)                  (dAD-dBD) "+sprintf("%6.3g",rate_of_change_2D_dyn)+" W/M^2")
-      print("dE/dt vertical remapping (remap)        (dAR-dAD) "+sprintf("%6.3g",rate_of_change_vertical_remapping)+" W/M^2")
-      rate_of_change_physics = (tot_energy(0,t,idBD)-tot_energy(0,t,idAF))/dtime
-      print("dE/dt physics tendency in dynamics      (dBD-dAF) "+sprintf("%6.3g",rate_of_change_physics)+" W/M^2")
-      print(" ")
-      print("Breakdown of 2D dynamics:")
-      print(" ")
-      rate_of_change_heating_term_put_back_in = (tot_energy(0,t,idAH)-tot_energy(0,t,idCH))/dtime
-      fheat = (tot_energy_2d(0,t,idAH,:)-tot_energy_2d(0,t,idCH,:))/dtime
-
-      hvis = (tot_energy_2d(0,t,idAH,:)-tot_energy_2d(0,t,idBH,:))/dtime
-      rate_of_change_hvis_sponge = (tot_energy(0,t,idAS)-tot_energy(0,t,idBS))/dtime
-
-      print("      dE/dt hypervis del4 (hvis)             (dCH-dBH) "+sprintf("%6.3g",diffusion_del4)+" W/M^2")
-      print("      dE/dt hypervis frictional heating del4 (dAH-dCH) "+sprintf("%6.3g",diffusion_fric)+" W/M^2")
-      print("      dE/dt hypervis del4 total (hvis)       (dAH-dBH) "+sprintf("%6.3g",diffusion_del4_tot)+" W/M^2")
-      print("      dE/dt hypervis sponge total            (dAS-dBS) "+sprintf("%6.3g",diffusion_sponge)+" W/M^2")
-      print("                                                       ")
-      print("      dE/dt explicit diffusion total                   "+sprintf("%6.3g",diffusion_total)+" W/M^2")
-
-
-;      consistency = diffusion_del4_tot-(diffusion_del4+diffusion_fric)
-;      print("      dE/dt hypervis consistency (dAH-dBH)=(dCH-dBH)+(dAH-dCH)="+sprintf("%6.3g",consistency)+" W/M^2")
 
 
 
-      twoDresidual = rate_of_change_2D_dyn-diffusion_total
-      print("      dE/dt residual (res)                        "+sprintf("%6.3g",twoDresidual)+" W/M^2")
-    end if
-    print(" ")
-    print(" ")
-
-    if (dycore.eq."SE".and.PhysDiags.and.dycoreDiags) then
-      print(" ")
-      print("=================================================================================")
-      print("|                                                                               |")
-      print("| ANALYSIS OF ENERGY DIAGNOSTICS IN DYNAMICS-PHYSICS COMBINED                   |")
-      print("|                                                                               |")
-      print("=================================================================================")
-      print(" ")
-      value_pdc = phys_total(0)-rate_of_change_physics
-      if (te_consistent_version.eq."True") then
-        print("Your model is energy consistent (qsize_condensate_loading=1 and cpdry)")
-        if (ftype .eq. "1") then
-          print(" ")
-          print("You are using ftype=1 so PDC errors should be zero:")
-          print(" ")
-          print("    dE/dt physics tendency in dynamics (dBD-dAF) should exactly match dE/dt physics total (pAM-pBF): "+sprintf("%6.3g",value_pdc))
-          print(" ")
-        else
-          print(" ")
-          print("You are using ftype=0 or 2 so there are PDC errors (dribbling errors):")
-          print(" ")
-          print("   Dribbling errors (pAM-pBF-(dBD-dAF))/dt: "+sprintf("%6.3g",value_pdc))
-        end if
-        discr = "0       "
-        str_pdc = sprintf("%6.3g",10*value_pdc)
-      else
-        print("Your model is energy inconsistent (qsize_condensate_loading<>1 and/or cp<>cpdry)")
-        print(" ")
-        print("PDC errors can not be assesed trhough ")
-        print(" ")
-        print("   dE/dt physics tendency in dynamics (dBD-dAF) does not match dE/dt physics total (pAM-pBF) due to energy discrepancy:"+sprintf("%6.3g",value_pdc))
-	print(phys_total+"  "+rate_of_change_physics)
-        str_pdc = "undef"
-      end if
-      print(" ")
-      print("Some more consisitency/budget terms")
-      print("===================================")
-      print(" ")
-      print("Energy fixer fixes dme_adjust (pDMEA), lack of energy conservation in adiabatic")
-      print("dynamical core (dADIA), energy discrepancy (EDIFF) and energy lost/gained in physics-dynamics coupling")
-      print(" ")
-      print("dADIA                     "+sprintf("%6.3g",dADIA    )+" W/M^2")    
-      print("pDMEA                     "+sprintf("%6.3g",pDMEA(0) )+" W/M^2")    
-      print("physics-dynamics coupling "+sprintf("%6.3g",value_pdc)+" W/M^2")
-      print(" ")
-      str="dPDC+EDIFF"
-      print(" ")
-      print("		-energy fixer = DME_adjust+adaib dycore+phys-dyn errors+discr")
-      print("            ")
-      ttt = -pDMEA(0)-dADIA-value_pdc
-      discr = -99.0
-      print("          DME_adjust+adaib dycore+phys-dyn errors+discr = "+sprintf("%6.3g",ttt))
-      print("          Energy fixer                                  = "+sprintf("%6.3g",pEFIX(0)))
-      print(" ")
-      fff = ttt-pEFIX(0)
-      print("          Difference                                    = "+sprintf("%6.3g",fff))     
-
-
-      qneg  = (tot_energy(0,t,ipBF)-tot_energy(0,t,idED))/dtime
-      print(" ")
-      print(" qneg: "+qneg)
-      print(" ")
-
-      ;
-      ; write diagnostics to file
-      ;
-      str1 = qsize_condensate_loading+"                       &"
-      str1 = str1 + " "+lcp_moist+"   &"      
-      str1 = str1 + " "+ftype+"   &"      
-      str1 = str1 + " "+sprintf("%6.3g",param(0))+"&"
-      str1 = str1 + " "+sprintf("%6.3g",pDMEA(0))+"&"
-      str1 = str1 + " "+sprintf("%6.3g",phys_total(0))+"&"
-      str1 = str1 + " "+discr+"&"
-      str1 = str1 + " "+sprintf("%6.3g",rate_of_change_2D_dyn)+"&"
-      str1 = str1 + " "+sprintf("%6.3g",diffusion_total)+"&"
-      str1 = str1 + " "+sprintf("%6.3g",rate_of_change_heating_term_put_back_in)+"&"
- ;      str1 = str1 + " "+sprintf("%6.3g",twoDresidual)+"&"
-      str1 = str1 + " "+sprintf("%6.3g",twoDresidual)+"&"
-      str1 = str1 + " "+sprintf("%6.3g",rate_of_change_vertical_remapping)+"&"
-      str1 = str1 + " "+sprintf("%6.3g",dADIA)+"&"
-      str1 = str1 + " "+sprintf("%6.3g",value_pdc)
-      str1 = str1 + " "+str_pdc
-
-      if (fileexists(diags_fname)) then
-        c1 = (/str1/)
-        alist   = [/c1/]
-        write_table(diags_fname, "a", alist, "%s")
-      else
-        c1 = (/"#qsize_condensate_loading cpmoist  ftype param     pwork     efix      discr     2D         hvis       fheat     res       remap      adiab      PDC",str1/)
-        alist   = [/c1/]
-        write_table(diags_fname, "w", alist, "%s")
-      end if
-    end if
-    if (qsize.gt.0) then
-      print("    ")
-      print("    ")
-      print(" ")
-      print("=================================================================================")
-      print("|                                                                               |")
-      print("| ANALYSIS OF WATER VAPOR, CLOUD LIQUID AND CLOUD ICE BUDGETS                   |")
-      print("|                                                                               |")
-      print("=================================================================================")
-      print(" ")
-      print(" ")
-    end if
-
-    do m_cnst=0,qsize-1
-      if (m_cnst.eq.0) then 
-        print("Water vapor")
-        print("-----------")
-      end if
-      if (m_cnst.eq.1) then
-        print("Cloud liquid")
-        print("------------")
-      end if
-      if (m_cnst.eq.2) then 
-        print("Cloud ice")
-        print("---------")
-      end if
-      print(" ")
-      phys_total(0)    = (tracer_mass(t,m_cnst,ipBP)-tracer_mass(t,m_cnst,ipBF))
-      pDMEA(0) = (tracer_mass(t,m_cnst,ipAM)-tracer_mass(t,m_cnst,ipAP))
-      param(0)           = (tracer_mass(t,m_cnst,ipAP)-tracer_mass(t,m_cnst,ipBP))
-      dyn_total       = (tracer_mass(t,m_cnst,idBF)-tracer_mass(t,m_cnst,idED))
-      phys_total      = (tracer_mass(t,m_cnst,ipAM)-tracer_mass(t,m_cnst,ipBF))
-
-      print("dMASS/dt energy fixer                      (pBP-pBF) "+sprintf("%6.3g",phys_total(0))+" Pa")
-      print("dMASS/dt parameterizations                 (pAP-pBP) "+sprintf("%6.3g",param(0))+" Pa")
-      print("dMASS/dt dry mass adjustment               (pAM-pAP) "+sprintf("%6.3g",pDMEA(0))+" Pa")
-      print(" ")
-      value = phys_total(0)+pDMEA(0)
-      print("=> dMASS/dt dynamical core (estimated from physics)  ")
-      print("   dMASS/dt energy fixer + dMASS/dt dry mass adjustment "+sprintf("%6.3g",value)+" Pa")
-
-      print("=> dMASS/dt physics total                   (pAM-pBF)"+sprintf("%6.3g",phys_total(0))+" Pa")
- 
-
-      print("  ")
-      print("  ")
-      print("  ")
-
-      if (idAD.ge.0.and.idBD.ge.0.and.idAR.ge.0.and.idCH.ge.0) then
-        mass_change__2D_dyn = (tracer_mass(t,m_cnst,idAD)-tracer_mass(t,m_cnst,idBD))
-        mass_change__vertical_remapping = (tracer_mass(t,m_cnst,idAR)-tracer_mass(t,m_cnst,idAD))
-        dADIA = mass_change__2D_dyn+mass_change__vertical_remapping
-        print("dE/dt total adiabatic dynamics                    "+sprintf("%6.3g",dADIA)+" Pa")
-        print("dE/dt 2D dynamics                       (dAD-dBD) "+sprintf("%6.3g",mass_change__2D_dyn)+" Pa")
-        print(" ")
-        print("Breakdown of 2D dynamics:")
-        print(" ")
-        mass_change__heating_term_put_back_in = (tracer_mass(t,m_cnst,idAH)-tracer_mass(t,m_cnst,idCH))
-        mass_change__hypervis_total           = (tracer_mass(t,m_cnst,idAH)-tracer_mass(t,m_cnst,idBH))
-        print("      dE/dt hypervis                    (dAH-dBH) "+sprintf("%6.3g",mass_change__hypervis_total)+" Pa")
-        print("      dE/dt frictional heating          (dAH-dCH) "+sprintf("%6.3g",mass_change__heating_term_put_back_in)+" Pa")
-        error = mass_change__2D_dyn-mass_change__hypervis_total
-        print("      dE/dt residual (time truncation errors)     "+sprintf("%6.3g",error)+" Pa")	
-      end if
-      if (idAR.ge.0.and.idAD.ge.0) then
-        mass_change__vertical_remapping = (tracer_mass(t,m_cnst,idAR)-tracer_mass(t,m_cnst,idAD))
-        print("dE/dt vertical remapping                (dAR-dAD) "+sprintf("%6.3g",mass_change__vertical_remapping)+" Pa")
-      end if
-      print(" ")
-      print(" ")
-
-      if (idBD.ge.0.and.idAF.ge.0) then
-        mass_change__physics = (tracer_mass(t,m_cnst,idBD)-tracer_mass(t,m_cnst,idAF))
-        print("dE/dt physics tendency in dynamics      (dBD-dAF) "+sprintf("%6.3g",mass_change__physics)+" Pa")
-        value = phys_total(0)-mass_change__physics
-      end if
-      if (idBD.ge.0.and.idAF.ge.0) then
-        if (ftype .eq. "1") then
-          print(" ")
-          print("      Consistency check:")
-          print(" ")
-          print("      dE/dt physics tendency in dynamics (dBD-dAF) should exactly match dE/dt physics total (pAM-pBF):"+sprintf("%6.3g",value))
-          print(" ")
-        else
-          print("Dribbling errors (pAM-pBF-(dBD-dAF))"+sprintf("%6.3g",value))
-        end if
-      end if
-
- 
-      if (dycore.eq."FV3") then
-        print("Checking physics dynamics coupling")
-        mass_change_phys = (tracer_mass(t,m_cnst,ipAM)-tracer_mass(t,m_cnst,ipBF))
-        print("Mass change in physics:               "+mass_change_phys)
-        mass_change_p_d_coupling  = (tracer_mass(t,m_cnst,idBD)-tracer_mass(t,m_cnst,idED))
-        print("Mass change in d_p_coupling: "+mass_change_p_d_coupling)
-	error = mass_change_p_d_coupling-mass_change_phys
-	print("Error  "+error)
-        mass_change_dyn  = (tracer_mass(t,m_cnst,idBF)-tracer_mass(t,m_cnst,idED))
-        print("Mass change in dynamics from physics: "+mass_change_dyn)
-
-        mass_error_in_coupling = (tracer_mass(t,m_cnst,ipAM)-tracer_mass(t,m_cnst,idBF))
-        print("Mass error in coulpling "+mass_error_in_coupling)
-       end if
-       print(" ")
-       print("---------------------------------------------------------------------------------------------------")
-       print(" ")
-     end do
-  ;
   ;----------------------------------------------------------------------------------------------------------------
   ;
   ; plotting stuff
   ;
   ;----------------------------------------------------------------------------------------------------------------
   ;
-  if (t.eq.nt-1) then
   output_format = "pdf"
-  wks = gsn_open_wks(output_format,panelTitle)
-  gsn_define_colormap(wks,"NCV_jaisnd");3gauss")      
+  if (t.eq.nt-1) then
+
+
+;  gsn_define_colormap(wks,"NCV_jaisnd");3gauss")      
 ; gsn_define_colormap(wks,"BlAqGrYeOrReVi200")   ; choose colormap
 ; gsn_define_colormap(wks,"GMT_polar")
     
 
-
-
-  res                     = True         ; plot modifications desired
-  res@gsnMaximize         = False         ; Maximize size of plot in frame
-  res@gsnSpreadColors     = True         ; Use full colormap, but start
-  res@gsnDraw             = False           ; don't draw
-  res@gsnFrame            = False           ; don't advance frame
-  res@cnFillOn            = True         ; Turn on contour fill
-;  res@cnFillMode          = "AreaFill"   ; Style of fill. You can also
-                                         ; use "CellFill" and "RasterFill"
-  res@cnLinesOn           = False        ; Turn off contour lines
-  res@cnLineLabelsOn      = False        ; Turn off contour line labels
-  res@lbLabelAutoStride   = True         ; Clean up labelbar labels.
-  res@cnFillMode="RasterFill"
-
-
-;  res@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
-;  res@cnMinLevelValF  = -30.0                        ; set the minimum contour level
-;  res@cnMaxLevelValF  = 30.0                   ; set the maximum contour level
-;  res@cnLevelSpacingF = 1.0                  ; set the interval between contours
-
-;  res@mpMinLatF = -30.                   ; set the minimum latitude = -70.
-;  res@mpMaxLatF = 30.                    ; set the maximum latitude = 70.
-
-; res@mpMinLonF = -40.                    ; set the minimum latitude = -70.
-;  res@mpMaxLonF = 40.
-
-  res@gsnStringFontHeightF = 0.02
-  res@tiMainFontHeightF = 0.025
-  res@lbLabelFontHeightF = 0.02
-  res@tmXBLabelFontHeightF = 0.015
-  res@tmYLLabelFontHeightF = 0.015
-  res@pmLabelBarOrthogonalPosF = 0.2
-
-  res@lbBoxLinesOn = False
-
-  res_p=res
-
-  plot = new(6,graphic) 
-
-
-
-  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
-  fmin = -150.
-      fmax = 150.
-  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
-  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
-  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
-  res_p@gsnLeftString        = "Total physics TE tendency"      
-
-;  res_p@tiMainString        = " [W/m^2]"
-      ;-148.2925226269828   max=1770.210548306306
-
-
-  min_f = min(dparam(0:ncol_p-1))
-  max_f = max(dparam(0:ncol_p-1))
-  print("dparam "+min_f+" "+max_f)
-  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
-  res_p@sfXArray            = lon1d
-  res_p@sfYArray            = lat1d
-  plot(0) = gsn_csm_contour_map_ce(wks,dparam(0:ncol_p-1),res_p)
-
-  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
-  res_p@cnMinLevelValF  =-20.                        ; set the minimum contour level
-  res_p@cnMaxLevelValF  = 20.                   ; set the maximum contour level
-  res_p@cnLevelSpacingF = 0.50                  ; set the interval between contours
-;  res_p@gsnRightString       = "W/m~S~2~N"
-  res_p@gsnLeftString        = "Pressure work error TE tendency (pwork)"
-  res@gsnRightString        = "mean: "+sprintf("%3.2g",diff_DME         )+"W/m^2"
-;  res@tiMainString        = "Pressure work error (pwork) [W/m^2]"
-
-
-  min_f = min(pwork(0:ncol_p-1))
-  max_f = max(pwork(0:ncol_p-1))
-  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
-  res_p@sfXArray            = lon1d
-  res_p@sfYArray            = lat1d
-  plot(1) = gsn_csm_contour_map_ce(wks,pwork(0:ncol_p-1),res_p)
-
-;  res@cnLevelSelectionMode = "AutomaticLevels"    ; manually set the contour levels with the following 3 resources
-  res@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
-  fmin   = -0.1
-      fmax = 0.1
-  res@cnMinLevelValF  = fmin                        ; set the minimum contour level
-  res@cnMaxLevelValF  = fmax                   ; set the maximum contour level
-  res@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
-  res@gsnLeftString       = "All water in dp"        
-  res@gsnRightString        = "mean: "+sprintf("%3.2g",diff_all_water_pel         )+"W/m^2"
-;  min_f = min(all_water)
-;  max_f = max(all_water); max((tot_energy_2d(0,t,idAR,0:ncol-1)-tot_energy_2d(0,t,idBD,0:ncol-1))/dtime)
-
-;  res@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
-  res@sfXArray            = lon1d_gll
-  res@sfYArray            = lat1d_gll
-  plot(2) = gsn_csm_contour_map_ce(wks,all_water(0:ncol-1),res)
-      printMinMax((tot_energy_2d(0,t,idAR,:)-tot_energy_2d(0,t,idBD,:))/dtime,False)
-      ;min=-1489.836497456233   max=122.200959737036
-
-  fmin   = -2.0
-  fmax = 2.0
-  res@cnMinLevelValF  = fmin                        ; set the minimum contour level
-  res@cnMaxLevelValF  = fmax                   ; set the maximum contour level
-  res@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
-
-
-  res@gsnLeftString        = "cpwv"        
-  res@gsnRightString        = "mean: "+sprintf("%3.2g",diff_cpwv         )+"W/m^2"
-
-
-;  min_f = min(hvis(0:ncol-1))
-;  max_f = max(hvis(0:ncol-1))
-;  res@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
-
-  plot(3) = gsn_csm_contour_map_ce(wks,cpwv_2d(0:ncol-1),res)	
-
-;      average_hvis = sum(area(:)*(tot_energy_2d(0,t,idAH,:)-tot_energy_2d(0,t,idBH,:))/dtime)/(4.0*PI)
-;      print("ave_hvis = "+average_hvis)
-  res@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
- if (dycore.eq."SE") then
-  res@cnMinLevelValF  = -2                        ; set the minimum contour level
-  res@cnMaxLevelValF  = 2.0                   ; set the maximum contour level
-  res@cnLevelSpacingF = 0.05                  ; set the interval between contours 
-else
-  res@cnMinLevelValF  = -10.0                        ; set the minimum contour level
-  res@cnMaxLevelValF  = 10.0                   ; set the maximum contour level
-  res@cnLevelSpacingF = 0.5                  ; set the interval between contours 
-end if
-  res@gsnLeftString        = "K TERM"      
-  res@gsnRightString        = "mean: "+sprintf("%4g",diff_KPHIS         )+"W/m^2"
-
-  min_f = min(K_2d(0:ncol-1))
-  max_f = max(K_2d(0:ncol-1))
-  res@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
-
-  plot(4) = gsn_csm_contour_map_ce(wks,K_2d(0:ncol-1),res)
-
-
-  res@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
-;  res@cnMinLevelValF  = -10.0                        ; set the minimum contour level
-;  res@cnMaxLevelValF  = 10.0                   ; set the maximum contour level
-;  res@cnLevelSpacingF = 0.5                  ; set the interval between contours
-  res@cnMinLevelValF  = -20.0                        ; set the minimum contour level
-  res@cnMaxLevelValF  = 20.0                   ; set the maximum contour level
-  res@cnLevelSpacingF = 0.5                  ; set the interval between contours
-  res@gsnLeftString        = "cpT terms"  
-  res@gsnRightString        = "mean: "+sprintf("%4g",diff_cpT         )+"W/m^2"
-  min_f = min(cpT_2d(0:ncol-1))
-  max_f = max(cpT_2d(0:ncol-1))
-  res@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
-
-  cppp = cpT_2d(0:ncol-1)
-
-  plot(5) = gsn_csm_contour_map_ce(wks,cpT_2d(0:ncol-1),res)
- 
-
-  resP                  = True                   ; modify the panel plot
-  resP@gsnFrame         = False                  ; don't advance panel plot
-  resP@gsnPanelFigureStrings = (/"a","b","c","d","e","f"/)
-  resP@gsnPanelYWhiteSpacePercent = 4.0
-  resP@gsnPanelXWhiteSpacePercent = 4.0
-
-;  resP@gsnPanelLabelBar = True                   ; add common colorbar
-;  resP@gsnPanelBottom   = 0.05
-  if (dycore.eq."FV3") then    
-     resP@txString   = "TE tendencies for the default CAM-FV3 configuration (AMIP)"
-  end if
-  if (dycore.eq."SE") then    
-     resP@txString   = "TE tendencies for the default CAM-SE configuration (AMIP)"
-  end if
-  resP@txString   = panelTitle
-     gsn_panel(wks,plot,(/2,3/),resP)               ; now draw as one plot
-
-
-
-   txres               = True
-;  txres@txFontHeightF = 0.015
-;  gsn_text_ndc(wks,"Figure 1: A nifty panel plot",0.5,0.02,txres)
-   frame(wks)
-
 ;
 ;
 ; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
@@ -1370,16 +921,12 @@ end if
 ; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
 ; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
 ;
+; CAM energy equations
 ;
-   delete(wks)
-   delete(res)
-   delete(plot)
-   delete(res_p)
-
-
-
-  filePlot = panelTitle+"_CAM_ENERGY_EQN"
+;
+  filePlot = "01_CAM_ENERGY_EQN"
   wks = gsn_open_wks(output_format,filePlot)
+
   gsn_define_colormap(wks,"NCV_jaisnd");3gauss")      
     
 
@@ -1573,7 +1120,7 @@ end if
   res_p@gsnLeftString        = str
   global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave)
-  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave )+" (kg/kg)/(s m^2)"
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave )+" W/m^2"
   plot(5) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
@@ -1606,11 +1153,10 @@ end if
   plot(6) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 
-  delete(resP)
 
   resP                  = True                   ; modify the panel plot
   resP@gsnFrame         = False                  ; don't advance panel plot
-  resP@gsnPanelFigureStrings = (/"a","b","c","d","e","f"/)
+  resP@gsnPanelFigureStrings = (/"a","b","c","d","e","f","g"/)
   resP@gsnPanelYWhiteSpacePercent = 4.0
   resP@gsnPanelXWhiteSpacePercent = 4.0
 
@@ -1634,7 +1180,7 @@ end if
 
 
 
-  filePlot = panelTitle+"water_flux"
+  filePlot = "03_water_flux"
   wks = gsn_open_wks(output_format,filePlot)
   gsn_define_colormap(wks,"NCV_jaisnd");3gauss")      
     
@@ -1668,9 +1214,15 @@ end if
 ; ***********************************************
 ; total water flux
 ; ***********************************************
-
+  delete(fld)
   fld = FH2O(t,0:ncol_p-1)
-  fld = 1000*24*3600*fld/dtime ;convert from m/s to mm/day
+  ; 
+  ; flux is in units of kg/m2/s in International System of Units (SI) used for precipitation 
+  ; 1kg = 1Liter = 10e6 mm3 and 1m2 = 10e6 mm2
+  ; Therfore 1kg of rain over 1 m2 is equivalent to 1mm
+  ; i.e. 1 kg/m2/s = 86400 mm/day
+
+  fld = 86400*fld ;convert from m/s to mm/day
   str = "Flux of total water into atmosphere"
   fmin = -10.0
   fmax = 10.0
@@ -1696,8 +1248,9 @@ end if
 ; ***********************************************
 ; water vapor flux
 ; ***********************************************
+  delete(fld)
   fld = FWV(t,0:ncol_p-1)
-  fld = 1000*24*3600*fld/dtime ;convert from m/s to mm/day
+  fld = 86400*fld ;convert from m/s to mm/day
   str = "Flux of water vapor into atmosphere"
 ;  fmin = -0.0001
 ;  fmax = 0.0001
@@ -1723,8 +1276,9 @@ end if
 ; ***********************************************
 ; liq flux
 ; ***********************************************
+  delete(fld)
   fld = FLIQ(t,0:ncol_p-1)
-  fld = 1000*24*3600*fld/dtime ;convert from m/s to mm/day
+  fld = 86400*fld ;convert from m/s to mm/day
   str = "Flux of liquid into atmosphere"
 ;  fmin = -0.0001
 ;  fmax = 0.0001
@@ -1751,7 +1305,7 @@ end if
 ; ice flux
 ; ***********************************************
   fld = FICE(t,0:ncol_p-1)
-  fld = 1000*24*3600*fld/dtime ;convert from m/s to mm/day
+  fld = 86400*fld ;convert from kg/m^2/s to mm/day
   str = "Flux of ice into atmosphere"
 
 ;  fmin = -0.0001
@@ -1790,6 +1344,182 @@ end if
   txres               = True
   frame(wks)
 
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+;
+;
+   delete(wks)
+   delete(res)
+   delete(plot)
+   delete(res_p)
+
+
+
+  filePlot = "02_DME_ADJUST_CAM"
+  wks = gsn_open_wks(output_format,filePlot)
+  gsn_define_colormap(wks,"NCV_jaisnd");3gauss")      
+    
+  res                     = True         ; plot modifications desired
+  res@gsnMaximize         = False         ; Maximize size of plot in frame
+  res@gsnSpreadColors     = True         ; Use full colormap, but start
+  res@gsnDraw             = False           ; don't draw
+  res@gsnFrame            = False           ; don't advance frame
+  res@cnFillOn            = True         ; Turn on contour fill
+;  res@cnFillMode          = "AreaFill"   ; Style of fill. You can also
+                                         ; use "CellFill" and "RasterFill"
+  res@cnLinesOn           = False        ; Turn off contour lines
+  res@cnLineLabelsOn      = False        ; Turn off contour line labels
+  res@lbLabelAutoStride   = True         ; Clean up labelbar labels.
+  res@cnFillMode="RasterFill"
+
+  res@gsnStringFontHeightF = 0.02
+  res@tiMainFontHeightF = 0.025
+  res@lbLabelFontHeightF = 0.02
+  res@tmXBLabelFontHeightF = 0.015
+  res@tmYLLabelFontHeightF = 0.015
+  res@pmLabelBarOrthogonalPosF = 0.2
+
+  res@lbBoxLinesOn = False
+
+  res_p=res
+
+  plot = new(6,graphic) 
+
+
+; ***********************************************
+  ; DME adjust CAM
+; ***********************************************
+
+  delete(fld)
+  fld = pwork(0:ncol_p-1)
+  str = "Dry-mass adjustment"
+  fmin = -30.
+  fmax = 30.
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
+  plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+
+; ***********************************************
+; dme_adjust for K
+; ***********************************************
+  delete(fld)
+  fld = (tot_energy_2d(1,t,iAP10,0:ncol_p-1)-tot_energy_2d(1,t,iBP10,0:ncol_p-1))/dtime - (tot_energy_2d(2,t,iAP10,0:ncol_p-1)-tot_energy_2d(2,t,iBP10,0:ncol_p-1))/dtime 
+
+  str = "Dry-mass adjustment K"
+  fmin = -0.01
+  fmax =  0.01
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
+  plot(3) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+; ***********************************************
+; dme_adjust for PHIS
+; ***********************************************
+  delete(fld)
+  fld = (tot_energy_2d(1,t,iAP11,0:ncol_p-1)-tot_energy_2d(1,t,iBP11,0:ncol_p-1))/dtime - (tot_energy_2d(2,t,iAP11,0:ncol_p-1)-tot_energy_2d(2,t,iBP11,0:ncol_p-1))/dtime 
+
+  str = "Dry-mass adjustment PHIS"
+  fmin = -1.0
+  fmax =  1.0
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
+  plot(4) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+; ***********************************************
+; dme_adjust for cp*T
+; ***********************************************
+  delete(fld)
+  fld = (tot_energy_2d(1,t,iAP12,0:ncol_p-1)-tot_energy_2d(1,t,iBP12,0:ncol_p-1))/dtime - (tot_energy_2d(2,t,iAP12,0:ncol_p-1)-tot_energy_2d(2,t,iBP12,0:ncol_p-1))/dtime 
+
+  str = "Dry-mass adjustment cp*T"
+  fmin = -0.3
+  fmax =  0.3
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
+  plot(5) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+  delete(resP)
+
+  resP                  = True                   ; modify the panel plot
+  resP@gsnFrame         = False                  ; don't advance panel plot
+  resP@gsnPanelFigureStrings = (/"a","b","c","d"/)
+  resP@gsnPanelYWhiteSpacePercent = 4.0
+  resP@gsnPanelXWhiteSpacePercent = 4.0
+
+  resP@txString   = "Dry-mass adjustment"
+  gsn_panel(wks,plot,(/2,3/),resP)               ; now draw as one plot
+
+  txres               = True
+  frame(wks)
+
 ;
 ; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
 ; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
@@ -1805,9 +1535,525 @@ end if
 
 
 
-  filePlot = panelTitle+"all_water_terms"
+  filePlot = "04_all_water"
   wks = gsn_open_wks(output_format,filePlot)
   gsn_define_colormap(wks,"NCV_jaisnd");3gauss")      
+    
+
+  res                     = True         ; plot modifications desired
+  res@gsnMaximize         = False         ; Maximize size of plot in frame
+  res@gsnSpreadColors     = True         ; Use full colormap, but start
+  res@gsnDraw             = False           ; don't draw
+  res@gsnFrame            = False           ; don't advance frame
+  res@cnFillOn            = True         ; Turn on contour fill
+;  res@cnFillMode          = "AreaFill"   ; Style of fill. You can also
+                                         ; use "CellFill" and "RasterFill"
+  res@cnLinesOn           = False        ; Turn off contour lines
+  res@cnLineLabelsOn      = False        ; Turn off contour line labels
+  res@lbLabelAutoStride   = True         ; Clean up labelbar labels.
+  res@cnFillMode="RasterFill"
+
+  res@gsnStringFontHeightF = 0.02
+  res@tiMainFontHeightF = 0.025
+  res@lbLabelFontHeightF = 0.02
+  res@tmXBLabelFontHeightF = 0.015
+  res@tmYLLabelFontHeightF = 0.015
+  res@pmLabelBarOrthogonalPosF = 0.2
+
+  res@lbBoxLinesOn = False
+
+ res_p=res
+
+  plot = new(4,graphic) 
+
+; ***********************************************************************
+; imbalance in CAM energy equation by including all forms of water in rho
+; ***********************************************************************
+
+  delete(fld)
+  fld = all_water(0:ncol_p-1)
+  str = "Imbalance by incl. all water in density"
+  fmin = -0.1
+  fmax = 0.1
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
+  plot(0) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+
+; ***********************************************************************
+; dme_ajust incl. all water 
+; ***********************************************************************
+
+  delete(fld)
+  fld = DME_adjust_2d_with_all_water(0:ncol_p-1)
+  str = "Epsilon term using all water in density"
+  fmin = -30.0
+  fmax = 30.0
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
+  plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+
+; ***********************************************************************
+; dme_ajust incl. all water 
+; ***********************************************************************
+
+  delete(fld)
+  fld = DME_adjust_2d_with_all_water(0:ncol_p-1)-pwork(0:ncol_p-1)
+  str = "Plot (b) minus CAM dry-mass adjustment"
+  fmin = -4.0
+  fmax = 4.0
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
+  plot(2) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+
+
+
+
+
+
+
+
+  delete(resP)
+
+  resP                  = True                   ; modify the panel plot
+  resP@gsnFrame         = False                  ; don't advance panel plot
+  resP@gsnPanelFigureStrings = (/"a","b","c"/)
+  resP@gsnPanelYWhiteSpacePercent = 4.0
+  resP@gsnPanelXWhiteSpacePercent = 4.0
+
+  resP@txString   = "Effects of using all water in energy equation"
+  gsn_panel(wks,plot,(/2,2/),resP)               ; now draw as one plot
+
+  txres               = True
+  frame(wks)
+
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+;
+;
+   delete(wks)
+   delete(res)
+   delete(plot)
+   delete(res_p)
+
+
+
+  filePlot = "05_epsilon_terms_detail"
+  wks = gsn_open_wks(output_format,filePlot)
+  gsn_define_colormap(wks,"NCV_jaisnd");3gauss")      
+    
+
+  res                     = True         ; plot modifications desired
+  res@gsnMaximize         = False         ; Maximize size of plot in frame
+  res@gsnSpreadColors     = True         ; Use full colormap, but start
+  res@gsnDraw             = False           ; don't draw
+  res@gsnFrame            = False           ; don't advance frame
+  res@cnFillOn            = True         ; Turn on contour fill
+;  res@cnFillMode          = "AreaFill"   ; Style of fill. You can also
+                                         ; use "CellFill" and "RasterFill"
+  res@cnLinesOn           = False        ; Turn off contour lines
+  res@cnLineLabelsOn      = False        ; Turn off contour line labels
+  res@lbLabelAutoStride   = True         ; Clean up labelbar labels.
+  res@cnFillMode="RasterFill"
+
+  res@gsnStringFontHeightF = 0.02
+  res@tiMainFontHeightF = 0.025
+  res@lbLabelFontHeightF = 0.02
+  res@tmXBLabelFontHeightF = 0.015
+  res@tmYLLabelFontHeightF = 0.015
+  res@pmLabelBarOrthogonalPosF = 0.2
+
+  res@lbBoxLinesOn = False
+
+  res_p=res
+
+  plot = new(12,graphic) 
+
+; ***********************************************************************
+; imbalance in CAM energy equation by including all forms of water in rho
+; ***********************************************************************
+
+  delete(fld)
+  fld = K_2d_allwater(0:ncol_p-1)+cpT_2d_allwater(0:ncol_p-1)+PHIS_2d_allwater(0:ncol_p-1)
+  str = "d/dt(TE total H2O varying) imbalance"
+  fmin = -30.0
+  fmax = 30.0
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
+  plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+; ***********************************************************************
+; imbalance in CAM energy equation by including all forms of water in rho for K term
+; ***********************************************************************
+
+  delete(fld)
+  str = "d/dt(KE total H2O varying) imbalance"
+  fld = K_2d_allwater(0:ncol_p-1) 
+  fmin = -0.01
+  fmax =  0.01
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
+  plot(3) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+; ***********************************************************************
+; imbalance in CAM energy equation by including all forms of water in rho for PHIS term
+; ***********************************************************************
+
+  delete(fld)
+  fld = PHIS_2d_allwater(0:ncol_p-1)
+  str = "d/dt(PHIS term total H2O vayring) imbalance"
+  fmin = -1.
+  fmax = 1.
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
+  plot(4) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+; ***********************************************************************
+; imbalance in CAM energy equation by including all forms of water in PHIS term
+; ***********************************************************************
+
+  delete(fld)
+  fld = cpT_2d_allwater(0:ncol_p-1)
+  str = "d/dt(cp*T term total H2O varying) imbalance"
+  fmin = -30.0
+  fmax = 30.0
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
+  plot(5) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+; ***********************************************
+; Missing kinetic energy flux 
+; ***********************************************
+
+  fld = FKE(t,0:ncol_p-1)
+  str = "FH2O*"+Ktilde+"=FH2O*K(nlev)"
+  fmin = -0.01
+  fmax =  0.01
+
+
+;  res_p@cnLevelSelectionMode = "AutomaticLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave2 = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave2)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave2        )+" W/m^2"
+  plot(6) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+; ***********************************************
+; PHIS flux
+; ***********************************************
+
+  delete(fld)
+  fld = FPHIS(t,0:ncol_p-1)
+  str = "FPHIS=FH2O*PHIS"
+  fmin = -2.
+  fmax = 2.
+
+;  res_p@cnLevelSelectionMode = "AutomaticLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+"W/m^2"
+  plot(7) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+; ***********************************************
+; Missing enthalpy flux at the surface
+; ***********************************************
+
+  fld = FNET_TBOT(t,0:ncol_p-1)*cpair
+  str = "FH2O*cpd*"+Ttilde+"=FH2O*cpd*T(nlev)"
+  fmin = -30.
+  fmax = 30.
+
+;  res_p@cnLevelSelectionMode = "AutomaticLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave2 = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave2)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave2        )+" W/m^2"
+  plot(8) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+
+; ***********************************************
+; Missing kinetic energy flux 
+; ***********************************************
+
+  fld = K_2d_allwater(0:ncol_p-1) - FKE(t,0:ncol_p-1)
+  str = "(b)-(e)"
+  fmin = -0.01
+  fmax =  0.01
+
+
+;  res_p@cnLevelSelectionMode = "AutomaticLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave2 = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave2)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave2        )+" W/m^2"
+  plot(9) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+; ***********************************************
+; PHIS flux
+; ***********************************************
+
+  delete(fld)
+  fld = PHIS_2d_allwater(0:ncol_p-1)-FPHIS(t,0:ncol_p-1)
+  str = "(c)-(f)"
+  fmin = -0.0001
+  fmax = 0.0001
+
+;  res_p@cnLevelSelectionMode = "AutomaticLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+"W/m^2"
+  plot(10) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+; ***********************************************
+; Missing enthalpy flux at the surface
+; ***********************************************
+
+  fld = cpT_2d_allwater(0:ncol_p-1)- FNET_TBOT(t,0:ncol_p-1)*cpair
+  str = "(d)-(g)"
+  fmin = -2.
+  fmax = 2.
+
+;  res_p@cnLevelSelectionMode = "AutomaticLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave2 = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave2)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave2        )+" W/m^2"
+  plot(11) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+
+
+  delete(resP)
+
+  resP                  = True                   ; modify the panel plot
+  resP@gsnFrame         = False                  ; don't advance panel plot
+  resP@gsnPanelFigureStrings = (/"a","a","a","b","c","d","e","f","g","h","i","j"/)
+  resP@gsnPanelYWhiteSpacePercent = 4.0
+  resP@gsnPanelXWhiteSpacePercent = 4.0
+
+  resP@txString   = "Dry-mass adjustment breakdown"
+  gsn_panel(wks,plot,(/4,3/),resP)               ; now draw as one plot
+
+  txres               = True
+  frame(wks)
+
+;
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+;
+;
+   delete(wks)
+   delete(res)
+   delete(plot)
+   delete(res_p)
+
+
+
+  filePlot = "06_LT"
+  wks = gsn_open_wks(output_format,filePlot)
+  gsn_define_colormap(wks,"NCV_jaisnd");3gauss")      
+
     
 
   res                     = True         ; plot modifications desired
@@ -1871,7 +2117,7 @@ end if
 
   delete(fld)
   fld = lvariableL_2d(0:ncol_p-1)
-  str = "L(T) imbalance"
+  str = "L(T) imbalance "
   fmin = -30.
   fmax = 30.
 
@@ -1922,6 +2168,57 @@ end if
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
   plot(2) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
+;wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
+  delete(fld)
+    fld = (tot_energy_2d(1,t,iAP9,0:ncol_p-1)-tot_energy_2d(1,t,iBP9,0:ncol_p-1))/dtime
+  str = "lht l(t)"
+  fmin = -30.
+  fmax = 30.
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
+  plot(2) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+  delete(fld)
+    fld = ((tot_energy_2d(2,t,iAP9,0:ncol_p-1)-tot_energy_2d(2,t,iBP9,0:ncol_p-1))/dtime )	
+  str = "rht l(t)"
+  fmin = -30.
+  fmax = 30.
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
+  plot(3) = gsn_csm_contour_map_ce(wks,fld,res_p)
+;wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
 
 
   delete(resP)
@@ -1932,7 +2229,7 @@ end if
   resP@gsnPanelXWhiteSpacePercent = 4.0
 
   resP@txString   = "Epsilon terms"
-  gsn_panel(wks,plot,(/1,3/),resP)               ; now draw as one plot
+  gsn_panel(wks,plot,(/2,3/),resP)               ; now draw as one plot
 
   txres               = True
   frame(wks)
@@ -1954,7 +2251,7 @@ end if
 
 
 
-  filePlot = panelTitle+"3"
+  filePlot = "07"
   wks = gsn_open_wks(output_format,filePlot)
   gsn_define_colormap(wks,"NCV_jaisnd");3gauss")      
     
@@ -2046,7 +2343,7 @@ end if
 ; d/dt(KE update all water)
 ; ***********************************************
 
-  fld = K_2d(0:ncol_p-1)
+  fld = K_2d_allwater(0:ncol_p-1)
   str = "d/dt(KE total H2O varying)"
   fmin = -0.01
   fmax =  0.01
@@ -2074,7 +2371,7 @@ end if
 ; d/dt(cp*T term total H2O varying
 ; ***********************************************
 
-  fld = cpT_2d(0:ncol_p-1);*cpair
+  fld = cpT_2d_allwater(0:ncol_p-1);*cpair
   str = "d/dt(cp*T term total H2O varying)"
   fmin = -30.
   fmax = 30.
@@ -2103,7 +2400,7 @@ end if
 ; update all H2O in PHIS
 ; ***********************************************
 
-  fld = PHIS_2d(0:ncol_p-1)
+  fld = PHIS_2d_allwater(0:ncol_p-1)
   str = "d/dt(PHIS term total H2O vayring)"
   fmin = -1.
   fmax = 1.
@@ -2166,8 +2463,8 @@ end if
 ; ***********************************************
 
   delete(fld)
-;  fld = cpT_2d(0:ncol_p-1)+PHIS_2d(0:ncol_p-1)-FNET_TS(t,0:ncol_p-1)*cpair
-  fld = cpT_2d(0:ncol_p-1)-FNET_TS(t,0:ncol_p-1)*cpair
+;  fld = cpT_2d_allwater(0:ncol_p-1)+PHIS_2d_allwater(0:ncol_p-1)-FNET_TS(t,0:ncol_p-1)*cpair
+  fld = cpT_2d_allwater(0:ncol_p-1)-FNET_TS(t,0:ncol_p-1)*cpair
   str = "(d)+(e)-(f)"
   fmin = -2.
   fmax = 2.
@@ -2229,7 +2526,7 @@ end if
 ; ***********************************************
 
   delete(fld)
-;  fld = cpT_2d(0:ncol_p-1)-FNET_TBOT(t,0:ncol_p-1)*cpair
+;  fld = cpT_2d_allwater(0:ncol_p-1)-FNET_TBOT(t,0:ncol_p-1)*cpair
 ;  str = "(e)-(f)"
   fld = (FNET_TS(t,0:ncol_p-1)-FNET_TBOT(t,0:ncol_p-1))*cpair
   str = "Enthalpy flux using T(lowest model level) - (f)"
@@ -2289,7 +2586,7 @@ end if
 
 
 
-  filePlot = panelTitle+"4"
+  filePlot = "08"
   wks = gsn_open_wks(output_format,filePlot)
   gsn_define_colormap(wks,"NCV_jaisnd");3gauss")      
     
@@ -2325,7 +2622,7 @@ end if
 ; d/dt(KE water flux)
 ; ***********************************************
 
-  fld = K_2d(0:ncol_p-1)
+  fld = K_2d_allwater(0:ncol_p-1)
   str = "d/dt(KE total H2O varying)"
   fmin = -0.01
   fmax =  0.01
@@ -2353,7 +2650,7 @@ end if
 ; d/dt(I+PHI water varying)
 ; ***********************************************
 
-  fld = cpT_2d(0:ncol_p-1)
+  fld = cpT_2d_allwater(0:ncol_p-1)
   str = "d/dt(enthalpy total H2O varying)"
   fmin = -30.
   fmax = 30.
@@ -2382,7 +2679,7 @@ end if
 ; update all H2O (dme_adjust)
 ; ***********************************************
 
-  fld = PHIS_2d(0:ncol_p-1)
+  fld = PHIS_2d_allwater(0:ncol_p-1)
   str = "d/dt(PHIS term; H2O vayring)"
   fmin = -20.
   fmax = 20.
@@ -2473,7 +2770,7 @@ end if
 ; ***********************************************
 
   delete(fld)
-  fld = cpT_2d(0:ncol_p-1)-FNET_TS(t,0:ncol_p-1)*cpair
+  fld = cpT_2d_allwater(0:ncol_p-1)-FNET_TS(t,0:ncol_p-1)*cpair
   str = "(d)-(e)"
   fmin = -2.
   fmax = 2.
@@ -2505,7 +2802,7 @@ end if
 ; ***********************************************
 
   delete(fld)
-  fld = cpT_2d(0:ncol_p-1)-FNET_TS(t,0:ncol_p-1)*cpair
+  fld = cpT_2d_allwater(0:ncol_p-1)-FNET_TS(t,0:ncol_p-1)*cpair
   str = "(b)-(d)"
   fmin = -0.7
   fmax = 0.7
@@ -2535,7 +2832,7 @@ end if
 ; ***********************************************
 
   delete(fld)
-  fld = cpT_2d(0:ncol_p-1)-FNET_TBOT(t,0:ncol_p-1)*cpair
+  fld = cpT_2d_allwater(0:ncol_p-1)-FNET_TBOT(t,0:ncol_p-1)*cpair
   str = "(b)-(e)"
   fmin = -0.7
   fmax = 0.7
@@ -2566,7 +2863,7 @@ end if
 ; ***********************************************
 
   delete(fld)
-;  fld = cpT_2d(0:ncol_p-1)-FNET_TBOT(t,0:ncol_p-1)*cpair
+;  fld = cpT_2d_allwater(0:ncol_p-1)-FNET_TBOT(t,0:ncol_p-1)*cpair
 ;  str = "(e)-(f)"
   fld = (FNET_TS(t,0:ncol_p-1)-FNET_TBOT(t,0:ncol_p-1))*cpair
   str = "FNET_TS-FNET_TBOT"
@@ -2694,13 +2991,13 @@ end if
 ; ***********************************************
 
   delete(fld)
-  fld = cpT_2d(0:ncol_p-1)
+  fld = cpT_2d_allwater(0:ncol_p-1)
   do i=0,ncol_p-1
 ;    if (abs(FH2O(t,i)).LE.1D-5) then
     if (abs(FH2O(t,i)).LE.1D-6) then
       fld(i) = 1000.0D0; TS(t,i)
     else
-      fld(i) = cpT_2d(i)/(cpair*FH2O(t,i))
+      fld(i) = cpT_2d_allwater(i)/(cpair*FH2O(t,i))
     end if
   end do
   testimate = fld
@@ -2767,7 +3064,7 @@ end if
   delete(fld)
 
   fld = PRECT(t,:)
-  fld = 1000*24*3600*fld ;convert from m/s to mm/day
+  fld = 1000*24*3600*fld ;convert from kg/m^2/s to mm/day
   str = "PRECT (mm/day)"
   fmin = -10.
   fmax = 10.
@@ -2827,7 +3124,7 @@ end if
 
 
 
-  filePlot = panelTitle+"KE"
+  filePlot = "09_KE"
   wks = gsn_open_wks(output_format,filePlot)
   gsn_define_colormap(wks,"NCV_jaisnd");3gauss")      
     
@@ -2863,7 +3160,7 @@ end if
 ; d/dt(KE water flux)
 ; ***********************************************
 
-  fld = K_2d(0:ncol_p-1)
+  fld = K_2d_allwater(0:ncol_p-1)
   str = "d/dt(KE total H2O varying)"
   fmin = -0.01
   fmax =  0.01
@@ -2922,7 +3219,7 @@ end if
 ; Missing kinetic energy flux 
 ; ***********************************************
 
-  fld = K_2d(0:ncol_p-1)-FKE(t,0:ncol_p-1)
+  fld = K_2d_allwater(0:ncol_p-1)-FKE(t,0:ncol_p-1)
   str = "(a)-(b)"
   fmin = -0.01
   fmax =  0.01
@@ -3038,7 +3335,7 @@ end if
 ; d/dt(enthalpy water varying)
 ; ***********************************************
 
-  fld = cpT_2d(0:ncol_p-1)
+  fld = cpT_2d_allwater(0:ncol_p-1)
   str = "d/dt(enthalpy total H2O varying)"
   fmin = -30.
   fmax = 30.
@@ -3095,7 +3392,7 @@ end if
 ; Missing enthalpy flux 
 ; ***********************************************
 
-  fld = cpT_2d(0:ncol_p-1)-FNET_TBOT(t,0:ncol_p-1)*cpair
+  fld = cpT_2d_allwater(0:ncol_p-1)-FNET_TBOT(t,0:ncol_p-1)*cpair
   str = "(d) - (e)"
   fmin = -1.
   fmax = 1.
@@ -3124,12 +3421,12 @@ end if
 ; equivalent T
 ; ***********************************************
 
-  fld = cpT_2d(0:ncol_p-1)
+  fld = cpT_2d_allwater(0:ncol_p-1)
   do i=0,ncol_p-1
     if (abs(FH2O(t,i)).LE.1D-6) then
       fld(i) = 0.0
     else
-      fld(i) = (cpT_2d(i)/(cpair*FH2O(t,i)))-TSatm(t,i)
+      fld(i) = (cpT_2d_allwater(i)/(cpair*FH2O(t,i)))-TSatm(t,i)
     end if
   end do
   str = Ttilde+" in (b) to balance (a) minus T(nlev)"
@@ -3194,7 +3491,7 @@ end if
 ; ***********************************************
 
   fld = PRECT(t,:)
-  fld = 1000*24*3600*fld ;convert from m/s to mm/day
+  fld = 1000*24*3600*fld ;convert from kg/m^2/s to mm/day
   str = "PRECT (mm/day)"
 
   fmin = -10.0
@@ -3276,7 +3573,7 @@ end if
 ; update all H2O (dme_adjust)
 ; ***********************************************
 
-  fld = PHIS_2d(0:ncol_p-1)
+  fld = PHIS_2d_allwater(0:ncol_p-1)
   str = "d/dt(PHIS term H2O vayring)"
   fmin = -2.
   fmax = 2.
@@ -3337,7 +3634,7 @@ end if
 ; ***********************************************
 
   delete(fld)
-  fld = PHIS_2d(0:ncol_p-1)-FPHIS(t,0:ncol_p-1)
+  fld = PHIS_2d_allwater(0:ncol_p-1)-FPHIS(t,0:ncol_p-1)
   str = "(g) - (h)"
   fmin = -2.
   fmax = 2.
@@ -3417,7 +3714,7 @@ end if
 ; ***********************************************
 
   delete(fld)
-;  fld = cpT_2d(0:ncol_p-1)-FNET_TBOT(t,0:ncol_p-1)*cpair
+;  fld = cpT_2d_allwater(0:ncol_p-1)-FNET_TBOT(t,0:ncol_p-1)*cpair
 ;  str = "(e)-(f)"
   fld = (FNET_TS(t,0:ncol_p-1)-FNET_TBOT(t,0:ncol_p-1))*cpair
   str = "FNET_TS-FNET_TBOT"
@@ -3520,7 +3817,7 @@ end if
   delete(fld)
 
   fld = PRECT(t,:)
-  fld = 1000*24*3600*fld ;convert from m/s to mm/day
+  fld = 1000*24*3600*fld ;
   str = "PRECT (mm/day)"
   fmin = -10.
   fmax = 10.

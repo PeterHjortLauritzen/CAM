@@ -1702,19 +1702,26 @@ contains
     call outfld('KE_AP8',ztodt*tend%te_tnd_diag(:,8) , pcols   ,lchnk   )
     call outfld('SE_AP9',state%te_cur_diag(:,9), pcols   ,lchnk   )
     call outfld('KE_AP9',ztodt*tend%te_tnd_diag(:,9) , pcols   ,lchnk   )
+    call outfld('SE_AP10',state%te_cur_diag(:,10), pcols   ,lchnk   )
+    call outfld('KE_AP10',ztodt*tend%te_tnd_diag(:,10) , pcols   ,lchnk   )
+    call outfld('SE_AP11',state%te_cur_diag(:,11), pcols   ,lchnk   )
+    call outfld('KE_AP11',ztodt*tend%te_tnd_diag(:,11) , pcols   ,lchnk   )
+    call outfld('SE_AP12',state%te_cur_diag(:,12), pcols   ,lchnk   )
+    call outfld('KE_AP12',ztodt*tend%te_tnd_diag(:,12) , pcols   ,lchnk   )
 
-    call outfld('FTURB',tend%te_tnd_diag(:,10), pcols   ,lchnk   ) !radiative and sensible heat flux
-    call outfld('FLAT',tend%te_tnd_diag(:,11), pcols   ,lchnk   )  !latent heat flux terms
-    call outfld('FLATE',tend%te_tnd_diag(:,13), pcols   ,lchnk   ) !latent heat flux term 1 (for wv reference state: F(wv)*LS)
-    call outfld('FLATP',tend%te_tnd_diag(:,14), pcols   ,lchnk   ) !latent heat flux term 2 (for wv reference state: F(liq)*LF)
-    call outfld('FNH2O',tend%te_tnd_diag(:,12), pcols   ,lchnk   )  !total net water flux
-    call outfld('FNWV',tend%te_tnd_diag(:,17), pcols   ,lchnk   )  !total net water flux
+    call outfld('FTURB',tend%te_tnd_diag(:,23), pcols   ,lchnk   ) !radiative and sensible heat flux
+    call outfld('FLAT',tend%te_tnd_diag(:,22), pcols   ,lchnk   )  !latent heat flux terms
+    call outfld('FLATE',tend%te_tnd_diag(:,24), pcols   ,lchnk   ) !latent heat flux term 1 (for wv reference state: F(wv)*LS)
+    call outfld('FLATP',tend%te_tnd_diag(:,25), pcols   ,lchnk   ) !latent heat flux term 2 (for wv reference state: F(liq)*LF)
+
+    call outfld('FNH2O',tend%te_tnd_diag(:,21), pcols   ,lchnk   )  !total net water flux
+    call outfld('FNWV',tend%te_tnd_diag(:,17), pcols   ,lchnk    )  !total net water flux
     call outfld('FNLIQ',tend%te_tnd_diag(:,18), pcols   ,lchnk   )  !total net liq flux
     call outfld('FNICE',tend%te_tnd_diag(:,19), pcols   ,lchnk   )  !total net ice flux    
 
-    call outfld('FNET_TS',tend%te_tnd_diag(:,12)*cam_in%ts, pcols   ,lchnk   )       !Fnet*TS
-    call outfld('FNET_TBOT',tend%te_tnd_diag(:,20), pcols   ,lchnk   )!Fnet*t(nlev)
-    call outfld('FLAT_T',tend%te_tnd_diag(:,21), pcols   ,lchnk   )!'sum(cp*FN*TBOT') !part of latent heat flux terms with temperature dependence!enthalpy flux with L(T)
+    call outfld('FNET_TS',tend%te_tnd_diag(:,27)*cam_in%ts, pcols   ,lchnk   )!Fnet*TS
+    call outfld('FNET_TBOT',tend%te_tnd_diag(:,20), pcols   ,lchnk   )        !Fnet*t(nlev)
+    call outfld('FLAT_T',tend%te_tnd_diag(:,26), pcols   ,lchnk   )           !'sum(cp*FN*TBOT') !part of latent heat flux terms with temperature dependence!enthalpy flux with L(T)
 
     call outfld('FKE',tend%te_tnd_diag(:,15), pcols   ,lchnk   )                   !kinetic energy flux at the surface
     call outfld('FPHIS',tend%te_tnd_diag(:,16), pcols   ,lchnk   )                 !PHIS energy flux at the surface
@@ -2128,6 +2135,12 @@ contains
     call outfld('KE_BP8',zero                       , pcols   ,lchnk   )
     call outfld('SE_BP9',state%te_ini_diag(:,9), pcols   ,lchnk   )
     call outfld('KE_BP9',zero                       , pcols   ,lchnk   )
+    call outfld('SE_BP10',state%te_ini_diag(:,10), pcols   ,lchnk   )
+    call outfld('KE_BP10',zero                       , pcols   ,lchnk   )
+    call outfld('SE_BP11',state%te_ini_diag(:,11), pcols   ,lchnk   )
+    call outfld('KE_BP11',zero                       , pcols   ,lchnk   )
+    call outfld('SE_BP12',state%te_ini_diag(:,12), pcols   ,lchnk   )
+    call outfld('KE_BP12',zero                       , pcols   ,lchnk   )
 
 
     call outfld('WV_BP1',zero                       , pcols   ,lchnk   )

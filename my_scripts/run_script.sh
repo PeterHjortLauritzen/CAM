@@ -104,6 +104,9 @@ echo "        'WV_AP6','WL_AP6','WI_AP6','SE_AP6','KE_AP6',  ">> user_nl_cam
 echo "        'WV_AP7','WL_AP7','WI_AP7','SE_AP7','KE_AP7',  ">> user_nl_cam  
 echo "        'WV_AP8','WL_AP8','WI_AP8','SE_AP8','KE_AP8',  ">> user_nl_cam  
 echo "        'WV_AP9','WL_AP9','WI_AP9','SE_AP9','KE_AP9',  ">> user_nl_cam  
+echo "        'WV_AP10','WL_AP10','WI_AP10','SE_AP10','KE_AP10',  ">> user_nl_cam  
+echo "        'WV_AP11','WL_AP11','WI_AP11','SE_AP11','KE_AP11',  ">> user_nl_cam  
+echo "        'WV_AP12','WL_AP12','WI_AP12','SE_AP12','KE_AP12',  ">> user_nl_cam  
 echo "        'WV_BP1','WL_BP1','WI_BP1','SE_BP1','KE_BP1',  ">> user_nl_cam  
 echo "        'WV_BP2','WL_BP2','WI_BP2','SE_BP2','KE_BP2',  ">> user_nl_cam  
 echo "        'WV_BP3','WL_BP3','WI_BP3','SE_BP3','KE_BP3',  ">> user_nl_cam  
@@ -113,7 +116,9 @@ echo "        'WV_BP6','WL_BP6','WI_BP6','SE_BP6','KE_BP6',  ">> user_nl_cam
 echo "        'WV_BP7','WL_BP7','WI_BP7','SE_BP7','KE_BP7',  ">> user_nl_cam  
 echo "        'WV_BP8','WL_BP8','WI_BP8','SE_BP8','KE_BP8',  ">> user_nl_cam  
 echo "        'WV_BP9','WL_BP9','WI_BP9','SE_BP9','KE_BP9',  ">> user_nl_cam 
-
+echo "        'WV_BP10','WL_BP10','WI_BP10','SE_BP10','KE_BP10',  ">> user_nl_cam 
+echo "        'WV_BP11','WL_BP11','WI_BP11','SE_BP11','KE_BP11',  ">> user_nl_cam 
+echo "        'WV_BP12','WL_BP12','WI_BP12','SE_BP12','KE_BP12',  ">> user_nl_cam 
 echo "        'TS','FTURB','FLAT','FNH2O','FNET_TBOT' ,'T','TBOT','FNET_TS','SST','PRECT',">> user_nl_cam 
 echo "        'FLATE','FLATP','FTAU','FKE','FTAU','FPHIS'">> user_nl_cam 
 echo "        'FNWV','FNLIQ','FNICE','FLAT_T'">> user_nl_cam 
