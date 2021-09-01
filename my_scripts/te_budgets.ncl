@@ -1448,12 +1448,14 @@ begin
   res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
   plot(3) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
+
+
 ; ***********************************************
 ; dme_adjust for PHIS
 ; ***********************************************
   delete(fld)
-  fld = (tot_energy_2d(1,t,iAP11,0:ncol_p-1)-tot_energy_2d(1,t,iBP11,0:ncol_p-1))/dtime - (tot_energy_2d(2,t,iAP11,0:ncol_p-1)-tot_energy_2d(2,t,iBP11,0:ncol_p-1))/dtime 
 
+  fld = (tot_energy_2d(1,t,iAP12,0:ncol_p-1)-tot_energy_2d(1,t,iBP12,0:ncol_p-1))/dtime - (tot_energy_2d(2,t,iAP12,0:ncol_p-1)-tot_energy_2d(2,t,iBP12,0:ncol_p-1))/dtime 
   str = "Dry-mass adjustment PHIS"
   fmin = -1.0
   fmax =  1.0
@@ -1481,11 +1483,12 @@ begin
 ; dme_adjust for cp*T
 ; ***********************************************
   delete(fld)
-  fld = (tot_energy_2d(1,t,iAP12,0:ncol_p-1)-tot_energy_2d(1,t,iBP12,0:ncol_p-1))/dtime - (tot_energy_2d(2,t,iAP12,0:ncol_p-1)-tot_energy_2d(2,t,iBP12,0:ncol_p-1))/dtime 
+  fld = (tot_energy_2d(1,t,iAP11,0:ncol_p-1)-tot_energy_2d(1,t,iBP11,0:ncol_p-1))/dtime - (tot_energy_2d(2,t,iAP11,0:ncol_p-1)-tot_energy_2d(2,t,iBP11,0:ncol_p-1))/dtime 
+
 
   str = "Dry-mass adjustment cp*T"
-  fmin = -0.3
-  fmax =  0.3
+  fmin = -30.0
+  fmax =  30.0
 
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
@@ -1505,6 +1508,7 @@ begin
   print(str+" global ave: "+global_ave)
   res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
   plot(5) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
 
   delete(resP)
 
@@ -1677,6 +1681,162 @@ begin
   txres               = True
   frame(wks)
 
+
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
+;
+;
+   delete(wks)
+   delete(res)
+   delete(plot)
+   delete(res_p)
+
+
+
+  filePlot = "05_Modified_CAM_energy_eqn"
+  wks = gsn_open_wks(output_format,filePlot)
+  gsn_define_colormap(wks,"NCV_jaisnd");3gauss")      
+    
+
+  res                     = True         ; plot modifications desired
+  res@gsnMaximize         = False         ; Maximize size of plot in frame
+  res@gsnSpreadColors     = True         ; Use full colormap, but start
+  res@gsnDraw             = False           ; don't draw
+  res@gsnFrame            = False           ; don't advance frame
+  res@cnFillOn            = True         ; Turn on contour fill
+;  res@cnFillMode          = "AreaFill"   ; Style of fill. You can also
+                                         ; use "CellFill" and "RasterFill"
+  res@cnLinesOn           = False        ; Turn off contour lines
+  res@cnLineLabelsOn      = False        ; Turn off contour line labels
+  res@lbLabelAutoStride   = True         ; Clean up labelbar labels.
+  res@cnFillMode="RasterFill"
+
+  res@gsnStringFontHeightF = 0.02
+  res@tiMainFontHeightF = 0.025
+  res@lbLabelFontHeightF = 0.02
+  res@tmXBLabelFontHeightF = 0.015
+  res@tmYLLabelFontHeightF = 0.015
+  res@pmLabelBarOrthogonalPosF = 0.2
+
+  res@lbBoxLinesOn = False
+
+  res_p=res
+
+  plot = new(3,graphic) 
+
+; ***********************************************************************
+; imbalance in CAM energy equation by including all forms of water in rho
+; ***********************************************************************
+
+  delete(fld)
+  fld = K_2d_allwater(0:ncol_p-1)+cpT_2d_allwater(0:ncol_p-1)+PHIS_2d_allwater(0:ncol_p-1)
+  str = "d/dt(TE total H2O varying) imbalance"
+  fmin = -30.0
+  fmax = 30.0
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
+  plot(0) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+
+
+; ***********************************************
+; Missing total flux 
+; ***********************************************
+
+  fld = FKE(t,0:ncol_p-1)+FPHIS(t,0:ncol_p-1)+FNET_TBOT(t,0:ncol_p-1)*cpair
+  str = "FH2O*("+Ktilde+"+PHIS+cpd*"+Ttilde+")"
+  fmin = -30.0
+  fmax =  30.0
+
+
+;  res_p@cnLevelSelectionMode = "AutomaticLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave2 = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave2)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave2        )+" W/m^2"
+  plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+
+
+; ***********************************************
+; Difference
+; ***********************************************
+
+  fld = K_2d_allwater(0:ncol_p-1)+cpT_2d_allwater(0:ncol_p-1)+PHIS_2d_allwater(0:ncol_p-1)-(FKE(t,0:ncol_p-1)+FPHIS(t,0:ncol_p-1)+FNET_TBOT(t,0:ncol_p-1)*cpair)
+  str = "(a)-(b)"
+  fmin = -2.
+  fmax = 2.
+
+;  res_p@cnLevelSelectionMode = "AutomaticLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave2 = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave2)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave2        )+" W/m^2"
+  plot(2) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+
+
+
+
+
+  delete(resP)
+
+  resP                  = True                   ; modify the panel plot
+  resP@gsnFrame         = False                  ; don't advance panel plot
+  resP@gsnPanelFigureStrings = (/"a","b","c","d","e","f","g","h","i","j"/)
+  resP@gsnPanelYWhiteSpacePercent = 4.0
+  resP@gsnPanelXWhiteSpacePercent = 4.0
+
+  resP@txString   = "CAM energy equation incl. extra flux terms"
+  gsn_panel(wks,plot,(/4,3/),resP)               ; now draw as one plot
+
+  txres               = True
+  frame(wks)
 ; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
 ; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
 ; NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT-NEWPLOT
