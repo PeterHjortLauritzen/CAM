@@ -499,7 +499,7 @@ contains
     real (kind=r8)                              :: v1,v2,v1new,v2new,dt,heating,T0,T1
     real (kind=r8)                              :: laplace_fluxes(nc,nc,4)
     real (kind=r8)                              :: rhypervis_subcycle
-    real (kind=r8)                              :: nu_ratio1, ptop, inv_rho
+    real (kind=r8)                              :: nu_ratio1, ptop(np,np), inv_rho
     real (kind=r8), dimension(ksponge_end)      :: dtemp,du,dv
     real (kind=r8)                              :: nu_temp, nu_dp, nu_velo
 
@@ -513,7 +513,7 @@ contains
       !
       call calc_dp3d_reference(elem,edge3,hybrid,nets,nete,nt,hvcoord,dp3d_ref)
       do ie=nets,nete
-        ps_ref(:,:,ie) = ptop + sum(elem(ie)%state%dp3d(:,:,:,nt),3)
+        ps_ref(:,:,ie) = ptop(:,:) + sum(elem(ie)%state%dp3d(:,:,:,nt),3)
       end do
     else
       !
@@ -1096,7 +1096,7 @@ contains
      real (kind=r8) :: sum_water(np,np,nlev), density_inv(np,np)
      real (kind=r8) :: E,v1,v2,glnps1,glnps2
      integer        :: i,j,k,kptr,ie
-     real (kind=r8) :: u_m_umet, v_m_vmet, t_m_tmet, ptop
+     real (kind=r8) :: u_m_umet, v_m_vmet, t_m_tmet, ptop(np,np)
 
 !JMD  call t_barrierf('sync_compute_and_apply_rhs', hybrid%par%comm)
      call t_adj_detailf(+1)
@@ -1522,6 +1522,7 @@ contains
     real(kind=r8) :: ke_tmp
     real(kind=r8) :: ps(np,np)
     real(kind=r8) :: pdel(np,np,nlev)
+    real(kind=r8) :: ptop(np,np)
     !
     ! global axial angular momentum (AAM) can be separated into one part (mr) associatedwith the relative motion
     ! of the atmosphere with respect to the planets surface (also known as wind AAM) and another part (mo)
@@ -1565,11 +1566,12 @@ contains
       !
       ! Compute frozen static energy in 3 parts:  KE, SE, and energy associated with vapor and liquid
       !
+      ptop = hyai(1)*ps0
       do ie=nets,nete
         se    = 0.0_r8
         ke    = 0.0_r8
         call get_dp(1,np,1,np,1,nlev,qsize,elem(ie)%state%Qdp(:,:,:,1:qsize,tl_qdp),2,thermodynamic_active_species_idx_dycore,&
-             elem(ie)%state%dp3d(:,:,:,tl),pdel,ps=ps,ptop=hyai(1)*ps0)
+             elem(ie)%state%dp3d(:,:,:,tl),pdel,ps=ps,ptop=ptop)
         call get_cp(1,np,1,np,1,nlev,qsize,elem(ie)%state%Qdp(:,:,:,1:qsize,tl_qdp),&
              .false.,cp,dp_dry=elem(ie)%state%dp3d(:,:,:,tl),&
              active_species_idx_dycore=thermodynamic_active_species_idx_dycore)
@@ -1653,11 +1655,12 @@ contains
       call strlist_get_ind(cnst_name_gll, 'CLDICE', ixcldice, abort=.false.)
       mr_cnst = rearth**3/gravit
       mo_cnst = omega*rearth**4/gravit
+      ptop = hyai(1)*ps0
       do ie=nets,nete
         mr    = 0.0_r8
         mo    = 0.0_r8
         call get_dp(1,np,1,np,1,nlev,qsize,elem(ie)%state%Qdp(:,:,:,1:qsize,tl_qdp),2,thermodynamic_active_species_idx_dycore,&
-             elem(ie)%state%dp3d(:,:,:,tl),pdel,ps=ps,ptop=hyai(1)*ps0)
+             elem(ie)%state%dp3d(:,:,:,tl),pdel,ps=ps,ptop=ptop)
         do k = 1, nlev
           do j=1,np
             do i = 1, np

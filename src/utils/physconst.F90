@@ -759,7 +759,7 @@ end subroutine physconst_init
      real(r8), intent(out) :: dp(i0:i1,j0:j1,k0:k1)              ! pressure level thickness
      real(r8), optional,intent(out) :: ps(i0:i1,j0:j1)           ! surface pressure (if ps present then ptop
                                                                  !                   must be present)
-     real(r8), optional,intent(in)  :: ptop                      ! pressure at model top
+     real(r8), optional,intent(in)  :: ptop(i0:i1,j0:j1)         ! pressure at model top
 
      integer :: i,j,k,m_cnst,nq
 
@@ -818,7 +818,7 @@ end subroutine physconst_init
                                                                  ! 2 => tracer is mass (q*dp)
      integer,  intent(in)  :: active_species_idx(:)              ! index for thermodynamic species in tracer array
      real(r8), intent(in)  :: dp_dry(i0:i1,j0:j1,nlev)           ! dry pressure level thickness
-     real(r8), intent(in)  :: ptop                               ! model top pressure
+     real(r8), intent(in)  :: ptop  (i0:i1,j0:j1)                ! model top pressure
      real(r8), intent(out) :: pmid(i0:i1,j0:j1,nlev)             ! mid-level pressure
      real(r8), optional, intent(out) :: pint(i0:i1,j0:j1,nlev+1) ! half-level pressure
      real(r8), optional, intent(out) :: dp(i0:i1,j0:j1,nlev)     ! presure level thickness
@@ -849,7 +849,7 @@ end subroutine physconst_init
      use dycore, only: dycore_is
      integer,  intent(in)            :: i0,i1,j0,j1,k0,k1         ! array bounds
      real(r8), intent(in)            :: dp(i0:i1,j0:j1,k0:k1)     ! dry pressure level thickness
-     real(r8), intent(in)            :: ptop                      ! pressure at model top
+     real(r8), intent(in)            :: ptop(i0:i1,j0:j1)         ! pressure at model top
      real(r8), intent(out)           :: pmid(i0:i1,j0:j1,k0:k1)   ! mid (full) level pressure
      real(r8), optional, intent(out) :: pint(i0:i1,j0:j1,k0:k1+1) ! pressure at interfaces (half levels)
 
@@ -887,7 +887,7 @@ end subroutine physconst_init
                                                                  ! 2 => tracer is mass (q*dp)
      integer,  intent(in)  :: active_species_idx(:)              ! index for thermodynamic species in tracer array
      real(r8), intent(in)  :: dp_dry(i0:i1,j0:j1,nlev)           ! dry pressure level thickness
-     real(r8), intent(in)  :: ptop                               ! pressure at model top
+     real(r8), intent(in)  :: ptop(i0:i1,j0:j1)                  ! pressure at model top
      real(r8), intent(in)  :: p00                                ! reference pressure for Exner pressure (usually 1000hPa)
      logical , intent(in)  :: inv_exner                          ! logical for outputting inverse Exner or Exner pressure
      real(r8), intent(out) :: exner(i0:i1,j0:j1,nlev)
@@ -928,7 +928,7 @@ end subroutine physconst_init
                                                                  ! 2 => tracer is mass (q*dp)
      integer,  intent(in)  :: active_species_idx(:)              ! index for thermodynamic species in tracer array
      real(r8), intent(in)  :: dp_dry(i0:i1,j0:j1,nlev)           ! dry pressure level thickness
-     real(r8), intent(in)  :: ptop                               ! pressure at model top
+     real(r8), intent(in)  :: ptop(i0:i1,j0:j1)                  ! pressure at model top
      real(r8), intent(in)  :: p00                                ! reference pressure for Exner pressure (usually 1000hPa)
      real(r8), intent(in)  :: temp(i0:i1,j0:j1,nlev)             ! temperature
      real(r8), intent(out) :: theta_v(i0:i1,j0:j1,nlev)          ! virtual potential temperature
@@ -956,7 +956,7 @@ end subroutine physconst_init
                                                                  ! 2 => tracer is mass (q*dp)
      integer,  intent(in)  :: active_species_idx(:)              ! index for thermodynamic species in tracer array
      real(r8), intent(in)  :: dp_dry(i0:i1,j0:j1,nlev)           ! dry pressure level thickness
-     real(r8), intent(in)  :: ptop                               ! pressure at model top
+     real(r8), intent(in)  :: ptop(i0:i1,j0:j1)                  ! pressure at model top
      real(r8), intent(in)  :: temp(i0:i1,j0:j1,nlev)             ! temperature
      real(r8), intent(in)  :: phis(i0:i1,j0:j1)                  ! surface geopotential
      real(r8), intent(out) :: gz(i0:i1,j0:j1,nlev)               ! geopotential
@@ -993,43 +993,45 @@ end subroutine physconst_init
    !
    !****************************************************************************************************************
    !
-   subroutine get_gz_given_dp_Tv_Rdry(i0,i1,j0,j1,nlev,dp,T_v,R_dry,phis,ptop,gz,pmid)
+   subroutine get_gz_given_dp_Tv_Rdry(i0,i1,j0,j1,nlev,dp,T_v,R_dry,phis,ptop,gz,pmid,gzi)
      use dycore, only: dycore_is
      integer,  intent(in)  :: i0,i1,j0,j1,nlev                 ! array bounds
      real(r8), intent(in)  :: dp   (i0:i1,j0:j1,nlev)          ! pressure level thickness
      real(r8), intent(in)  :: T_v  (i0:i1,j0:j1,nlev)          ! virtual temperature
      real(r8), intent(in)  :: R_dry(i0:i1,j0:j1,nlev)          ! R dry
      real(r8), intent(in)  :: phis (i0:i1,j0:j1)               ! surface geopotential
-     real(r8), intent(in)  :: ptop                             ! model top presure
-     real(r8), intent(out) :: gz(i0:i1,j0:j1,nlev)             ! geopotential
+     real(r8), intent(in)  :: ptop  (i0:i1,j0:j1)              ! model top presure
+     real(r8), intent(out) :: gz(i0:i1,j0:j1,nlev)             ! geopotential at interface
      real(r8), optional, intent(out) :: pmid(i0:i1,j0:j1,nlev) ! mid-level pressure
+     real(r8), optional, intent(out) :: gzi(i0:i1,j0:j1,nlev+1)! geopotential at mid level
 
 
      real(r8), dimension(i0:i1,j0:j1,nlev)   :: pmid_local
      real(r8), dimension(i0:i1,j0:j1,nlev+1) :: pint
-     real(r8), dimension(i0:i1,j0:j1)        :: gzh, Rdry_tv
+     real(r8), dimension(i0:i1,j0:j1)        :: Rdry_tv
+     real(r8), dimension(i0:i1,j0:j1,nlev+1) :: gzi_local
      integer :: k
 
      call get_pmid_from_dp(i0,i1,j0,j1,1,nlev,dp,ptop,pmid_local,pint)
-
      !
      ! integrate hydrostatic eqn
      !
-     gzh = phis
-     if (dycore_is ('LR').or.dycore_is ('FV3')) then
+     gzi_local(:,:,nlev+1) = phis
+     if (dycore_is('LR').or.dycore_is('FV3')) then
        do k=nlev,1,-1
-         Rdry_tv(:,:) = R_dry(:,:,k)*T_v(:,:,k)
-         gz(:,:,k) = gzh(:,:)+Rdry_tv(:,:)*(1.0_r8-pint(:,:,k)/pmid_local(:,:,k))
-         gzh(:,:)  = gzh(:,:) + Rdry_tv(:,:)*(log(pint(:,:,k+1))-log(pint(:,:,k)))
+         Rdry_tv(:,:)     = R_dry(:,:,k)*T_v(:,:,k)
+         gz(:,:,k)        = gzi_local(:,:,k+1) + Rdry_tv(:,:)*(1.0_r8-pint(:,:,k)/pmid_local(:,:,k))
+         gzi_local(:,:,k) = gzi_local(:,:,k+1) + Rdry_tv(:,:)*(log(pint(:,:,k+1))-log(pint(:,:,k)))
        end do
      else
        do k=nlev,1,-1
-         Rdry_tv(:,:) = R_dry(:,:,k)*T_v(:,:,k)
-         gz(:,:,k) = gzh(:,:)+Rdry_tv(:,:)*0.5_r8*dp(:,:,k)/pmid_local(:,:,k)
-         gzh(:,:)  = gzh(:,:) + Rdry_tv(:,:)*dp(:,:,k)/pmid_local(:,:,k)
+         Rdry_tv(:,:)      = R_dry(:,:,k)*T_v(:,:,k)
+         gz(:,:,k)         = gzi_local(:,:,k+1) + Rdry_tv(:,:)*0.5_r8*dp(:,:,k)/pmid_local(:,:,k)
+         gzi_local(:,:,k)  = gzi_local(:,:,k+1) + Rdry_tv(:,:)*dp(:,:,k)/pmid_local(:,:,k)
        end do
      end if
-     if (present(pmid)) pmid=pmid_local
+     if (present(pmid)) pmid = pmid_local
+     if (present(gzi))  gzi  = gzi_local
    end subroutine get_gz_given_dp_Tv_Rdry
    !
    !****************************************************************************************************************
@@ -1046,7 +1048,7 @@ end subroutine physconst_init
                                                                    ! 2 => tracer is mass (q*dp)
      integer,  intent(in)  :: active_species_idx(:)                ! index for thermodynamic species in tracer array
      real(r8), intent(in)  :: dp_dry(i0:i1,j0:j1,nlev)             ! dry pressure level thickness
-     real(r8), intent(in)  :: ptop                                 ! pressure at model top
+     real(r8), intent(in)  :: ptop(i0:i1,j0:j1)                    ! pressure at model top
      real(r8), intent(in)  :: p00                                  ! reference pressure for Exner pressure (usually 1000hPa)
      real(r8), intent(in)  :: temp(i0:i1,j0:j1,nlev)               ! temperature
      real(r8), intent(in)  :: v(i0:i1,j0:j1,2,nlev)                ! velocity components
@@ -1094,7 +1096,7 @@ end subroutine physconst_init
                                                                    ! 2 => tracer is mass (q*dp)
      integer,  intent(in)  :: active_species_idx(:)                ! index for thermodynamic species in tracer array
      real(r8), intent(in)  :: dp_dry(i0:i1,j0:j1,nlev)             ! dry pressure level thickness
-     real(r8), intent(in)  :: ptop                                 ! pressure at model top
+     real(r8), intent(in)  :: ptop(i0:i1,j0:j1)                    ! pressure at model top
      real(r8), intent(in)  :: phis(i0:i1,j0:j1)                    ! surface geopotential
      real(r8), intent(in)  :: temp(i0:i1,j0:j1,nlev)               ! temperature
      real(r8), intent(in)  :: v(i0:i1,j0:j1,2,nlev)                ! velocity components
@@ -1127,7 +1129,7 @@ end subroutine physconst_init
      real(r8), intent(in)   :: tracer_mass(i0:i1,j0:j1,k0:k1,1:ntrac) ! Tracer array
      real(r8), intent(in)   :: dp_dry(i0:i1,j0:j1,k0:k1)       ! dry pressure level thickness
      real(r8), intent(out)  :: ps(i0:i1,j0:j1)             ! surface pressure
-     real(r8), intent(in)   :: ptop
+     real(r8), intent(in)   :: ptop(i0:i1,j0:j1)
      integer,  intent(in)   :: active_species_idx(:)
 
      integer                    :: i,j,k,m_cnst,nq
@@ -1626,7 +1628,7 @@ end subroutine physconst_init
      integer,  intent(in)           :: i0,i1,j0,j1,k1,ntrac,nlev
      real(r8), intent(in)           :: tracer(i0:i1,j0:j1,nlev,ntrac) ! Tracer array
      real(r8), intent(in)           :: temp(i0:i1,j0:j1,1:nlev) ! Temperature
-     real(r8), intent(in)           :: ptop
+     real(r8), intent(in)           :: ptop(i0:i1,j0:j1)
      real(r8), intent(in)           :: dp_dry(i0:i1,j0:j1,nlev)
      logical,  intent(in)           :: tracer_mass
      real(r8), optional,intent(out) :: rho_dry(i0:i1,j0:j1,1:k1)
