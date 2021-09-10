@@ -1,3 +1,4 @@
+#define debug_gz
 !-------------------------------------------------------------------------------
 !physics data types module
 !-------------------------------------------------------------------------------
@@ -205,6 +206,7 @@ contains
     use phys_control, only: phys_getopts
     use physconst,    only: physconst_update ! Routine which updates physconst variables (WACCM-X)
     use qneg_module,  only: qneg3
+    use physconst,    only: get_gz_given_dp_Tv_Rdry
 
 !------------------------------Arguments--------------------------------
     type(physics_ptend), intent(inout)  :: ptend   ! Parameterization tendencies
@@ -228,6 +230,10 @@ contains
 
     real(r8),allocatable :: cpairv_loc(:,:)
     real(r8),allocatable :: rairv_loc(:,:)
+    real(r8),allocatable :: phis_loc(:,:), tvir_loc(:,:)
+#ifdef debug_gz
+    real(r8),allocatable :: zi_old(:,:),zm_old(:,:)
+#endif
 
     ! PERGRO limits cldliq/ice for macro/microphysics:
     character(len=24), parameter :: pergro_cldlim_names(4) = &
@@ -415,10 +421,38 @@ contains
     ! Derive new geopotential fields if heating or water tendency not 0.
 
     if (ptend%ls .or. ptend%lq(1)) then
-       call geopotential_t  (                                                                    &
-            state%lnpint, state%lnpmid, state%pint  , state%pmid  , state%pdel  , state%rpdel  , &
-            state%t     , state%q(:,:,1), rairv_loc(:,:), gravit  , zvirv              , &
-            state%zi    , state%zm      , ncol         )
+       !
+       ! new code
+       !
+      allocate(phis_loc(ncol,pver),tvir_loc(ncol,pver))
+      tvir_loc = (1._r8 + zvirv(:ncol,:) * state%q(:ncol,:,1))*state%t(:ncol,:)
+      phis_loc = 0.0_r8
+      call get_gz_given_dp_Tv_Rdry(1,ncol,1,1,pver,state%pdel(:ncol,:),tvir_loc,rairv_loc(:ncol,:),phis_loc,state%pint(:,:),&
+           state%zm(1:ncol,:),gzi=state%zi(1:ncol,:))
+      state%zm(1:ncol,:) = state%zm(1:ncol,:)/gravit
+      state%zi(1:ncol,:) = state%zi(1:ncol,:)/gravit
+      deallocate(phis_loc,tvir_loc)
+#ifdef debug_gz
+      allocate(zi_old(ncol,pver+1),zm_old(ncol,pver))
+      !
+      ! old code
+      ! 
+      call geopotential_t  (                                                                    &
+           state%lnpint, state%lnpmid, state%pint  , state%pmid  , state%pdel  , state%rpdel  , &
+           state%t     , state%q(:,:,1), rairv_loc(:,:), gravit  , zvirv              , &
+           zi_old      , zm_old      , ncol         )
+      do k=1,pver
+        do m = 1,ncol
+          if (ABS((state%zm(m,k)-zm_old(m,k))/state%zm(m,k))>1.0E-14) then
+            write(*,*) "zmzmzm",(state%zm(m,k)-zm_old(m,k))/state%zm(m,k),state%zm(m,k),zm_old(m,k)
+          end if
+          if (ABS((state%zi(m,k)-zi_old(m,k))/state%zi(m,k))>1.0E-14) then
+            write(*,*) "zizizi",(state%zi(m,k)-zi_old(m,k))/state%zi(m,k),state%zi(m,k),zi_old(m,k)
+          end if
+        end do
+      end do
+      deallocate(zi_old,zm_old)
+#endif
        ! update dry static energy for use in next process
        do k = ptend%top_level, ptend%bot_level
           state%s(:ncol,k) = state%t(:ncol,k)*cpairv_loc(:ncol,k) &
