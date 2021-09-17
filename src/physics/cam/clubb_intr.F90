@@ -1173,6 +1173,10 @@ end subroutine clubb_init_cnst
 
     call addfld ('QSATFAC',          (/ 'lev' /),  'A', '-', 'Subgrid cloud water saturation scaling factor')
     call addfld ('KVH_CLUBB',        (/ 'ilev' /), 'A', 'm2/s', 'CLUBB vertical diffusivity of heat/moisture on interface levels')
+!+++ARH
+    call addfld ('ELEAK_CLUBB',      horiz_only,   'A', 'W/m2',      'CLUBB energy leak')
+    call addfld ('TFIX_CLUBB',       horiz_only,   'A', 'K',         'Temperature increment to conserve energy')
+!---ARH
  
     !  Initialize statistics, below are dummy variables
     dum1 = 300._r8
@@ -1236,6 +1240,10 @@ end subroutine clubb_init_cnst
        call add_default('QT',               1, ' ')
        call add_default('THETAL',           1, ' ')
        call add_default('CONCLD',           1, ' ')
+!+++ARH
+       call add_default('ELEAK_CLUBB',      1, ' ')
+       call add_default('TFIX_CLUBB',       1, ' ')
+!---ARH
     end if
       
      if (history_amwg) then
@@ -1575,7 +1583,10 @@ end subroutine clubb_init_cnst
    ! Variables below are needed to compute energy integrals for conservation
    real(r8) :: ke_a(pcols), ke_b(pcols), te_a(pcols), te_b(pcols)
    real(r8) :: wv_a(pcols), wv_b(pcols), wl_b(pcols), wl_a(pcols)
-   real(r8) :: se_dis, se_a(pcols), se_b(pcols), clubb_s(pver)
+!+++ARH
+   !real(r8) :: se_dis, se_a(pcols), se_b(pcols), clubb_s(pver)
+   real(r8) :: se_dis(pcols), se_a(pcols), se_b(pcols), clubb_s(pver)
+!---ARH
 
    real(r8) :: inv_exner_clubb(pcols,pverp)     ! Inverse exner function consistent with CLUBB  [-]
    real(r8) :: wpthlp_output(pcols,pverp)       ! Heat flux output variable                     [W/m2]
@@ -2652,7 +2663,10 @@ end subroutine clubb_init_cnst
       te_b(i) = te_b(i)+(cam_in%shf(i)+cam_in%cflx(i,1)*(latvap+latice))*hdtime      
 
       ! Compute the disbalance of total energy, over depth where CLUBB is active
-      se_dis = (te_a(i) - te_b(i))/(state1%pint(i,pverp)-state1%pint(i,clubbtop+1))
+!+++ARH
+      !se_dis = (te_a(i) - te_b(i))/(state1%pint(i,pverp)-state1%pint(i,clubbtop+1))
+      se_dis(i) = (te_a(i) - te_b(i))/(state1%pint(i,pverp)-state1%pint(i,clubbtop+1))
+!---ARH
 
       ! Fix the total energy coming out of CLUBB so it achieves enery conservation.
       ! Apply this fixer throughout the column evenly, but only at layers where 
@@ -2663,9 +2677,16 @@ end subroutine clubb_init_cnst
       ! variable.
       if (clubb_do_energyfix) then
         do k=clubbtop+1,pver
-           clubb_s(k) = clubb_s(k) - se_dis*gravit
+!+++ARH
+           !clubb_s(k) = clubb_s(k) - se_dis*gravit
+           clubb_s(k) = clubb_s(k) - se_dis(i)*gravit
+!---ARH
         enddo
       endif           
+!+++ARH
+      ! convert to units of +ve [K] 
+      se_dis(i) = -1._r8*se_dis(i)*gravit/cpairv(i,pver,lchnk)
+!---ARH
 
       !  Now compute the tendencies of CLUBB to CAM, note that pverp is the ghost point
       !  for all variables and therefore is never called in this loop
@@ -2738,6 +2759,12 @@ end subroutine clubb_init_cnst
       
 
    enddo  ! end column loop
+
+!+++ARH
+   ! dte / hdtime = [kg/s2]/[s] = W/m2
+   call outfld('ELEAK_CLUBB', (te_a - te_b)/hdtime, pcols, lchnk)
+   call outfld('TFIX_CLUBB', se_dis, pcols, lchnk)
+!---ARH
 
    call outfld('KVH_CLUBB', khzm, pcols, lchnk)
 
