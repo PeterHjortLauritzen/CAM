@@ -767,7 +767,7 @@ begin
       ;
       ; DME_adjust with all water     
       ;
-      DME_adjust_2d_with_all_water = K_2d_allwater+cpT_2d_allwater+PHIS_2d_allwater-all_water
+      DME_adjust_2d_with_all_water = K_2d_allwater+cpT_2d_allwater+PHIS_2d_allwater ;-all_water
 
       pDEFAULT(1,8) = (tot_energy(1,t,iAP8)-tot_energy(1,t,iBP8))/dtime
       pDEFAULT(2,8) = (tot_energy(2,t,iAP8)-tot_energy(2,t,iBP8))/dtime
@@ -1075,8 +1075,8 @@ begin
   fld = LF*FLIQ(t,0:ncol_p-1)
 ;  fld = FTURB(t,0:ncol_p-1)
   str = "Latent heat flux: Fnet^liq*LF00"
-  fmin = -150.
-  fmax = 150.
+  fmin = -50.
+  fmax = 50.
 
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
@@ -1568,7 +1568,7 @@ begin
 
  res_p=res
 
-  plot = new(4,graphic) 
+  plot = new(6,graphic) 
 
 ; ***********************************************************************
 ; imbalance in CAM energy equation by including all forms of water in rho
@@ -1577,8 +1577,8 @@ begin
   delete(fld)
   fld = all_water(0:ncol_p-1)
   str = "Imbalance by incl. all water in density"
-  fmin = -0.1
-  fmax = 0.1
+  fmin = -0.05
+  fmax = 0.05
 
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
@@ -1606,7 +1606,7 @@ begin
 
   delete(fld)
   fld = DME_adjust_2d_with_all_water(0:ncol_p-1)
-  str = "Epsilon term using all water in density"
+  str = "Dry-mass adjustment with all water"
   fmin = -30.0
   fmax = 30.0
 
@@ -1627,16 +1627,16 @@ begin
   global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
-  plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(3) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 
 ; ***********************************************************************
-; dme_ajust incl. all water 
+; dme_ajust CAM
 ; ***********************************************************************
 
   delete(fld)
-  fld = DME_adjust_2d_with_all_water(0:ncol_p-1)-pwork(0:ncol_p-1)
-  str = "Plot (b) minus CAM dry-mass adjustment"
+  fld = pwork(0:ncol_p-1)
+  str = "CAM Dry-mass adjustment (only water vapor)"
   fmin = -4.0
   fmax = 4.0
 
@@ -1657,7 +1657,36 @@ begin
   global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
-  plot(2) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(4) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+; ***********************************************************************
+; dme_ajust incl. all water 
+; ***********************************************************************
+
+  delete(fld)
+  fld = DME_adjust_2d_with_all_water(0:ncol_p-1)-pwork(0:ncol_p-1)
+  str = "(b)-(c)"
+  fmin = -1.0
+  fmax = 1.0
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
+  plot(4) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 
 
@@ -1671,12 +1700,12 @@ begin
 
   resP                  = True                   ; modify the panel plot
   resP@gsnFrame         = False                  ; don't advance panel plot
-  resP@gsnPanelFigureStrings = (/"a","b","c"/)
+  resP@gsnPanelFigureStrings = (/"a","a","a","b","c"/)
   resP@gsnPanelYWhiteSpacePercent = 4.0
   resP@gsnPanelXWhiteSpacePercent = 4.0
 
   resP@txString   = "Effects of using all water in energy equation"
-  gsn_panel(wks,plot,(/2,2/),resP)               ; now draw as one plot
+  gsn_panel(wks,plot,(/2,3/),resP)               ; now draw as one plot
 
   txres               = True
   frame(wks)
@@ -1880,36 +1909,9 @@ begin
 
   res_p=res
 
-  plot = new(12,graphic) 
+  plot = new(9,graphic) 
 
-; ***********************************************************************
-; imbalance in CAM energy equation by including all forms of water in rho
-; ***********************************************************************
 
-  delete(fld)
-  fld = K_2d_allwater(0:ncol_p-1)+cpT_2d_allwater(0:ncol_p-1)+PHIS_2d_allwater(0:ncol_p-1)
-  str = "d/dt(TE total H2O varying) imbalance"
-  fmin = -30.0
-  fmax = 30.0
-
-  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
-  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
-  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
-  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
-
-  min_f = min(fld(0:ncol_p-1))
-  max_f = max(fld(0:ncol_p-1))
-  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
-  print(str+" min/max: "+min_f+"  "+max_f)
-
-  res_p@sfXArray            = lon1d
-  res_p@sfYArray            = lat1d
-
-  res_p@gsnLeftString        = str
-  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
-  print(str+" global ave: "+global_ave)
-  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
-  plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************************************
 ; imbalance in CAM energy equation by including all forms of water in rho for K term
@@ -1938,7 +1940,7 @@ begin
   global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
-  plot(3) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(0) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************************************
 ; imbalance in CAM energy equation by including all forms of water in rho for PHIS term
@@ -1967,7 +1969,7 @@ begin
   global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
-  plot(4) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************************************
 ; imbalance in CAM energy equation by including all forms of water in PHIS term
@@ -1996,7 +1998,7 @@ begin
   global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
-  plot(5) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(2) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
 ; Missing kinetic energy flux 
@@ -2026,7 +2028,7 @@ begin
   global_ave2 = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave2)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave2        )+" W/m^2"
-  plot(6) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(3) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
 ; PHIS flux
@@ -2057,7 +2059,7 @@ begin
   print(str+" global ave: "+global_ave)
 
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+"W/m^2"
-  plot(7) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(4) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
 ; Missing enthalpy flux at the surface
@@ -2086,7 +2088,7 @@ begin
   global_ave2 = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave2)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave2        )+" W/m^2"
-  plot(8) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(5) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 
 ; ***********************************************
@@ -2094,7 +2096,7 @@ begin
 ; ***********************************************
 
   fld = K_2d_allwater(0:ncol_p-1) - FKE(t,0:ncol_p-1)
-  str = "(b)-(e)"
+  str = "(a)-(d)"
   fmin = -0.01
   fmax =  0.01
 
@@ -2117,7 +2119,7 @@ begin
   global_ave2 = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave2)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave2        )+" W/m^2"
-  plot(9) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(6) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
 ; PHIS flux
@@ -2125,7 +2127,7 @@ begin
 
   delete(fld)
   fld = PHIS_2d_allwater(0:ncol_p-1)-FPHIS(t,0:ncol_p-1)
-  str = "(c)-(f)"
+  str = "(b)-(e)"
   fmin = -0.0001
   fmax = 0.0001
 
@@ -2148,14 +2150,14 @@ begin
   print(str+" global ave: "+global_ave)
 
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+"W/m^2"
-  plot(10) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(7) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
 ; Missing enthalpy flux at the surface
 ; ***********************************************
 
   fld = cpT_2d_allwater(0:ncol_p-1)- FNET_TBOT(t,0:ncol_p-1)*cpair
-  str = "(d)-(g)"
+  str = "(c)-(f)"
   fmin = -2.
   fmax = 2.
 
@@ -2177,7 +2179,7 @@ begin
   global_ave2 = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave2)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave2        )+" W/m^2"
-  plot(11) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(8) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 
 
@@ -2185,7 +2187,7 @@ begin
 
   resP                  = True                   ; modify the panel plot
   resP@gsnFrame         = False                  ; don't advance panel plot
-  resP@gsnPanelFigureStrings = (/"a","a","a","b","c","d","e","f","g","h","i","j"/)
+  resP@gsnPanelFigureStrings = (/"a","b","c","d","e","f","g","h","i","j"/)
   resP@gsnPanelYWhiteSpacePercent = 4.0
   resP@gsnPanelXWhiteSpacePercent = 4.0
 
@@ -2240,16 +2242,18 @@ begin
 
   res_p=res
 
-  plot = new(6,graphic) 
+  plot = new(9,graphic) 
+
+
 ; ***********************************************
-  ; DME adjust
+; L(T)
 ; ***********************************************
 
   delete(fld)
-  fld = pwork(0:ncol_p-1)
-  str = "Dry-mass adjustment"
-  fmin = -30.
-  fmax = 30.
+  fld = lvariableL_2d(0:ncol_p-1)
+  str = "L(T) imbalance "
+  fmin = -1.
+  fmax = 1.
 
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
@@ -2272,14 +2276,14 @@ begin
 
 
 ; ***********************************************
-; L(T)
+; energy balance with latent heats
 ; ***********************************************
-
+  lt = (tot_energy_2d(1,t,iAP8,0:ncol_p-1)-tot_energy_2d(1,t,iBP8,0:ncol_p-1))/dtime - CAM_LHS(0:ncol_p-1)
   delete(fld)
-  fld = lvariableL_2d(0:ncol_p-1)
-  str = "L(T) imbalance "
-  fmin = -30.
-  fmax = 30.
+  fld = lt
+  str = "d/dt(cp*T + L(T) H2O varying) imbalance"
+  fmin = -50.
+  fmax = 50.
 
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
@@ -2299,66 +2303,45 @@ begin
   print(str+" global ave: "+global_ave)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
   plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+; ***********************************************
+; energy balance with latent heats
+; ***********************************************
+
+  delete(fld)
+  fld = cpT_2d_allwater(0:ncol_p-1) ; xxxpwork(0:ncol_p-1);(tot_energy_2d(1,t,iAP8,0:ncol_p-1)-tot_energy_2d(1,t,iBP8,0:ncol_p-1))/dtime - CAM_LHS(0:ncol_p-1);lt_2d(0:ncol_p-1)
+  str = "d/dt(cpd*T  H2O varying) imbalance"
+  fmin = -50.
+  fmax = 50.
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
+  plot(2) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
 ; ***********************************************
 ; 
 ; ***********************************************
 
   delete(fld)
-    fld = FLH_T(t,0:ncol_p-1)
+  fld = FLH_T(t,0:ncol_p-1)
   str = "enthalpy flux with variable cp"
-  fmin = -30.
-  fmax = 30.
-
-  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
-  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
-  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
-  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
-
-  min_f = min(fld(0:ncol_p-1))
-  max_f = max(fld(0:ncol_p-1))
-  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
-  print(str+" min/max: "+min_f+"  "+max_f)
-
-  res_p@sfXArray            = lon1d
-  res_p@sfYArray            = lat1d
-
-  res_p@gsnLeftString        = str
-  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
-  print(str+" global ave: "+global_ave)
-  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
-  plot(2) = gsn_csm_contour_map_ce(wks,fld,res_p)
-
-;wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
-  delete(fld)
-    fld = (tot_energy_2d(1,t,iAP9,0:ncol_p-1)-tot_energy_2d(1,t,iBP9,0:ncol_p-1))/dtime
-  str = "lht l(t)"
-  fmin = -30.
-  fmax = 30.
-
-  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
-  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
-  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
-  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
-
-  min_f = min(fld(0:ncol_p-1))
-  max_f = max(fld(0:ncol_p-1))
-  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
-  print(str+" min/max: "+min_f+"  "+max_f)
-
-  res_p@sfXArray            = lon1d
-  res_p@sfYArray            = lat1d
-
-  res_p@gsnLeftString        = str
-  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
-  print(str+" global ave: "+global_ave)
-  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
-  plot(2) = gsn_csm_contour_map_ce(wks,fld,res_p)
-
-  delete(fld)
-    fld = ((tot_energy_2d(2,t,iAP9,0:ncol_p-1)-tot_energy_2d(2,t,iBP9,0:ncol_p-1))/dtime )	
-  str = "rht l(t)"
-  fmin = -30.
-  fmax = 30.
+  fmin = -50.
+  fmax = 50.
 
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
@@ -2378,7 +2361,68 @@ begin
   print(str+" global ave: "+global_ave)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
   plot(3) = gsn_csm_contour_map_ce(wks,fld,res_p)
-;wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
+
+; ***********************************************
+; energy balance with latent heats
+; ***********************************************
+
+  delete(fld)
+  fld = lvariableL_2d(0:ncol_p-1)-FLH_T(t,0:ncol_p-1) ; xxxpwork(0:ncol_p-1);(tot_energy_2d(1,t,iAP8,0:ncol_p-1)-tot_energy_2d(1,t,iBP8,0:ncol_p-1))/dtime - CAM_LHS(0:ncol_p-1);lt_2d(0:ncol_p-1)
+  str = "(b)-(d)"
+  fmin = -50.
+  fmax = 50.
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
+  plot(4) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+
+
+; ***********************************************
+; 
+; ***********************************************
+  delete(fld)
+  fld = TSatm(t,:)-TS(t,:)
+  str = "T(k=nlev) atmosphere minus TS(skin)"
+  fmin = -4.
+  fmax = 4.
+
+;  res_p@cnLevelSelectionMode = "AutomaticLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld(0:ncol_p-1))
+  max_f = max(fld(0:ncol_p-1))
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
+  print(str+" global ave: "+global_ave+"K")
+
+  res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+"K"
+  plot(5) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
 
 
   delete(resP)
@@ -2388,7 +2432,7 @@ begin
   resP@gsnPanelYWhiteSpacePercent = 4.0
   resP@gsnPanelXWhiteSpacePercent = 4.0
 
-  resP@txString   = "Epsilon terms"
+  resP@txString   = "Variable latent heat experiments"
   gsn_panel(wks,plot,(/2,3/),resP)               ; now draw as one plot
 
   txres               = True
@@ -2654,10 +2698,10 @@ begin
 ; ***********************************************
 
   delete(fld)
-  fld = TSatm(t,:)-TS(t,:)
-  str = "T(lowest model level) - TS"
-  fmin = -5.
-  fmax = 5.
+  fld = TSatm(t,:);-TS(t,:)
+  str = "T(lowest model level)"; - TS"
+  fmin = 221; -5.
+  fmax = 301;5.
 
 ;  res_p@cnLevelSelectionMode = "AutomaticLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources

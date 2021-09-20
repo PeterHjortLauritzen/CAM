@@ -759,7 +759,6 @@ end subroutine check_energy_get_integrals
     idx=8
     !
     ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
-    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
     ke = 0._r8
     se = 0._r8
 
@@ -769,15 +768,17 @@ end subroutine check_energy_get_integrals
          pdel = (1.0_r8+state%m_diag(i,k,1,1))*state%pdeldry(i,k)/gravit
          ps(i) = ps(i)+pdel
          ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
-         se(i) = se(i) +         state%t(i,k)*cpair*state%pdeldry(i,k)/gravit 
-         se(i) = se(i) +         state%t(i,k)*cpice*state%m_diag(i,k,1,1)*state%pdeldry(i,k)/gravit !water vapor
-#ifdef ref_ice
-         se(i) = se(i) + (state%m_diag(i,k,1,1)*state%pdeldry(i,k)/gravit)*&  !wv
-              ((latice+latvap)+(cpwv-cpice)*state%t(i,k)) !assume T_00=0, h^ice_00=0
-         se(i) = se(i) + ((state%m_diag(i,k,2,1)+state%m_diag(i,k,4,1))*state%pdeldry(i,k)/gravit)*&  !cldliq
-              (latice+(cpliq-cpice)*state%t(i,k))
-#endif
-!xxx other ref states missing
+         se(i) = se(i) +         state%t(i,k)*cpair*state%pdeldry(i,k)/gravit
+         se(i) = se(i) +         state%t(i,k)*cpair *state%pdeldry(i,k)*state%m_diag(i,k,1,1)/gravit       !xxx
+         se(i) = se(i) +         state%t(i,k)*cpwv *state%pdeldry(i,k)*state%m_diag(i,k,1,1)/gravit       !water vapor
+         se(i) = se(i) +         state%t(i,k)*cpliq*state%pdeldry(i,k)*state%m_diag(i,k,2,1)/gravit!liq
+         se(i) = se(i) +         state%t(i,k)*cpliq*state%pdeldry(i,k)*state%m_diag(i,k,3,1)/gravit!liq
+         se(i) = se(i) +         state%t(i,k)*cpice*state%pdeldry(i,k)*state%m_diag(i,k,4,1)/gravit!ice
+         se(i) = se(i) +         state%t(i,k)*cpice*state%pdeldry(i,k)*state%m_diag(i,k,5,1)/gravit!ice
+         se(i) = se(i) +         state%t(i,k)*cpice*state%pdeldry(i,k)*state%m_diag(i,k,6,1)/gravit!ice
+
+!         se(i) = se(i) +         state%t(i,k)*cpair*state%pdeldry(i,k)/gravit !dry air
+!         se(i) = se(i) +         state%t(i,k)*cpair*state%m_diag(i,k,1,1)*state%pdeldry(i,k)/gravit !water vapor
        end do
     end do
     do i = 1, ncol
@@ -795,17 +796,61 @@ end subroutine check_energy_get_integrals
 #ifdef ref_ice
        state%te_ini_diag(i,idx) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
 #endif
-!       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i)+&
-!                        (SUM(state%pdeldry(i,1:pver))+wv(i)+wl(i)+wi(i))*(latice+latvap)!(latvap+latice)*wv(i) + latice*wl(i)
        state%tw_ini_diag(i,idx) = wv(i) + wl(i) + wi(i)
 
        state%te_cur_diag(i,idx) = state%te_ini_diag(i,idx)
        state%tw_cur_diag(i,idx) = state%tw_ini_diag(i,idx)
-     end do
-         !
+    end do
+!    idx=8
+!    !
+!
+!    ke = 0._r8
+!    se = 0._r8
+!
+!    ps(:) = 0.0_r8
+!    do k = 1, pver
+!       do i = 1, ncol
+!         pdel = state%pdeldry(i,k)/gravit
+!         do w=1,6
+!           pdel = pdel + state%m_diag(i,k,w,2)*state%pdeldry(i,k)/gravit
+!         end do
+!         
+!         ps(i) = ps(i)+pdel
+!         ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
+!         se(i) = se(i) +         state%t(i,k)*cpair*state%pdeldry(i,k)/gravit
+!         se(i) = se(i) +         state%t(i,k)*cpair *state%pdeldry(i,k)*state%m_diag(i,k,1,1)/gravit       !xxx
+!!         se(i) = se(i) +         state%t(i,k)*cpwv *state%pdeldry(i,k)*state%m_diag(i,k,1,1)/gravit       !water vapor
+!!         se(i) = se(i) +         state%t(i,k)*cpliq*state%pdeldry(i,k)*state%m_diag(i,k,2,1)/gravit!liq
+!!         se(i) = se(i) +         state%t(i,k)*cpliq*state%pdeldry(i,k)*state%m_diag(i,k,3,1)/gravit!liq
+!!         se(i) = se(i) +         state%t(i,k)*cpice*state%pdeldry(i,k)*state%m_diag(i,k,4,1)/gravit!ice
+!!         se(i) = se(i) +         state%t(i,k)*cpice*state%pdeldry(i,k)*state%m_diag(i,k,5,1)/gravit!ice
+!!         se(i) = se(i) +         state%t(i,k)*cpice*state%pdeldry(i,k)*state%m_diag(i,k,6,1)/gravit!ice
+!       end do
+!    end do
+!    do i = 1, ncol
+!       se(i) = se(i) + state%phis(i)*ps(i)
+!    end do
+!! Compute vertical integrals of frozen static energy and total water.
+!    do i = 1, ncol
+!#ifdef ref_wv
+!       state%te_ini_diag(i,idx) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+!#endif
+!#ifdef ref_liq
+!       state%te_ini_diag(i,idx) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+!#endif
+!#ifdef ref_ice
+!       state%te_ini_diag(i,idx) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+!#endif
+!       state%tw_ini_diag(i,idx) = wv(i) + wl(i) + wi(i)
+!
+!       state%te_cur_diag(i,idx) = state%te_ini_diag(i,idx)
+!       state%tw_cur_diag(i,idx) = state%tw_ini_diag(i,idx)
+!    end do
+!    
+    !
     !**************************************************************************************************
     !
-    ! idx=9 CAM DEFAULT ENERGY COMPUTATION USING (57)
+    ! idx=9 L(T) effect without DME adjust
     !
     !**************************************************************************************************
     idx=9
@@ -818,7 +863,7 @@ end subroutine check_energy_get_integrals
     do k = 1, pver
        do i = 1, ncol
          pdel = state%pdeldry(i,k)/gravit
-         do w=1,6
+         do w=1,1
            pdel = pdel + state%m_diag(i,k,w,1)*state%pdeldry(i,k)/gravit
          end do
          
@@ -1806,22 +1851,25 @@ end subroutine check_energy_get_integrals
 
     ps = 0.0_r8
     do k = 1, pver
-      do i = 1, ncol
-         pdel = (1.0_r8+state%m_diag(i,k,1,1))*state%pdeldry(i,k)/gravit
-         ps(i) = ps(i)+pdel
+       do i = 1, ncol
+         pdel = (1.0_r8+state%m_diag(i,k,1,1))*state%pdeldry(i,k)/gravit         
+
+         ps(i)=ps(i)+pdel
          ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
-         se(i) = se(i) +         state%t(i,k)*cpair*state%pdeldry(i,k)/gravit !water vapor
-         se(i) = se(i) +         state%t(i,k)*cpice*state%m_diag(i,k,1,1)*state%pdeldry(i,k)/gravit !water vapor
-#ifdef ref_ice
-         se(i) = se(i) + (state%m_diag(i,k,1,1)*state%pdeldry(i,k)/gravit)*&  !wv
-              ((latice+latvap)+(cpwv-cpice)*state%t(i,k)) !assume T_00=0, h^ice_00=0
-         se(i) = se(i) + ((state%m_diag(i,k,2,1)+state%m_diag(i,k,4,1))*state%pdeldry(i,k)/gravit)*&  !cldliq
-              (latice+(cpliq-cpice)*state%t(i,k))
-#endif
-      end do
+         se(i) = se(i) +         state%t(i,k)*cpair*state%pdeldry(i,k)/gravit
+         se(i) = se(i) +         state%t(i,k)*cpair *state%pdeldry(i,k)*state%m_diag(i,k,1,2)/gravit       !xxx
+         se(i) = se(i) +         state%t(i,k)*cpwv *state%pdeldry(i,k)*state%m_diag(i,k,1,2)/gravit       !water vapor
+         se(i) = se(i) +         state%t(i,k)*cpliq*state%pdeldry(i,k)*state%m_diag(i,k,2,2)/gravit!liq
+         se(i) = se(i) +         state%t(i,k)*cpliq*state%pdeldry(i,k)*state%m_diag(i,k,3,2)/gravit!liq
+         se(i) = se(i) +         state%t(i,k)*cpice*state%pdeldry(i,k)*state%m_diag(i,k,4,2)/gravit!ice
+         se(i) = se(i) +         state%t(i,k)*cpice*state%pdeldry(i,k)*state%m_diag(i,k,5,2)/gravit!ice
+         se(i) = se(i) +         state%t(i,k)*cpice*state%pdeldry(i,k)*state%m_diag(i,k,6,2)/gravit!ice
+!          se(i) = se(i) +         state%t(i,k)*cpair*state%pdeldry(i,k)/gravit !dry air
+!          se(i) = se(i) +         state%t(i,k)*cpair*state%m_diag(i,k,1,1)*state%pdeldry(i,k)/gravit !water vapor
+       end do
     end do
     do i = 1, ncol
-      se(i) = se(i) + state%phis(i)*ps(i)
+       se(i) = se(i) + state%phis(i)*ps(i)
     end do
 
 
@@ -1837,7 +1885,7 @@ end subroutine check_energy_get_integrals
 #ifdef ref_ice
        te(i) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
 #endif
-    end do
+     end do
 
     ! compute expected values and tendencies
     do i = 1, ncol
@@ -1857,13 +1905,87 @@ end subroutine check_energy_get_integrals
        ! cummulative tendencies from boundary fluxes
        tend%te_tnd_diag(i,idx) = tend%te_tnd_diag(i,idx) + te_tnd(i)
        tend%tw_tnd_diag(i,idx) = tend%tw_tnd_diag(i,idx) + tw_tnd(i)
-     end do
+    end do
+
 
     ! copy new value to state
     do i = 1, ncol
        state%te_cur_diag(i,idx) = te(i)
        state%tw_cur_diag(i,idx) = tw(i)
     end do
+
+!    idx=8
+!    ! Compute vertical integrals of dry static energy (modified), kinetic energy and water (vapor, liquid, ice)
+!    ke = 0._r8
+!    se = 0._r8
+!    ps = 0.0_r8
+!    do k = 1, pver
+!       do i = 1, ncol
+!         pdel = state%pdeldry(i,k)/gravit
+!         do w=1,6
+!           pdel = pdel + state%m_diag(i,k,w,2)*state%pdeldry(i,k)/gravit
+!         end do
+!
+!         ps(i) = ps(i)+pdel
+!         ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
+!
+!         se(i) = se(i) +         state%t(i,k)*cpair*state%pdeldry(i,k)/gravit
+!         se(i) = se(i) +         state%t(i,k)*cpair *state%pdeldry(i,k)*state%m_diag(i,k,1,2)/gravit       !xxx
+!         se(i) = se(i) +         state%t(i,k)*cpwv *state%pdeldry(i,k)*state%m_diag(i,k,1,2)/gravit       !water vapor
+!         se(i) = se(i) +         state%t(i,k)*cpliq*state%pdeldry(i,k)*state%m_diag(i,k,2,2)/gravit!liq
+!         se(i) = se(i) +         state%t(i,k)*cpliq*state%pdeldry(i,k)*state%m_diag(i,k,3,2)/gravit!liq
+!         se(i) = se(i) +         state%t(i,k)*cpice*state%pdeldry(i,k)*state%m_diag(i,k,4,2)/gravit!ice
+!         se(i) = se(i) +         state%t(i,k)*cpice*state%pdeldry(i,k)*state%m_diag(i,k,5,2)/gravit!ice
+!         se(i) = se(i) +         state%t(i,k)*cpice*state%pdeldry(i,k)*state%m_diag(i,k,6,2)/gravit!ice
+!       end do
+!    end do
+!    do i = 1, ncol
+!       se(i) = se(i) + state%phis(i)*ps(i)
+!    end do
+!
+!
+!    ! Compute vertical integrals of frozen static energy and total water.
+!    do i = 1, ncol
+!       tw(i) = wv(i) + wl(i) + wi(i)
+!#ifdef ref_wv
+!       te(i) = se(i) + ke(i) - latvap*wl(i) - (latice+latvap)*wi(i) ! wv reference state
+!#endif
+!#ifdef ref_liq
+!       te(i) = se(i) + ke(i) + latvap*wv(i) - latice*wi(i) ! liq reference state
+!#endif
+!#ifdef ref_ice
+!       te(i) = se(i) + ke(i) + (latice+latvap)*wv(i) + latice*wl(i) ! ice reference state
+!#endif
+!    end do
+!
+!    ! compute expected values and tendencies
+!    do i = 1, ncol
+!       ! expected tendencies from boundary fluxes for last process
+!#ifdef ref_wv
+!       te_tnd(i) =  (flx_cnd(i) - flx_ice(i))*1000._r8*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+!       not coded
+!#endif
+!#ifdef ref_liq
+!       te_tnd(i) = flx_vap(i)*latvap + flx_ice(i)*1000._r8*latice + flx_sen(i)
+!       not coded
+!#endif
+!#ifdef ref_ice
+!! \dot{m}^{(liq)} = -(flx_cnd(i) - flx_ice(i))*1000._r8
+!       te_tnd(i) = flx_vap(i)*(latvap+latice) - (flx_cnd(i) - flx_ice(i))*1000._r8*latice + flx_sen(i)
+!       te_tnd(i) = te_tnd(i)+(flx_vap(i)*cpwv - (flx_cnd(i) - flx_ice(i))*1000._r8*cpliq- flx_ice(i)*1000.0_r8*cpice)*state%t(i,pver)
+!#endif
+!       tw_tnd(i) = flx_vap(i) - flx_cnd(i) *1000._r8
+!
+!       ! cummulative tendencies from boundary fluxes
+!       tend%te_tnd_diag(i,idx) = tend%te_tnd_diag(i,idx) + te_tnd(i)
+!       tend%tw_tnd_diag(i,idx) = tend%tw_tnd_diag(i,idx) + tw_tnd(i)
+!     end do
+!
+!    ! copy new value to state
+!    do i = 1, ncol
+!       state%te_cur_diag(i,idx) = te(i)
+!       state%tw_cur_diag(i,idx) = tw(i)
+!    end do
          !
     !**************************************************************************************************
     !
@@ -1878,9 +2000,10 @@ end subroutine check_energy_get_integrals
     do k = 1, pver
        do i = 1, ncol
          pdel = state%pdeldry(i,k)/gravit
-         do w=1,6
-           pdel = (1.0_r8+state%m_diag(i,k,w,1))*state%pdeldry(i,k)/gravit
+         do w=1,1
+           pdel = pdel + state%m_diag(i,k,w,1)*state%pdeldry(i,k)/gravit
          end do
+
          ps(i) = ps(i)+pdel
          ke(i) = ke(i) + 0.5_r8*(state%u(i,k)**2 + state%v(i,k)**2)*pdel
 
