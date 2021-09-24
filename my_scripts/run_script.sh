@@ -25,15 +25,16 @@ set pw=`pwd`
 
 set cset="F2000climo"
 
-#set walltime = "01:30:00"
-#set stopoption="nmonths"
-#set steps="13"
-#set pecount="2700"
-
-set pecount="1800"
-set walltime = "00:45:00"
+set walltime = "01:00:00"
 set stopoption="nmonths"
-set steps="2"
+set steps="13"
+set pecount="2700"
+#set pecount="900"
+
+#set pecount="1800"
+#set walltime = "00:45:00"
+#set stopoption="nmonths"
+#set steps="2"
 
 #set walltime = "00:15:00"
 #set stopoption="nsteps"
@@ -46,7 +47,8 @@ set PBS_ACCOUNT="P93300642"
 set queue="premium"
 echo $PBS_ACCOUNT
 
-set caze=cam_energy_long
+set caze=cam_energy_clubb_ref
+#set caze=cam_energy_clubb_scale_shf
 $homedir/$USER/src/$src/cime/scripts/create_newcase --case $scratch/$USER/$caze --compset $cset --res $res  --q $queue --walltime $walltime --pecount $pecount  --project $PBS_ACCOUNT --compiler $compiler --run-unsupported
 #set caze=energy_${cset}_adam_${res}
 #/glade/u/home/aherring/src/cam6_2_017/cime/scripts/create_newcase --case $scratch/$USER/$caze --compset $cset --res $res  --q $queue --walltime $walltime --pecount $pecount  --project $PBS_ACCOUNT --compiler $compiler --run-unsupported
@@ -58,6 +60,12 @@ cd $scratch/$USER/$caze
 #./xmlchange DEBUG=TRUE
 ./xmlchange NTHRDS=$NTHRDS
 ./xmlchange TIMER_LEVEL=10
+#
+# CLUBB mods
+#
+#./xmlchange --append CAM_CONFIG_OPTS="-cppdefs -Dscale_shf"
+#./xmlchange --append CAM_CONFIG_OPTS="-cppdefs -Dfriction_heating_clubb" #NOT WORKING!
+
 ./case.setup
   echo "se_statefreq       = 144"                     >> user_nl_cam
   echo "interpolate_output = .true.,.false.,.true."    >> user_nl_cam
@@ -122,10 +130,14 @@ echo "        'WV_BP12','WL_BP12','WI_BP12','SE_BP12','KE_BP12',  ">> user_nl_ca
 echo "        'TS','FTURB','FLAT','FNH2O','FNET_TBOT' ,'T','TBOT','FNET_TS','SST','PRECT',">> user_nl_cam 
 echo "        'FLATE','FLATP','FTAU','FKE','FTAU','FPHIS'">> user_nl_cam 
 echo "        'FNWV','FNLIQ','FNICE','FLAT_T'">> user_nl_cam 
+echo "        'ELEAK_CLUBB','KLEAK_CLUBB','SLEAK_CLUBB','TFIX_CLUBB'" >> user_nl_cam 
  
 
 
 echo "inithist           = 'YEARLY'"   >> user_nl_cam
+
+
+
 
 #
 # Energy consistent configuration

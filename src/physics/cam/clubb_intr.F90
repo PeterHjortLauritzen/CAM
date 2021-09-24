@@ -1,3 +1,6 @@
+!#define scale_shf
+!#define force_consistency
+!#define friction_heating_clubb
 module clubb_intr
 
   !----------------------------------------------------------------------------------------------------- !
@@ -20,6 +23,9 @@ module clubb_intr
   use shr_kind_mod,  only: r8=>shr_kind_r8                                                                  
   use ppgrid,        only: pver, pverp, pcols, begchunk, endchunk
   use phys_control,  only: phys_getopts
+#ifdef scale_shf
+  use physconst,     only: rair
+#endif
   use physconst,     only: rairv, cpairv, cpair, gravit, latvap, latice, zvir, rh2o, karman
   use spmd_utils,    only: masterproc 
   use constituents,  only: pcnst, cnst_add
@@ -1174,7 +1180,9 @@ end subroutine clubb_init_cnst
     call addfld ('QSATFAC',          (/ 'lev' /),  'A', '-', 'Subgrid cloud water saturation scaling factor')
     call addfld ('KVH_CLUBB',        (/ 'ilev' /), 'A', 'm2/s', 'CLUBB vertical diffusivity of heat/moisture on interface levels')
 !+++ARH
-    call addfld ('ELEAK_CLUBB',      horiz_only,   'A', 'W/m2',      'CLUBB energy leak')
+    call addfld ('ELEAK_CLUBB',      horiz_only,   'A', 'W/m2',      'CLUBB total energy leak')
+    call addfld ('KLEAK_CLUBB',      horiz_only,   'A', 'W/m2',      'CLUBB kinetic energy leak')
+    call addfld ('SLEAK_CLUBB',      horiz_only,   'A', 'W/m2',      'CLUBB kinetic energy leak')
     call addfld ('TFIX_CLUBB',       horiz_only,   'A', 'K',         'Temperature increment to conserve energy')
 !---ARH
  
@@ -1589,6 +1597,9 @@ end subroutine clubb_init_cnst
 !---ARH
 
    real(r8) :: inv_exner_clubb(pcols,pverp)     ! Inverse exner function consistent with CLUBB  [-]
+#ifdef scale_shf
+   real(r8) :: inv_exner_clubb_surf
+#endif
    real(r8) :: wpthlp_output(pcols,pverp)       ! Heat flux output variable                     [W/m2]
    real(r8) :: wprtp_output(pcols,pverp)        ! Total water flux output variable              [W/m2]
    real(r8) :: wp3_output(pcols,pverp)          ! wp3 output                                    [m^3/s^3]
@@ -2004,6 +2015,12 @@ end subroutine clubb_init_cnst
        thlm(i,k) = ( state1%t(i,k) &
                      - (latvap/cpairv(i,k,lchnk))*state1%q(i,k,ixcldliq) ) &
                    * inv_exner_clubb(i,k)
+#ifdef force_consistency
+       thlm(i,k) = ( state1%t(i,k) &                                                 !phl option 3
+                     - (latvap/cpairv(i,k,lchnk))*state1%q(i,k,ixcldliq) ) &         !phl option 3
+                     +(gravit/cpairv(i,k,lchnk)) * (state1%zm(i,k) + state1%phis(i)) !phl option 3
+#endif
+                  
 
        if (clubb_do_adv) then
           if (macmic_it  ==  1) then 
@@ -2248,7 +2265,12 @@ end subroutine clubb_init_cnst
       wm_zm           = zt2zm_api(wm_zt)
  
       !  Surface fluxes provided by host model                                                                  
-      wpthlp_sfc = cam_in%shf(i)/(cpair*rho_ds_zm(1))       ! Sensible heat flux
+      wpthlp_sfc = cam_in%shf(i)/(cpair*rho_ds_zm(1))       ! Sensible heat flux !phl Option 3
+#ifdef scale_shf
+      inv_exner_clubb_surf = 1._r8/((state1%pmid(i,pver)/p0_clubb)**(rair/cpair)) !phl Option 2
+      wpthlp_sfc = wpthlp_sfc*inv_exner_clubb_surf
+#endif
+
       wprtp_sfc  = cam_in%cflx(i,1)/rho_ds_zm(1)            ! Moisture flux  (check rho)
       upwp_sfc   = cam_in%wsx(i)/rho_ds_zm(1)               ! Surface meridional momentum flux
       vpwp_sfc   = cam_in%wsy(i)/rho_ds_zm(1)               ! Surface zonal momentum flux  
@@ -2570,12 +2592,24 @@ end subroutine clubb_init_cnst
       do while ((rtp2(i,clubbtop) <= 1.e-15_r8 .and. rcm(i,clubbtop)  ==  0._r8) .and. clubbtop <  pver-1)
          clubbtop = clubbtop + 1
       enddo    
+
+#ifdef friction_heating_clubb
+      do k=1,pver
+        thlm(i,k) = thlm(i,k) &
+             -.5_r8*((um(i,k)**2+vm(i,k)**2)-(state1%u(i,k)**2+state1%v(i,k)**2))*(inv_exner_clubb(i,k)/cpairv(i,k,lchnk))
+      end do
+#endif
+
       
       ! Compute static energy using CLUBB's variables
       do k=1,pver
          clubb_s(k) = cpairv(i,k,lchnk) * thlm(i,k) / inv_exner_clubb(i,k) &
                       + latvap * rcm(i,k) &
                       + gravit * state1%zm(i,k) + state1%phis(i)
+#ifdef force_consistency
+         clubb_s(k) = cpairv(i,k,lchnk) * thlm(i,k) & !phl option 3
+                      + latvap * rcm(i,k)             !phl option 3
+#endif
       enddo      
       
       !  Compute integrals above layer where CLUBB is active
@@ -2632,19 +2666,20 @@ end subroutine clubb_init_cnst
 
       ! Compute integrals for static energy, kinetic energy, water vapor, and liquid water
       ! after CLUBB is called.  This is for energy conservation purposes.
-      se_a = 0._r8
-      ke_a = 0._r8
-      wv_a = 0._r8
-      wl_a = 0._r8
+      se_a(i) = 0._r8
+      ke_a(i) = 0._r8
+      wv_a(i) = 0._r8
+      wl_a(i) = 0._r8
       
       ! Do the same as above, but for before CLUBB was called.
-      se_b = 0._r8
-      ke_b = 0._r8
-      wv_b = 0._r8
-      wl_b = 0._r8            
+      se_b(i) = 0._r8
+      ke_b(i) = 0._r8
+      wv_b(i) = 0._r8
+      wl_b(i) = 0._r8            
       do k=1,pver
          se_a(i) = se_a(i) + clubb_s(k)*state1%pdel(i,k)/gravit
          ke_a(i) = ke_a(i) + 0.5_r8*(um(i,k)**2+vm(i,k)**2)*state1%pdel(i,k)/gravit
+!PHL option 1 frictional heating after clubb_s stuff (do NOT include K in this computation)
          wv_a(i) = wv_a(i) + (rtm(i,k)-rcm(i,k))*state1%pdel(i,k)/gravit
          wl_a(i) = wl_a(i) + (rcm(i,k))*state1%pdel(i,k)/gravit
  
@@ -2763,6 +2798,9 @@ end subroutine clubb_init_cnst
 !+++ARH
    ! dte / hdtime = [kg/s2]/[s] = W/m2
    call outfld('ELEAK_CLUBB', (te_a - te_b)/hdtime, pcols, lchnk)
+   call outfld('KLEAK_CLUBB', (ke_a - ke_b)/hdtime, pcols, lchnk)
+   call outfld('SLEAK_CLUBB', (se_a - se_b+(latvap+latice)*wv_a+latice*wl_a-((latvap+latice)*wv_b+latice*wl_b))/hdtime&
+        -(cam_in%shf+cam_in%cflx(:,1)*(latvap+latice)), pcols, lchnk)
    call outfld('TFIX_CLUBB', se_dis, pcols, lchnk)
 !---ARH
 
