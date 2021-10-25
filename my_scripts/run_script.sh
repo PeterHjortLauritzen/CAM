@@ -25,16 +25,17 @@ set pw=`pwd`
 
 set cset="F2000climo"
 
-set walltime = "01:00:00"
-set stopoption="nmonths"
-set steps="13"
-set pecount="2700"
+#set walltime = "01:00:00"
+#set stopoption="nmonths"
+#set steps="13"
+#set pecount="2700"
+
 #set pecount="900"
 
-#set pecount="1800"
-#set walltime = "00:45:00"
-#set stopoption="nmonths"
-#set steps="2"
+set pecount="1800"
+set walltime = "00:45:00"
+set stopoption="nmonths"
+set steps="2"
 
 #set walltime = "00:15:00"
 #set stopoption="nsteps"
@@ -47,7 +48,7 @@ set PBS_ACCOUNT="P93300642"
 set queue="premium"
 echo $PBS_ACCOUNT
 
-set caze=cam_energy_clubb_ref
+set caze=debug_cam_energy_pe1800
 #set caze=cam_energy_clubb_scale_shf
 $homedir/$USER/src/$src/cime/scripts/create_newcase --case $scratch/$USER/$caze --compset $cset --res $res  --q $queue --walltime $walltime --pecount $pecount  --project $PBS_ACCOUNT --compiler $compiler --run-unsupported
 #set caze=energy_${cset}_adam_${res}

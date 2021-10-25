@@ -370,6 +370,10 @@ contains
     call addfld ('FLATE',   horiz_only, 'A', 'J/m2','Latent heat terms') !latent heat flux
     call addfld ('FLATP',   horiz_only, 'A', 'J/m2','Latent heat terms') !latent heat flux
     call addfld ('FLAT_T',   horiz_only, 'A', 'J/m2','sum(cp*FN*TBOT')   !enthalpy flux assuming L(T)
+
+    call addfld ('FLAT_EVAP',   horiz_only, 'A', 'J/m2','cpwv*FWV*TS')        !not coded yet
+    call addfld ('FLAT_PRECLIQ',   horiz_only, 'A', 'J/m2','cpliq*FLIQ*TBOT') !not coded yet 
+    call addfld ('FLAT_PRECICE',   horiz_only, 'A', 'J/m2','cpice*FLIQ*TBOT') !not coded yet 
     !
     ! enthalpy flux (different versions)
     !

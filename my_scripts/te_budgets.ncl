@@ -37,6 +37,7 @@ begin
   ;
   ; constants from CAM
   ;
+  T00 = 273.16D0
   cpair    = 1004.64D0 
   cpliq    = 4188.00D0
   cpwv     = 1810.00D0
@@ -2252,8 +2253,8 @@ begin
   delete(fld)
   fld = lvariableL_2d(0:ncol_p-1)
   str = "L(T) imbalance "
-  fmin = -1.
-  fmax = 1.
+  fmin = -5.
+  fmax = 5.
 
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
@@ -2282,8 +2283,8 @@ begin
   delete(fld)
   fld = lt
   str = "d/dt(cp*T + L(T) H2O varying) imbalance"
-  fmin = -50.
-  fmax = 50.
+  fmin = -5.
+  fmax = 5.
 
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
@@ -2311,8 +2312,8 @@ begin
   delete(fld)
   fld = cpT_2d_allwater(0:ncol_p-1) ; xxxpwork(0:ncol_p-1);(tot_energy_2d(1,t,iAP8,0:ncol_p-1)-tot_energy_2d(1,t,iBP8,0:ncol_p-1))/dtime - CAM_LHS(0:ncol_p-1);lt_2d(0:ncol_p-1)
   str = "d/dt(cpd*T  H2O varying) imbalance"
-  fmin = -50.
-  fmax = 50.
+  fmin =-30.
+  fmax = 30.
 
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
@@ -2339,9 +2340,11 @@ begin
 
   delete(fld)
   fld = FLH_T(t,0:ncol_p-1)
+  fld = FWV(t,0:ncol_p-1)*(SST(t,0:ncol_p-1)-T00)*cpwv+FLIQ(t,0:ncol_p-1)*(TSatm(t,0:ncol_p-1)-T00)*cpliq+FICE(t,0:ncol_p-1)*(TSatm(t,0:ncol_p-1)-T00)*cpice
+
   str = "enthalpy flux with variable cp"
-  fmin = -50.
-  fmax = 50.
+  fmin = -5.
+  fmax = 5.
 
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
@@ -2369,8 +2372,8 @@ begin
   delete(fld)
   fld = lvariableL_2d(0:ncol_p-1)-FLH_T(t,0:ncol_p-1) ; xxxpwork(0:ncol_p-1);(tot_energy_2d(1,t,iAP8,0:ncol_p-1)-tot_energy_2d(1,t,iBP8,0:ncol_p-1))/dtime - CAM_LHS(0:ncol_p-1);lt_2d(0:ncol_p-1)
   str = "(b)-(d)"
-  fmin = -50.
-  fmax = 50.
+  fmin = -5.
+  fmax = 5.
 
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
