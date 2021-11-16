@@ -449,6 +449,12 @@ contains
     call cnst_get_ind('CLDLIQ', ixcldliq, abort=.false.)
     call cnst_get_ind('CLDICE', ixcldice, abort=.false.)
 
+#define pmid_fix
+#ifdef pmid_fix
+    call addfld ('zmid_cam',    (/ 'lev' /), 'A', '', ' ')
+    call addfld ('zfloat_cam',    (/ 'lev' /), 'A', '', ' ')
+#endif
+
     ! outfld calls in diag_phys_writeout
     call addfld ('OMEGAQ',     (/ 'lev' /), 'A', 'kgPa/kgs', 'Vertical water transport' )
     call addfld ('VQ',         (/ 'lev' /), 'A', 'm/skg/kg',  'Meridional water transport')

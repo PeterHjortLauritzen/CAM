@@ -553,7 +553,10 @@ subroutine dyn_init(dyn_in, dyn_out)
         call addfld (TRIM(ADJUSTL(str1)),   horiz_only, 'A', TRIM(ADJUSTL(str3)),TRIM(ADJUSTL(str2)), gridname='mpas_cell')
       end do
     end do
-
+#define pmid_fix
+#ifdef pmid_fix
+    call addfld ('zmid_mpas',   (/ 'lev' /), 'A', ' ','zmid_mpas', gridname='mpas_cell')
+#endif
    !
    ! initialize CAM thermodynamic infrastructure
    !
