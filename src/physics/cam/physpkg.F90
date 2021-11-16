@@ -1851,11 +1851,6 @@ contains
     end if
 
 
-#define pmid_fix
-#ifdef pmid_fix xxx
-      call outfld( 'zfloat_cam', pcols, lchnk)
-#endif
-
     moist_mixing_ratio_dycore = dycore_is('LR').or. dycore_is('FV3')    
     !
     ! FV: convert dry-type mixing ratios to moist here because physics_dme_adjust

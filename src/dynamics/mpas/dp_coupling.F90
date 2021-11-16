@@ -326,11 +326,6 @@ subroutine derived_phys(phys_state, phys_tend, pbuf2d)
 
    ! Compute fields in the physics state object which are diagnosed from the
    ! MPAS prognostic fields.
-#define pmid_fix
-#ifdef pmid_fix
-  use physconst,          only: gravit, rga
-  use cam_history,    only: outfld
-#endif
    use geopotential,  only: geopotential_t
    use check_energy,  only: check_energy_timestep_init
    use shr_vmath_mod, only: shr_vmath_log
@@ -351,10 +346,6 @@ subroutine derived_phys(phys_state, phys_tend, pbuf2d)
 
    real(r8) :: factor(pcols,pver)
    real(r8) :: zvirv(pcols,pver)
-#define pmid_fix
-#ifdef pmid_fix
-   real(r8) :: zcam(pcols,pver)
-#endif
 
    real(r8), parameter :: pref = 1.e5_r8 ! reference pressure (Pa)
 
@@ -497,13 +488,6 @@ subroutine derived_phys(phys_state, phys_tend, pbuf2d)
          phys_state(lchnk)%pmid,   phys_state(lchnk)%pdel,     phys_state(lchnk)%rpdel,         &
          phys_state(lchnk)%t,      phys_state(lchnk)%q(:,:,1), rairv(:,:,lchnk), gravit, zvirv, &
          phys_state(lchnk)%zi,     phys_state(lchnk)%zm,       ncol)
-#define pmid_fix
-#ifdef pmid_fix
-      do k = 1, pver
-        zcam(1:ncol,k) = phys_state(lchnk)%zm(:ncol,k)+phys_state(lchnk)%phis(:ncol)*rga
-      end do
-      call outfld('zmid_cam',zcam(1:ncol,:),ncol,lchnk)
-#endif
 
       ! Compute initial dry static energy, include surface geopotential
       do k = 1, pver
@@ -726,12 +710,6 @@ subroutine hydrostatic_pressure(nCells, nVertLevels, zz, zgrid, rho_zz, theta_m,
    !
   use mpas_constants, only : cp, rgas, cv, gravity, p0, Rv_over_Rd => rvord
   use physconst,      only:  rair, cpair
-#define pmid_fix
-#ifdef pmid_fix
-  use cam_history,    only: outfld
-  integer:: kk
-  real(r8) :: arr2d(nCells,nVertLevels)
-#endif
    ! Arguments
    integer, intent(in) :: nCells
    integer, intent(in) :: nVertLevels
@@ -784,28 +762,16 @@ subroutine hydrostatic_pressure(nCells, nVertLevels, zz, zgrid, rho_zz, theta_m,
         ! compute non-hydrostatic mid level pressures based on equation of state consistent with MPAS
         !
         thetavk          = theta_m(k,iCell)/ (1.0_r8 + q(k,iCell))             !convert modified theta to virtual theta
-        pmid(k,iCell)    = (rhok*rgas*thetavk*kap1)**kap2                     !mid-level pressure xxx
+        !pmid(k,iCell)    = (rhok*rgas*thetavk*kap1)**kap2                     !mid-level pressure
         theta            = theta_m(k,iCell)/(1.0_r8 + Rv_over_Rd * q(k,iCell)) !potential temperature
-        pmiddry(k,iCell) = (rhodryk*rgas*theta*kap1)**kap2                    !mid-level dry pressure xxx
+        !pmiddry(k,iCell) = (rhodryk*rgas*theta*kap1)**kap2                    !mid-level dry pressure
       end do
-#define pmid_fix
-#ifdef pmid_fix
+
       do k = nVertLevels, 1, -1
         pmid   (k,iCell) = 0.5_r8*(pint(k+1)+pint(k))                    !hydrostatic mid-level pressure
         pmiddry(k,iCell) = 0.5_r8*(pintdry(k+1,iCell)+pintdry(k,iCell))  !hydrostatic mid-level dry pressure
       end do
-#endif
     end do
-#define pmid_fix
-#ifdef pmid_fix
-    do k = 1, nVertLevels
-      kk = nVertLevels - k + 1
-      do iCell = 1, nCells
-        arr2d(iCell,k) = 0.5_r8*(zgrid(kk+1,iCell) + zgrid(kk,iCell)) 
-      end do
-      end do
-    call outfld("zmid_mpas",arr2d(1:nCells,:),ncells,1)
-#endif
 end subroutine hydrostatic_pressure
 
 
