@@ -758,11 +758,6 @@ subroutine hydrostatic_pressure(nCells, nVertLevels, zz, zgrid, rho_zz, theta_m,
         rhok    = (1.0_r8+q(k,iCell))*rhodryk
         pintdry(k,iCell) = pintdry(k+1,iCell) + gravity * rhodryk * dz(k)
         pint   (k)       = pint   (k+1)       + gravity * rhok    * dz(k)
-        !
-        ! compute non-hydrostatic mid level pressures based on equation of state consistent with MPAS
-        !
-        thetavk          = theta_m(k,iCell)/ (1.0_r8 + q(k,iCell))             !convert modified theta to virtual theta
-        theta            = theta_m(k,iCell)/(1.0_r8 + Rv_over_Rd * q(k,iCell)) !potential temperature
       end do
 
       do k = nVertLevels, 1, -1
