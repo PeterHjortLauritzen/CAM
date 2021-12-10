@@ -585,7 +585,8 @@ subroutine dyn_register()
          frontgf_idx)
       call pbuf_add_field("FRONTGA", "global", dtype_r8, (/pcols,pver/),       &
          frontga_idx)
-   end if
+      write(iulog,*) 'xxx: ', frontgf_idx,frontga_idx!xxx
+    end if
 
 end subroutine dyn_register
 

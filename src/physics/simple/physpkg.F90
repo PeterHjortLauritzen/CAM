@@ -78,7 +78,9 @@ contains
     use check_energy,       only: check_energy_register
     use kessler_cam,        only: kessler_register
     use tj2016_cam,         only: thatcher_jablonowski_register
-
+#ifdef phl
+    use dyn_comp,           only: dyn_register
+#endif
     !---------------------------Local variables-----------------------------
     !
     integer  :: mm       ! constituent index
@@ -130,6 +132,9 @@ contains
 
     ! Register test tracers
     call tracers_register()
+#ifdef phl
+    call dyn_register()
+#endif
 
     ! All tracers registered, check that the dimensions are correct
     call cnst_chk_dim()

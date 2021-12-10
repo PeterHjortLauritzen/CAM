@@ -3,7 +3,10 @@ module cam_diagnostics
 !---------------------------------------------------------------------------------
 ! Module to compute a variety of diagnostics quantities for history files
 !---------------------------------------------------------------------------------
-
+#ifdef phl
+  use phys_control,  only: use_gw_front
+  use dyn_comp,      only: frontgf_idx, frontga_idx
+#endif
 use shr_kind_mod,    only: r8 => shr_kind_r8
 use camsrfexch,      only: cam_in_t, cam_out_t
 use cam_control_mod, only: moist_physics
@@ -427,6 +430,17 @@ contains
 
     call addfld( 'CPAIRV', (/ 'lev' /), 'I', 'J/K/kg', 'Variable specific heat cap air' )
     call addfld( 'RAIRV', (/ 'lev' /), 'I', 'J/K/kg', 'Variable dry air gas constant' )
+
+#ifdef phl
+    if (use_gw_front) then
+!      frontgf_idx = pbuf_get_index('FRONTGF')
+!      frontga_idx = pbuf_get_index('FRONTGA')
+      call addfld ('frontgf_phys',   (/ 'lev' /), 'A', '', '')
+      call addfld ('frontga_phys',   (/ 'lev' /), 'A', '', '')
+    end if
+#endif
+
+
 
   end subroutine diag_init_dry
 
@@ -961,6 +975,10 @@ contains
     real(r8) :: dlon(pcols)       ! width of grid cell (meters)
 
     real(r8), pointer :: psl(:)   ! Sea Level Pressure
+#ifdef phl
+    real (kind=r8),  pointer     :: pbuf_frontgf(:,:)
+    real (kind=r8),  pointer     :: pbuf_frontga(:,:)
+#endif
 
     integer  :: i, k, m, lchnk, ncol, nstep
     !
@@ -1259,6 +1277,15 @@ contains
     ! tidal diagnostics
     !---------------------------------------------------------
     call tidal_diag_write(state)
+
+#ifdef phl
+    if (use_gw_front) then
+      call pbuf_get_field(pbuf, frontgf_idx, pbuf_frontgf)
+      call pbuf_get_field(pbuf, frontga_idx, pbuf_frontga)
+      call outfld('frontgf_phys',pbuf_frontgf, pcols   ,lchnk   )
+      call outfld('frontga_phys',pbuf_frontga, pcols   ,lchnk   )
+    end if
+#endif
 
     return
   end subroutine diag_phys_writeout_dry
