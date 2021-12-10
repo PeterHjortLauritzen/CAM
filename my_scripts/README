@@ -1,0 +1,17 @@
+get code:
+=========
+git clone https://github.com/PeterHjortLauritzen/CAM cam-idealized-tests
+cd cam-idealized-tests
+git checkout cam-idealized-tests
+
+setup:
+======
+cd my_scripts
+module load python/3.7.12
+open "FKESSLER.sh" and set correct account number: set PBS_ACCOUNT="P93300642"
+source FKSESSLER (will show you arguments required); 
+
+here is what I run:
+
+source FKESSLER.sh mpasa120_mpasa120 /glade/p/cgd/amp/pel/src/cam-idealized-tests cam-idealized-tests
+
