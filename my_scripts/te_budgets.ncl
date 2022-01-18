@@ -1941,7 +1941,7 @@ begin
   global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
-  plot(0) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(3) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************************************
 ; imbalance in CAM energy equation by including all forms of water in rho for PHIS term
@@ -1970,7 +1970,7 @@ begin
   global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
-  plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(6) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************************************
 ; imbalance in CAM energy equation by including all forms of water in PHIS term
@@ -2000,7 +2000,7 @@ begin
   global_ave = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
-  plot(2) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(0) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
 ; Missing kinetic energy flux 
@@ -2030,7 +2030,7 @@ begin
   global_ave2 = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave2)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave2        )+" W/m^2"
-  plot(3) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(4) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
 ; PHIS flux
@@ -2061,7 +2061,7 @@ begin
   print(str+" global ave: "+global_ave)
 
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+"W/m^2"
-  plot(4) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(7) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
 ; Missing enthalpy flux at the surface
@@ -2090,7 +2090,7 @@ begin
   global_ave2 = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave2)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave2        )+" W/m^2"
-  plot(5) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 
 ; ***********************************************
@@ -2098,7 +2098,7 @@ begin
 ; ***********************************************
 
   fld = K_2d_allwater(0:ncol_p-1) - FKE(t,0:ncol_p-1)
-  str = "(a)-(d)"
+  str = "(d)-(e)"
   fmin = -0.01
   fmax =  0.01
 
@@ -2121,7 +2121,7 @@ begin
   global_ave2 = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave2)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave2        )+" W/m^2"
-  plot(6) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(5) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
 ; PHIS flux
@@ -2129,7 +2129,7 @@ begin
 
   delete(fld)
   fld = PHIS_2d_allwater(0:ncol_p-1)-FPHIS(t,0:ncol_p-1)
-  str = "(b)-(e)"
+  str = "(g)-(h)"
   fmin = -0.0001
   fmax = 0.0001
 
@@ -2152,14 +2152,14 @@ begin
   print(str+" global ave: "+global_ave)
 
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+"W/m^2"
-  plot(7) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(8) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
 ; Missing enthalpy flux at the surface
 ; ***********************************************
 
   fld = cpT_2d_allwater(0:ncol_p-1)- FNET_TBOT(t,0:ncol_p-1)*cpair
-  str = "(c)-(f)"
+  str = "(a)-(b)"
   fmin = -2.
   fmax = 2.
 
@@ -2181,7 +2181,7 @@ begin
   global_ave2 = sum(area_p(0:ncol_p-1)*fld(0:ncol_p-1))*inv_area_sphere_p
   print(str+" global ave: "+global_ave2)
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave2        )+" W/m^2"
-  plot(8) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(2) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 
 
@@ -2190,10 +2190,10 @@ begin
   resP                  = True                   ; modify the panel plot
   resP@gsnFrame         = False                  ; don't advance panel plot
   resP@gsnPanelFigureStrings = (/"a","b","c","d","e","f","g","h","i","j"/)
-  resP@gsnPanelYWhiteSpacePercent = 4.0
+  resP@gsnPanelYWhiteSpacePercent = 25.0
   resP@gsnPanelXWhiteSpacePercent = 4.0
 
-  resP@txString   = "Dry-mass adjustment breakdown"
+;  resP@txString   = "Dry-mass adjustment breakdown"
   gsn_panel(wks,plot,(/4,3/),resP)               ; now draw as one plot
 
   txres               = True
@@ -2253,7 +2253,7 @@ begin
 
   delete(fld)
   fld = lvariableL_2d(0:ncol_p-1)
-  str = "L(T) imbalance "
+  str = "phase change + fric. heat imbalance /w L(T)"
   fmin = -1.
   fmax = 1.
 
@@ -2313,7 +2313,7 @@ begin
 
   delete(fld)
   fld = FLH_T(t,0:ncol_p-1)+t00term_on_rhs;cpT_2d_allwater(0:ncol_p-1) ; xxxpwork(0:ncol_p-1);(tot_energy_2d(1,t,iAP8,0:ncol_p-1)-tot_energy_2d(1,t,iBP8,0:ncol_p-1))/dtime - CAM_LHS(0:ncol_p-1);lt_2d(0:ncol_p-1)
-  str = "d/dt(K+PHI+cpd*T H2O varying)";"Modified CAM imbalance"
+  str = "K+PHIS+cp*T surface flux";"Modified CAM imbalance"
   fmin =-30.
   fmax = 30.
 
@@ -2346,7 +2346,7 @@ begin
 ;  fld = FWV(t,0:ncol_p-1)*(SST(t,0:ncol_p-1)-T00)*cpwv+FLIQ(t,0:ncol_p-1)*(TSatm(t,0:ncol_p-1)-T00)*cpliq+FICE(t,0:ncol_p-1)*(TSatm(t,0:ncol_p-1)-T00)*cpice
 ;  fld = FWV(t,0:ncol_p-1)*(SST(t,0:ncol_p-1))*cpwv+FLIQ(t,0:ncol_p-1)*(TSatm(t,0:ncol_p-1))*cpliq+FICE(t,0:ncol_p-1)*(TSatm(t,0:ncol_p-1))*cpice
 
-  str = "Imbalance in modified CAM"
+  str = "Imbalance /w constant latent heats"
   fmin = -3.
   fmax = 3.
 
@@ -2378,7 +2378,7 @@ begin
   t00term_on_rhs = FWV(t,0:ncol_p-1)*T00*cpwv+FLIQ(t,0:ncol_p-1)*T00*cpliq+FICE(t,0:ncol_p-1)*T00*cpice
   fld = lt-(FLH_T(t,0:ncol_p-1)+t00term_on_rhs)-lvariableL_2d(0:ncol_p-1)- dme_minus_flux_cam
 
-  str = "(b)-(c)-(b)-(e)"
+  str = "(b)-(c)-(a)-(e)"
   fmin = -3.
   fmax = 3.
 
@@ -2442,7 +2442,7 @@ begin
   resP@gsnPanelYWhiteSpacePercent = 4.0
   resP@gsnPanelXWhiteSpacePercent = 4.0
 
-  resP@txString   = "Variable latent heat experiments"
+;  resP@txString   = "Variable latent heat experiments"
   gsn_panel(wks,plot,(/2,3/),resP)               ; now draw as one plot
 
   txres               = True
