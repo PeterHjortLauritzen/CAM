@@ -134,26 +134,27 @@ subroutine biharmonic_wk_dp3d(elem,dptens,dpflux,ttens,vtens,deriv,edge3,hybrid,
      ! Laplace_p(T) = Laplace(T) - dT/dp Laplace(p)
      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
      
-     ! lap_p_wk should be precomputed:     
-     do k=1,nlev
-       call laplace_sphere_wk(pmid_ref(:,:,k,ie),deriv,elem(ie),lap_p_wk(:,:,k),var_coef=.false.)
-     enddo
-     
-     ! average T to interfaces, then compute dT/dp on midpoints:
-     T_i(:,:,1) = elem(ie)%state%T(:,:,1,nt)
-     T_i(:,:,nlevp) = elem(ie)%state%T(:,:,nlev,nt)
-     do k=2,nlev
-       T_i(:,:,k)=(elem(ie)%state%T(:,:,k,nt) + elem(ie)%state%T(:,:,k-1,nt))/2
-     enddo
-
-     do k=1,nlev
-       if (hvcoord%hybm(k)>0) then
-         tmp(:,:) = (T_i(:,:,k+1)-T_i(:,:,k))/dp3d_ref(:,:,k,ie)
-         tmp(:,:)=tmp(:,:) / (1.0_r8 + abs(tmp(:,:))/dp_thresh)
-         ttens(:,:,k,ie)=ttens(:,:,k,ie)-tmp(:,:)*lap_p_wk(:,:,k)   ! correction term
-       endif
-     enddo
-
+     if (present(pmid_ref).and.present(dp3d_ref)) then 
+       ! lap_p_wk should be precomputed:     
+       do k=1,nlev
+         call laplace_sphere_wk(pmid_ref(:,:,k,ie),deriv,elem(ie),lap_p_wk(:,:,k),var_coef=.false.)
+       enddo
+       
+       ! average T to interfaces, then compute dT/dp on midpoints:
+       T_i(:,:,1) = elem(ie)%state%T(:,:,1,nt)
+       T_i(:,:,nlevp) = elem(ie)%state%T(:,:,nlev,nt)
+       do k=2,nlev
+         T_i(:,:,k)=(elem(ie)%state%T(:,:,k,nt) + elem(ie)%state%T(:,:,k-1,nt))/2
+       enddo
+       
+       do k=1,nlev
+         if (hvcoord%hybm(k)>0) then
+           tmp(:,:) = (T_i(:,:,k+1)-T_i(:,:,k))/dp3d_ref(:,:,k,ie)
+           tmp(:,:)=tmp(:,:) / (1.0_r8 + abs(tmp(:,:))/dp_thresh)
+           ttens(:,:,k,ie)=ttens(:,:,k,ie)-tmp(:,:)*lap_p_wk(:,:,k)   ! correction term
+         endif
+       enddo
+     end if
       
 
       
