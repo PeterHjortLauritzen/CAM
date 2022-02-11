@@ -1,14 +1,8 @@
 module ic_baro_dry_jw06
   !-----------------------------------------------------------------------
   !
-  ! Purpose: Set idealized initial conditions for the Jablonowski and
-  !          Williamson baroclinic instability test.
-  !          References: 
-  !          Jablonowski, C., and D. L. Williamson (2006), A Baroclinic Instability Test Case for 
-  !              Atmospheric Model Dynamical Cores, Quart. J. Roy. Met. Soc., Vol. 132, 2943-2975
-  !          Jablonowski, C., and D. L. Williamson (2006), A Baroclinic Wave Test Case for Dynamical 
-  !              Cores of General Circulation Models: Model Intercomparisons, 
-  !              NCAR Technical Note NCAR/TN-469+STR, Boulder, CO, 89 pp.
+  ! Purpose: Set idealized initial conditions for the DCMIP-2012 test 2-0-0 (acid test with a Gaussian mountain)
+
   !
   !-----------------------------------------------------------------------
   use cam_logfile,         only: iulog
@@ -24,24 +18,19 @@ module ic_baro_dry_jw06
   private
 
   !=======================================================================
-  !    JW06 Dry baroclinic wave test case parameters
+  !    Test case parameters: Acid test
   !=======================================================================
   real(r8), parameter, private ::             &
-       eta_tropo              = 0.2_r8,       & ! tropopause level (hybrid vertical coordinate))
-       u0                     = 35._r8,       & ! maximum jet speed 35 m/s
-       T0                     = 288._r8,      & ! horizontal mean T at the surface
-       p00                    = 1.e5_r8,      & ! surface pressure in Pa
-       eta0                   = 0.252_r8,     & ! center of jets (hybrid vertical coordinate)
-       radius                 = 10._r8,       & ! reciprocal radius of the perturbation without the Earth's radius 'a'
-       perturbation_amplitude = 1._r8,        & ! amplitude of u perturbation 1 m/s
-       perturbation_longitude = 20._r8,       & ! longitudinal position, 20E
-       perturbation_latitude  = 40._r8,       & ! latitudinal position, 40N
-       eta_sfc                = 1._r8,        & ! hybrid value at the surface
-       delta_T                = 480000._r8,   & ! in K, parameter for T mean calculation
-       gamma                  = 0.005_r8        ! lapse rate in K/m
-  real(r8) :: a_omega, exponent
+       T0                     = 300._r8,      & ! horizontal mean T at the surface in K
+       p00                    = 1.e5_r8,      & ! reference surface pressure in Pa
+       mountain_halfwidth     = 1._r8/10._r8, & ! halfwidth of the Gaussian mountain without Earth's radius=1 (a/10 with a=1) 
+       mountain_amplitude     = 2000._r8,     & ! mountain amplitude of 2000 m
+       mountain_longitude     = 180._r8,      & ! mountain longitudinal center position in degrees, 180E
+       mountain_latitude      = 0._r8,        & ! mountain latitudinal center position in degrees, 0N (equator)
+       gamma                  = 0.0065_r8       ! temperature lapse rate K/m
 
-  real(r8), parameter :: deg2rad = pi/180._r8   ! conversion to radians
+  real(r8) :: exponent, exponent_rev
+  real(r8), parameter :: deg2rad = pi/180._r8                 ! conversion to radians
 
   ! Public interface
   public :: bc_dry_jw06_set_ic
@@ -56,7 +45,7 @@ contains
 
     !-----------------------------------------------------------------------
     !
-    ! Purpose: Set baroclinic wave initial values for dynamics state variables
+    ! Purpose: Set initial values for the dry acid test (DCMIP-2021  2-0-0)
     !
     !-----------------------------------------------------------------------
 
@@ -83,16 +72,28 @@ contains
     integer                           :: nlev
     integer                           :: ncnst
     character(len=*), parameter       :: subname = 'BC_DRY_JW06_SET_IC'
-    real(r8)                          :: tmp
-    real(r8)                          :: r(size(latvals))
-    real(r8)                          :: eta
-    real(r8)                          :: factor
-    real(r8)                          :: perturb_lon, perturb_lat
-    real(r8)                          :: phi_vertical
-    real(r8)                          :: u_wind(size(latvals))
+    real(r8)                          :: r(size(latvals))         ! great circle distance (unit circle)
+    real(r8)                          :: surface_pressure(size(latvals))
+    real(r8)                          :: surface_height(size(latvals))
+    real(r8)                          :: mountain_lon, mountain_lat
+    real(r8)                          :: mountain_radius, mountain_oscillation_width
+    logical                           :: mountain_gaussian
 
-       a_omega                = rearth*omega
-       exponent               = rair*gamma/gravit
+    exponent     = gravit/(rair*gamma)
+    exponent_rev = 1.d0/exponent
+
+
+    !*******************************
+    ! Mountain parameters
+    !*******************************
+    mountain_lon = mountain_longitude * deg2rad       ! in radians
+    mountain_lat = mountain_latitude  * deg2rad       ! in radians
+    ! parameters for the Schaer-type oscillatory mountain range (DCMIP-2012 test 2-0-0), not needed for a Gaussian mountain
+    mountain_radius            = 3._r8*pi/4._r8       ! mountain radius (radians)
+    mountain_oscillation_width = pi/16._r8            ! mountain oscillation half-width (radians) 
+    ! flag that distinguishes between two mountain shapes
+    mountain_gaussian          = .true.               ! flag that either selects a Gaussian mountain (.true.) or the oscillatory mountain (.false.)
+    ! mountain_gaussian          = .false.               ! flag that either selects a Gaussian mountain (.true.) or the oscillatory mountain (.false.)
 
     allocate(mask_use(size(latvals)))
     if (present(mask)) then
@@ -119,6 +120,53 @@ contains
       call endrun(subname//':  height-based vertical coordinate not currently supported')
     end if
 
+    !*******************************
+    !
+    ! Initialize the surface height (topography) and surface pressure
+    !
+    !*******************************
+    !
+    if (mountain_gaussian) then
+    !  Gaussian mountain
+       where(mask_use)
+    !    great circle distance without the Earth's radius (unit circle)
+         r(:) = acos( sin(mountain_lat)*sin(latvals(:)) + cos(mountain_lat)*cos(latvals(:))*cos(lonvals(:)-mountain_lon))
+         surface_height(:) = mountain_amplitude*exp(- (r(:)/mountain_halfwidth)**2._r8 )
+    !    surface pressure (in hydrostatic balance) 
+         surface_pressure(:) = p00 * (1._r8 - gamma/T0*surface_height(:))**exponent
+       end where
+    else 
+    ! oscillatory Schaer-type mountain used in DCMIP-2012 test 2-0-0
+       do i = 1, size(latvals,1)
+         if (mask_use(i)) then
+    !       great circle distance without the Earth's radius (unit circle)
+            r(i) = acos( sin(mountain_lat)*sin(latvals(i)) + cos(mountain_lat)*cos(latvals(i))*cos(lonvals(i)-mountain_lon))
+            if (r(i) .lt. mountain_radius) then
+              surface_height(i) = (mountain_amplitude/2._r8)*(1._r8+cos(pi*r(i)/mountain_radius))*cos(pi*r(i)/mountain_oscillation_width)**2._r8
+            else
+              surface_height(i) = 0._r8
+            endif
+    !       surface pressure (in hydrostatic balance) 
+            surface_pressure(i) = p00 * (1._r8 - gamma/T0*surface_height(i))**exponent
+         endif
+       end do
+    endif
+
+    !*******************************
+    !
+    ! Initialize PHIS
+    !
+    !*******************************
+    !
+     if (present(PHIS)) then
+      where(mask_use)
+      ! surface geopotential: mountain height times gravity 
+        PHIS(:) = gravit*surface_height(:)
+      end where
+      if(masterproc .and. verbose_use) then
+        write(iulog,*) '          PHIS initialized by "',subname,'"'
+      end if
+     end if
     !
     !*******************************
     !
@@ -126,33 +174,16 @@ contains
     !
     !*******************************
     !
-    if (present(PS)) then
+     if (present(PS)) then
       where(mask_use)
-        PS = p00
+        PS(:) = surface_pressure(:)
       end where
 
       if(masterproc .and. verbose_use) then
         write(iulog,*) '          PS initialized by "',subname,'"'
       end if
-    end if
+     end if
     !
-    !*******************************
-    !
-    ! Initialize PHIS
-    !
-    !*******************************
-    !
-    if (present(PHIS)) then
-      phis = 0.0_r8
-      tmp =  u0 * (cos((eta_sfc-eta0)*pi*0.5_r8))**1.5_r8
-      where(mask_use)
-        PHIS(:) = ((-2._r8*(sin(latvals(:)))**6 * ((cos(latvals(:)))**2 + 1._r8/3._r8) + 10._r8/63._r8)*tmp   &
-                + (8._r8/5._r8*(cos(latvals(:)))**3 * ((sin(latvals(:)))**2 + 2._r8/3._r8) - pi/4._r8)*a_omega)*tmp
-      end where
-      if(masterproc .and. verbose_use) then
-        write(iulog,*) '          PHIS initialized by "',subname,'"'
-      end if
-    end if
     !
     !*******************************
     !
@@ -175,17 +206,9 @@ contains
 
       if (lu) then
         do k = 1, nlev
-          perturb_lon = perturbation_longitude * deg2rad
-          perturb_lat = perturbation_latitude  * deg2rad
-          phi_vertical = ((hyam(k)+hybm(k)) - eta0) *0.5_r8*pi
-             where(mask_use)
-               ! background wind
-               u_wind(:) = (cos(phi_vertical))**1.5_r8 * 4._r8 * u0 * (sin(latvals(:)))**2 * (cos(latvals(:)))**2
-               ! great circle distance without radius 'a'
-               r(:)      = acos( sin(perturb_lat)*sin(latvals(:)) + cos(perturb_lat)*cos(latvals(:))*cos(lonvals(:)-perturb_lon))
-               !  background + perturbation wind
-               U(:,k)    = perturbation_amplitude*exp(- (r(:)*radius)**2 ) + u_wind(:)
-             end where
+          where(mask_use)
+             U(:,k) = 0.0_r8
+          end where
         end do
         if(masterproc.and. verbose_use) then
           write(iulog,*) '          U initialized by "',subname,'"'
@@ -203,23 +226,9 @@ contains
       end if
       if (lt) then
        do k = 1, nlev
-         eta = hyam(k) + hybm(k)
-            ! background temperature
-            if (eta .ge. eta_tropo) then
-              tmp = T0*eta**exponent
-            else
-              tmp = T0*eta**exponent + delta_T*(eta_tropo-eta)**5
-            endif
-            factor       = eta*pi*u0/rair
-            phi_vertical = (eta - eta0) * 0.5_r8*pi
-           where(mask_use)
-            ! background temperature 'tmp' plus temperature deviation
-            T(:,k)       = factor * 1.5_r8 * sin(phi_vertical) * (cos(phi_vertical))**0.5_r8 *                &
-                         ((-2._r8*(sin(latvals(:)))**6 * ((cos(latvals(:)))**2 + 1._r8/3._r8) + 10._r8/63._r8)*              &
-                         u0 * (cos(phi_vertical))**1.5_r8  + &
-                         (8._r8/5._r8*(cos(latvals(:)))**3 * ((sin(latvals(:)))**2 + 2._r8/3._r8) - pi/4._r8)*a_omega*0.5_r8 ) + &
-                         tmp
-           end where
+         where(mask_use)
+            T(:,k)   = T0*(hyam(k) + hybm(k)*surface_pressure(:)/p00)**exponent_rev 
+         end where
        enddo
         if(masterproc.and. verbose_use) then
           write(iulog,*) '          T initialized by "',subname,'"'
