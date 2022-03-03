@@ -26,6 +26,22 @@ module ic_baro_dry_jw06
   !=======================================================================
   !    JW06 Dry baroclinic wave test case parameters
   !=======================================================================
+#ifdef planet_mars
+  real(r8), parameter, private ::             &
+       eta_tropo              = 0.2_r8,       & ! tropopause level (hybrid vertical coordinate))
+       u0                     = 35._r8,       & ! maximum jet speed 35 m/s
+       T0                     = 230._r8,      & ! horizontal mean T at the surface
+       p00                    = 6.e1_r8,      & ! surface pressure in Pa
+       eta0                   = 0.252_r8,     & ! center of jets (hybrid vertical coordinate)
+       radius                 = 10._r8,       & ! reciprocal radius of the perturbation without the Earth's radius 'a'
+       perturbation_amplitude = 1._r8,        & ! amplitude of u perturbation 1 m/s
+       perturbation_longitude = 20._r8,       & ! longitudinal position, 20E
+       perturbation_latitude  = 40._r8,       & ! latitudinal position, 40N
+       eta_sfc                = 1._r8,        & ! hybrid value at the surface
+       delta_T                = 480000._r8,   & ! in K, parameter for T mean calculation
+       gamma                  = 0.0025_r8       ! lapse rate in K/m
+  real(r8) :: a_omega, exponent
+#else
   real(r8), parameter, private ::             &
        eta_tropo              = 0.2_r8,       & ! tropopause level (hybrid vertical coordinate))
        u0                     = 35._r8,       & ! maximum jet speed 35 m/s
@@ -40,7 +56,7 @@ module ic_baro_dry_jw06
        delta_T                = 480000._r8,   & ! in K, parameter for T mean calculation
        gamma                  = 0.005_r8        ! lapse rate in K/m
   real(r8) :: a_omega, exponent
-
+#endif
   real(r8), parameter :: deg2rad = pi/180._r8   ! conversion to radians
 
   ! Public interface
