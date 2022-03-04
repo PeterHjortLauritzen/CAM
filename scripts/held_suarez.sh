@@ -4,9 +4,6 @@ set res = ne30_ne30_mg17
 # source code (assumed to be in /glade/u/home/$USER/src)
 #
 set src="cam-mars"
-#
-# number of test tracers
-#
 set stopoption="ndays"
 set steps="1"
 set cset="FHS94"
