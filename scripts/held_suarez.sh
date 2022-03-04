@@ -39,7 +39,9 @@ echo "nhtfrq = -24" >> user_nl_cam
 echo "mfilt = 144" >> user_nl_cam
 echo "avgflag_pertape(1) = 'I'" >> user_nl_cam
 echo "fincl1 = 'PS','U','V','T','OMEGA'" >> user_nl_cam
-
+#
+# time-steps have not been optimized for Mars at this point
+#
 echo "se_nsplit = 6" >> user_nl_cam
 
 qcmd -- ./case.build

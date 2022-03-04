@@ -4,9 +4,6 @@ set res = ne30_ne30_mg17
 # source code (assumed to be in /glade/u/home/$USER/src)
 #
 set src="cam-mars"
-#
-# number of test tracers
-#
 set stopoption="ndays"
 set steps="1"
 set cset="FADIAB"
@@ -39,7 +36,9 @@ echo "nhtfrq = -24" >> user_nl_cam
 echo "mfilt = 144" >> user_nl_cam
 echo "avgflag_pertape(1) = 'I'" >> user_nl_cam
 echo "fincl1 = 'PS','U','V','T','OMEGA'" >> user_nl_cam
-
+#
+# time-steps have not been optimized for Mars at this point
+#
 echo "se_nsplit = 6" >> user_nl_cam
 
 qcmd -- ./case.build
