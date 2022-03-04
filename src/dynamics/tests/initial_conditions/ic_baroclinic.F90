@@ -11,7 +11,7 @@ module ic_baroclinic
   use cam_abortutils,      only: endrun
   use spmd_utils,          only: masterproc
 
-  use physconst, only : rair, gravit, rearth, pi, omega, epsilo
+  use physconst, only : rair, gravit, rearth, pi, omega, epsilo, pstd
   use hycoef,    only : hyai, hybi, hyam, hybm, ps0
 
   implicit none
@@ -23,11 +23,17 @@ module ic_baroclinic
   !    Baroclinic wave test case parameters
   !=======================================================================
   real(r8), parameter, private :: Mvap = 0.608_r8           ! Ratio of molar mass dry air/water vapor
+#ifdef planet_mars
+  real(r8), parameter, private :: psurf_moist = pstd ! Moist surface pressure
+  real(r8), parameter, private ::     &
+       T0E        = 255.0_r8,         & ! Temperature at equatorial surface (K)
+       T0P        = 205.0_r8,         & ! Temperature at polar surface (K)
+#else
   real(r8), parameter, private :: psurf_moist = 100000.0_r8 ! Moist surface pressure
-
   real(r8), parameter, private ::     &
        T0E        = 310.0_r8,         & ! Temperature at equatorial surface (K)
        T0P        = 240.0_r8,         & ! Temperature at polar surface (K)
+#endif
        B          = 2.0_r8,           & ! Jet half-width parameter
        KK         = 3.0_r8,           & ! Jet width parameter
        lapse      = 0.005_r8            ! Lapse rate parameter
