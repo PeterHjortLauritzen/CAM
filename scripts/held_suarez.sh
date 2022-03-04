@@ -9,7 +9,7 @@ set src="cam-mars"
 #
 set stopoption="ndays"
 set steps="1"
-set cset="FADIAB"
+set cset="FHS94"
 set pecount="225"
 set queue="regular"
 set PBS_ACCOUNT="P93300642"
@@ -24,9 +24,9 @@ cd $scratch/$USER/$caze
 ./xmlchange DOUT_S=FALSE
 ./xmlchange DEBUG=FALSE
 ./xmlchange TIMER_LEVEL=10
-./xmlchange CAM_CONFIG_OPTS="-phys adiabatic -analytic_ic -cppdefs -Dplanet_mars -nlev 32"
+./xmlchange CAM_CONFIG_OPTS="-phys held_suarez -analytic_ic -cppdefs -Dplanet_mars -nlev 32"
+./xmlquery CAM_CONFIG_OPTS
 ./case.setup
-
 echo "se_statefreq       = 1"                     >> user_nl_cam
 
 echo "interpolate_output = .true.,.true.,.true."    >> user_nl_cam
@@ -44,4 +44,3 @@ echo "se_nsplit = 6" >> user_nl_cam
 
 qcmd -- ./case.build
 ./case.submit
-
