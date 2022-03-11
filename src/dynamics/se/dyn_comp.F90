@@ -1793,7 +1793,6 @@ subroutine set_phis(dyn_in)
    type(element_t), pointer         :: elem(:)
 
    real(r8), allocatable            :: phis_tmp(:,:)      ! (npsp,nelemd)
-   real(r8), allocatable            :: phis_phys_tmp(:,:) ! (fv_nphys**2,nelemd)
 
    integer                          :: i, ie, indx, j, kptr
    integer                          :: ierr, pio_errtype
@@ -1833,8 +1832,6 @@ subroutine set_phis(dyn_in)
    phis_tmp = 0.0_r8
 
    if (fv_nphys > 0) then
-      allocate(phis_phys_tmp(fv_nphys**2,nelemd))
-      phis_phys_tmp = 0.0_r8
       do ie=1,nelemd
         elem(ie)%sub_elem_mass_flux=0.0_r8
 #ifdef waccm_debug
@@ -1857,11 +1854,7 @@ subroutine set_phis(dyn_in)
 
       ! Set name of grid object which will be used to read data from file
       ! into internal data structure via PIO.
-      if (fv_nphys == 0) then
-         grid_name = 'GLL'
-      else
-         grid_name = 'physgrid_d'
-      end if
+      grid_name = 'GLL'
 
       ! Get number of global columns from the grid object and check that
       ! it matches the file data.
@@ -1869,10 +1862,14 @@ subroutine set_phis(dyn_in)
       dyn_cols = dims(1)
 
       ! The dimension of the unstructured grid in the TOPO file is 'ncol'.
-      ierr = pio_inq_dimid(fh_topo, 'ncol', ncol_did)
-      if (ierr /= PIO_NOERR) then
-         call endrun(sub//': dimension ncol not found in bnd_topo file')
+      if (fv_nphys > 0) then
+        ierr = pio_inq_dimid(fh_topo, 'ncol_gll', ncol_did)
+        if (ierr /= PIO_NOERR) call endrun(sub//': dimension ncol_gll not found in bnd_topo file')
+      else
+        ierr = pio_inq_dimid(fh_topo, 'ncol', ncol_did)
+        if (ierr /= PIO_NOERR) call endrun(sub//': dimension ncol not found in bnd_topo file')
       end if
+
       ierr = pio_inq_dimlen(fh_topo, ncol_did, ncol_size)
       if (ncol_size /= dyn_cols) then
          if (masterproc) then
@@ -1881,15 +1878,13 @@ subroutine set_phis(dyn_in)
          call endrun(sub//': ncol size in bnd_topo file does not match grid definition')
       end if
 
-      fieldname = 'PHIS'
+      if (fv_nphys > 0) then
+        fieldname = 'PHIS_gll'
+      else
+        fieldname = 'PHIS'
+      end if
       if (dyn_field_exists(fh_topo, trim(fieldname))) then
-         if (fv_nphys == 0) then
-           call read_dyn_var(fieldname, fh_topo, 'ncol', phis_tmp)
-         else
-           call read_phys_field_2d(fieldname, fh_topo, 'ncol', phis_phys_tmp)
-           call map_phis_from_physgrid_to_gll(dyn_in%fvm, elem, phis_phys_tmp, &
-                phis_tmp, pmask)
-         end if
+           call read_dyn_var(fieldname, fh_topo, 'ncol_gll', phis_tmp)
       else
          call endrun(sub//': Could not find PHIS field on input datafile')
       end if
@@ -1920,44 +1915,6 @@ subroutine set_phis(dyn_in)
                               PHIS_OUT=phis_tmp, mask=pmask(:))
       deallocate(glob_ind)
 
-      if (fv_nphys > 0) then
-
-         ! initialize PHIS on physgrid
-         allocate(latvals_phys(fv_nphys*fv_nphys*nelemd))
-         allocate(lonvals_phys(fv_nphys*fv_nphys*nelemd))
-         indx = 1
-         do ie = 1, nelemd
-            do j = 1, fv_nphys
-               do i = 1, fv_nphys
-                  latvals_phys(indx) = dyn_in%fvm(ie)%center_cart_physgrid(i,j)%lat
-                  lonvals_phys(indx) = dyn_in%fvm(ie)%center_cart_physgrid(i,j)%lon
-                  indx = indx + 1
-               end do
-            end do
-         end do
-
-         allocate(pmask_phys(fv_nphys*fv_nphys*nelemd))
-         pmask_phys(:) = .true.
-         allocate(glob_ind(fv_nphys*fv_nphys*nelemd))
-
-         j = 1
-         do ie = 1, nelemd
-            do i = 1, fv_nphys*fv_nphys
-               ! Create a global(ish) column index
-               glob_ind(j) = elem(ie)%GlobalId
-               j = j + 1
-            end do
-         end do
-
-         call analytic_ic_set_ic(vcoord, latvals_phys, lonvals_phys, glob_ind, &
-                                 PHIS_OUT=phis_phys_tmp, mask=pmask_phys)
-
-         deallocate(latvals_phys)
-         deallocate(lonvals_phys)
-         deallocate(pmask_phys)
-         deallocate(glob_ind)
-      end if
-
    end if
 
    deallocate(pmask)
@@ -1973,16 +1930,7 @@ subroutine set_phis(dyn_in)
          end do
       end do
    end do
-   if (fv_nphys > 0) then
-      do ie = 1, nelemd
-         dyn_in%fvm(ie)%phis_physgrid = RESHAPE(phis_phys_tmp(:,ie),(/fv_nphys,fv_nphys/))
-      end do
-   end if
-
    deallocate(phis_tmp)
-   if (fv_nphys > 0) then
-      deallocate(phis_phys_tmp)
-   end if
 
    ! boundary exchange to update the redundent columns in the element objects
    do ie = 1, nelemd
@@ -2231,61 +2179,6 @@ subroutine read_phys_field_2d(fieldname, fh, dimname, buffer)
 
 end subroutine read_phys_field_2d
 
-!========================================================================================
-
-subroutine map_phis_from_physgrid_to_gll(fvm,elem,phis_phys_tmp,phis_tmp,pmask)
-
-   use hybrid_mod,         only: get_loop_ranges, config_thread_region
-   use dimensions_mod,     only: nhc_phys
-   use fvm_mapping,        only: phys2dyn
-   use thread_mod,         only: horz_num_threads
-
-   type(element_t),   intent(inout) :: elem(:)
-   type (fvm_struct), intent(in)    :: fvm(:)
-   real(r8)         , intent(in)    :: phis_phys_tmp(fv_nphys**2,nelemd) !physgrid phis
-   real(r8)         , intent(inout) :: phis_tmp(npsq,nelemd)             !gll phis
-   logical          , intent(in)    :: pmask(npsq*nelemd)
-
-   type(hybrid_t)                   :: hybrid
-   integer                          :: nets, nete, ie,i,j,indx
-   real(r8),            allocatable :: fld_phys(:,:,:,:,:),fld_gll(:,:,:,:,:)
-   logical                          :: llimiter(1)
-   !----------------------------------------------------------------------------
-
-   !!$OMP PARALLEL NUM_THREADS(horz_num_threads), DEFAULT(SHARED), PRIVATE(hybrid,nets,nete,ie)
-   !hybrid = config_thread_region(par,'horizontal')
-   hybrid = config_thread_region(par,'serial')
-
-   call get_loop_ranges(hybrid, ibeg=nets, iend=nete)
-
-   allocate(fld_phys(1-nhc_phys:fv_nphys+nhc_phys,1-nhc_phys:fv_nphys+nhc_phys,1,1,nets:nete))
-   allocate(fld_gll(np,np,1,1,nets:nete))
-   fld_phys = 0.0_r8
-   do ie = nets, nete
-      fld_phys(1:fv_nphys,1:fv_nphys,1,1,ie) = RESHAPE(phis_phys_tmp(:,ie),(/fv_nphys,fv_nphys/))
-   end do
-   llimiter = .true.
-   call phys2dyn(hybrid,elem,fld_phys,fld_gll,nets,nete,1,1,fvm,llimiter,halo_filled=.false.)
-   do ie = nets,nete
-      indx = 1
-      do j = 1, np
-         do i = 1, np
-            if (pmask(((ie - 1) * npsq) + indx)) then
-               phis_tmp(indx,ie) = fld_gll(i,j,1,1,ie)
-            else
-               phis_tmp(indx,ie) = 0.0_r8
-            end if
-            indx = indx + 1
-         end do
-      end do
-   end do
-   deallocate(fld_phys)
-   deallocate(fld_gll)
-   !!$OMP END PARALLEL
-end subroutine map_phis_from_physgrid_to_gll
-
-!========================================================================================
-
 subroutine write_dyn_vars(dyn_out)
 
    type (dyn_export_t), intent(inout) :: dyn_out ! Dynamics export container
@@ -2314,5 +2207,4 @@ subroutine write_dyn_vars(dyn_out)
 
 end subroutine write_dyn_vars
 
-!=========================================================================================
 end module dyn_comp
