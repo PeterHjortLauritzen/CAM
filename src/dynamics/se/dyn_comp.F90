@@ -819,7 +819,6 @@ subroutine dyn_init(dyn_in, dyn_out)
    nu_scale_top(:) = 0.0_r8
    if (nu_top>0) then
      ptop  = hvcoord%hyai(1)*hvcoord%ps0
-     if (masterproc) write(iulog,*) sub//": sponge layer viscosity scaling factor"
      if (ptop>300.0_r8) then
        !
        ! for low tops the tanh formulae below makes the sponge excessively deep
@@ -845,11 +844,13 @@ subroutine dyn_init(dyn_in, dyn_out)
    ksponge_end = MAX(MAX(ksponge_end,1),kmol_end)
    if (masterproc) then
      write(iulog,*) sub//": ksponge_end = ",ksponge_end
+     write(iulog,*) sub//": sponge layer Laplacian damping"
+     write(iulog,*) "k, p, z, nu_scale_top, nu (actual Laplacian damping coefficient)"
      if (nu_top>0) then
        do k=1,ksponge_end+1
          press = (hvcoord%hyam(k)+hvcoord%hybm(k))*hvcoord%ps0
          call std_atm_height(press,z)
-         write(iulog,'(a,i3,4e11.4)') sub//": k, p, z, nu_scale_top, nu ",k,press,z,&
+         write(iulog,'(i3,4e11.4)') k,press,z,&
               nu_scale_top(k),nu_scale_top(k)*nu_top
        end do
      end if
