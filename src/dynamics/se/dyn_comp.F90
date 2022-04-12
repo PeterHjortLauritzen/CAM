@@ -818,17 +818,27 @@ subroutine dyn_init(dyn_in, dyn_out)
    !
    nu_scale_top(:) = 0.0_r8
    if (nu_top>0) then
+     ptop  = hvcoord%hyai(1)*hvcoord%ps0
      if (masterproc) write(iulog,*) sub//": sponge layer viscosity scaling factor"
-     do k=1,nlev
-       press = (hvcoord%hyam(k)+hvcoord%hybm(k))*hvcoord%ps0
-       ptop  = hvcoord%hyai(1)*hvcoord%ps0
-       nu_scale_top(k) = 8.0_r8*(1.0_r8+tanh(1.0_r8*log(ptop/press(1)))) ! tau will be maximum 8 at model top
-       if (nu_scale_top(k).ge.0.15_r8) then
-         ksponge_end = k
-       else
-         nu_scale_top(k) = 0.0_r8
-       end if
-     end do
+     if (ptop>300.0_r8) then
+       !
+       ! for low tops the tanh formulae below makes the sponge excessively deep
+       !
+       nu_scale_top(1) = 4.0_r8
+       nu_scale_top(2) = 2.0_r8
+       nu_scale_top(3) = 1.0_r8
+       ksponge_end = 3
+     else
+       do k=1,nlev
+         press = (hvcoord%hyam(k)+hvcoord%hybm(k))*hvcoord%ps0
+         nu_scale_top(k) = 8.0_r8*(1.0_r8+tanh(1.0_r8*log(ptop/press(1)))) ! tau will be maximum 8 at model top
+         if (nu_scale_top(k).ge.0.15_r8) then
+           ksponge_end = k
+         else
+           nu_scale_top(k) = 0.0_r8
+         end if
+       end do
+     end if
    else
      ksponge_end = 0
    end if
