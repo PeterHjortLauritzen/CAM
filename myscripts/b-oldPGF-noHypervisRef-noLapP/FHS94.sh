@@ -17,14 +17,14 @@ setenv PBS_ACCOUNT "P93300642"
 #
 # source code (assumed to be in /glade/u/home/$USER/src)
 #
-set src="cam_development"
+set src="topo-mods"
 #
 # number of test tracers
 #
 set NTHRDS="1"
 set pw=`pwd`
 set stopoption="nmonths"
-set steps="18"
+set steps="19"
 set cset="FHS94"
 if ($res == "C96_C96_mg17") then
   set pecount="1536"
@@ -46,7 +46,7 @@ echo $PBS_ACCOUNT
 unset caze
 set caze=${cset}_${src}_${res}_b
 set pw=`pwd`
-/glade/scratch/$USER/$src/cime/scripts/create_newcase --case $scratch/$USER/$caze --compset $cset --res $res  --q $queue --walltime 00:30:00 --pecount $pecount  --project $PBS_ACCOUNT --compiler $compiler --run-unsupported
+/glade/scratch/$USER/$src/cime/scripts/create_newcase --case $scratch/$USER/$caze --compset $cset --res $res  --q $queue --walltime 01:00:00 --pecount $pecount  --project $PBS_ACCOUNT --compiler $compiler --run-unsupported
 
 cd $scratch/$USER/$caze
 ./xmlchange STOP_OPTION=$stopoption,STOP_N=$steps
@@ -94,7 +94,7 @@ if(`hostname` == 'izumi.unified.ucar.edu') then
  ./case.build
 endif
 if(`hostname` == 'cheyenne1' || `hostname` == 'cheyenne2' || `hostname` == 'cheyenne3' || `hostname` == 'cheyenne4' || `hostname` == 'cheyenne5' || `hostname` == 'cheyenne6') then
-qcmd -- ./case.build
+#qcmd -- ./case.build
 endif
-./case.submit
+#./case.submit
 
