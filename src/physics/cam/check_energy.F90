@@ -994,7 +994,7 @@ end subroutine check_energy_get_integrals
 
       tt    = 0._r8
       if (ixtt > 1) then
-        if (name_out6 == 'TT_pAM'.or.name_out6 == 'TT_zAM') then
+        if (name_out6 == 'TT_phAM'.or.name_out6 == 'TT_dyAM') then
           !
           ! after dme_adjust mixing ratios are all wet
           !
