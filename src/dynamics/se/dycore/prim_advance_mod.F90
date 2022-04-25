@@ -1508,7 +1508,7 @@ contains
 
     if ( hist_fld_active(name_out1).or.hist_fld_active(name_out2).or.hist_fld_active(name_out3).or.&
          hist_fld_active(name_out4).or.hist_fld_active(name_out5).or.hist_fld_active(name_out6)) then
-      call cnst_get_ind('TT_LW' , ixtt    , abort=.false.)
+      call cnst_get_ind('TT_UN' , ixtt    , abort=.false.)
       !
       ! Compute frozen static energy in 3 parts:  KE, SE, and energy associated with vapor and liquid
       !
@@ -1686,7 +1686,7 @@ contains
 
       call cnst_get_ind('CLDLIQ', ixcldliq, abort=.false.)
       call cnst_get_ind('CLDICE', ixcldice, abort=.false.)
-      call cnst_get_ind('TT_LW' , ixtt    , abort=.false.)
+      call cnst_get_ind('TT_MD' , ixtt    , abort=.false.)
 
       do ie=nets,nete
         call util_function(qdp(:,:,:,1,ie),nx,nlev,name_out1,ie)
