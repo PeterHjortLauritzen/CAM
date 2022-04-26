@@ -40,6 +40,9 @@ if ($duration == "debug") then
   if ($res == "mpasa120_mpasa120") then
     set pecount = "192x1" 
   endif
+  if ($res == "C96_C96_mg17") then
+    set pecount="384"
+  endif
   set stopoption="nsteps"
   set steps="3"
   set walltime="00:15:00"
@@ -63,7 +66,7 @@ set PBS_ACCOUNT="P93300642"
 
 set pw=`pwd`
 
-set caze=${cset}_${res}_ebudgets
+set caze=${cset}_${res}_ebudgets_cam_dev_no_cpp_all_water
 
 $src/cime/scripts/create_newcase --case $scratch/$USER/$caze --compset $cset --res $res  --q $queue --walltime $walltime --pecount $pecount  --project $PBS_ACCOUNT --compiler $compiler --machine $machine --run#-unsupported
 
@@ -163,6 +166,6 @@ if(`hostname` == 'izumi.unified.ucar.edu') then
  ./case.build
 endif
 if(`hostname` == 'cheyenne1' || `hostname` == 'cheyenne2' || `hostname` == 'cheyenne3' || `hostname` == 'cheyenne4' || `hostname` == 'cheyenne5' || `hostname` == 'cheyenne6') then
-  qcmd -- ./case.build
+#  qcmd -- ./case.build
 endif
-./case.submit
+#./case.submit
