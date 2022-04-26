@@ -1219,10 +1219,15 @@ end subroutine physics_ptend_copy
     ! constituents, momentum, and total energy
     state%ps(:ncol) = state%pint(:ncol,1)
     do k = 1, pver
-
+#ifdef ALL_WATER_IN_DP
+      do m_cnst=1,thermodynamic_active_species_num
+        m = thermodynamic_active_species_idx(m_cnst)
+        fdq(:ncol) = 1._r8 + state%q(:ncol,k,1) - qini(:ncol,k)
+      end do
+#else
        ! adjusment factor is just change in water vapor
        fdq(:ncol) = 1._r8 + state%q(:ncol,k,1) - qini(:ncol,k)
-
+#endif
        ! adjust constituents to conserve mass in each layer
        do m = 1, pcnst
           state%q(:ncol,k,m) = state%q(:ncol,k,m) / fdq(:ncol)

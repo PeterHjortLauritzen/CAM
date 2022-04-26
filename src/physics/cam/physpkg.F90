@@ -1445,7 +1445,6 @@ contains
     integer :: ncol                                 ! number of atmospheric columns
     integer i,k,m                 ! Longitude, level indices
     integer :: yr, mon, day, tod       ! components of a date
-    integer :: ixcldice, ixcldliq      ! constituent indices for cloud liquid and ice water.
 
     logical :: labort                            ! abort flag
 
@@ -1455,9 +1454,6 @@ contains
     real(r8) obklen(pcols)             ! Obukhov length
     real(r8) :: fh2o(pcols)            ! h2o flux to balance source from methane chemistry
     real(r8) :: flx_heat(pcols)        ! Heat flux for check_energy_chng.
-    real(r8) :: tmp_q     (pcols,pver) ! tmp space
-    real(r8) :: tmp_cldliq(pcols,pver) ! tmp space
-    real(r8) :: tmp_cldice(pcols,pver) ! tmp space
     real(r8) :: tmp_trac  (pcols,pver,pcnst) ! tmp space
     real(r8) :: tmp_pdel  (pcols,pver) ! tmp space
     real(r8) :: tmp_ps    (pcols)      ! tmp space
@@ -1901,14 +1897,6 @@ contains
     !     assumes moist. This is done in p_d_coupling for other dynamics. Bundy, Feb 2004.
     if (moist_mixing_ratio_dycore) call set_dry_to_wet(state)    ! Physics had dry, dynamics wants moist
 
-    ! Scale dry mass and energy (does nothing if dycore is EUL or SLD)
-    call cnst_get_ind('CLDLIQ', ixcldliq)
-    call cnst_get_ind('CLDICE', ixcldice)
-
-    tmp_q     (:ncol,:pver) = state%q(:ncol,:pver,1)
-    tmp_cldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
-    tmp_cldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
-
     ! for dry mixing ratio dycore, physics_dme_adjust is called for energy diagnostic purposes only.  
     ! So, save off tracers 
     if (.not.moist_mixing_ratio_dycore.and.&
@@ -1975,8 +1963,7 @@ contains
        endif
     endif
 
-    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, tmp_q, tmp_cldliq, tmp_cldice, &
-         qini, cldliqini, cldiceini)
+    call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, qini, cldliqini, cldiceini)
 
     call clybry_fam_set( ncol, lchnk, map2chm, state%q, pbuf )
 
