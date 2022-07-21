@@ -1,3 +1,4 @@
+#define lauritzen_fix
 module gw_drag
 
 !--------------------------------------------------------------------------
@@ -1497,6 +1498,9 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
      do m=1, pcnst
         do k = 1, pver
            ptend%q(:ncol,k,m) = ptend%q(:ncol,k,m) + qtgw(:,k,m)
+#ifdef lauritzen_fix
+          q(:ncol,k,m) =  q(:ncol,k,m) + dt*qtgw(:,k,m)
+#endif
         end do
      end do
 
@@ -1582,6 +1586,9 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
      do m=1, pcnst
         do k = 1, pver
            ptend%q(:ncol,k,m) = ptend%q(:ncol,k,m) + qtgw(:,k,m)
+#ifdef lauritzen_fix
+           q(:ncol,k,m) =  q(:ncol,k,m) + dt*qtgw(:,k,m)
+#endif
         end do
      end do
 
@@ -1667,6 +1674,9 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
      do m=1, pcnst
         do k = 1, pver
            ptend%q(:ncol,k,m) = ptend%q(:ncol,k,m) + qtgw(:,k,m)
+#ifdef lauritzen_fix
+           q(:ncol,k,m) =  q(:ncol,k,m) + dt*qtgw(:,k,m)
+#endif
         end do
      end do
 
@@ -1754,6 +1764,9 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
      do m=1, pcnst
         do k = 1, pver
            ptend%q(:ncol,k,m) = ptend%q(:ncol,k,m) + qtgw(:,k,m)
+#ifdef lauritzen_fix
+           q(:ncol,k,m) =  q(:ncol,k,m) + dt*qtgw(:,k,m)
+#endif
         end do
      end do
 
@@ -1867,6 +1880,9 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
      do m = 1, pcnst
         do k = 1, pver
            ptend%q(:ncol,k,m) = ptend%q(:ncol,k,m) + qtgw(:,k,m)
+#ifdef lauritzen_fix
+           q(:ncol,k,m) =  q(:ncol,k,m) + dt*qtgw(:,k,m)
+#endif
         end do
      end do
 
@@ -2014,7 +2030,11 @@ subroutine gw_rdg_calc( &
    real(r8),         intent(in) :: ni(ncol,pver+1) ! Interface Brunt-Vaisalla frequencies (s-1).
    real(r8),         intent(in) :: rhoi(ncol,pver+1) ! Interface density (kg m-3).
    real(r8),         intent(in) :: kvtt(ncol,pver+1) ! Molecular thermal diffusivity.
+#ifdef lauritzen_fix
+   real(r8),         intent(inout) :: q(:,:,:)        ! Constituent array.
+#else
    real(r8),         intent(in) :: q(:,:,:)        ! Constituent array.
+#endif
    real(r8),         intent(in) :: dse(ncol,pver)  ! Dry static energy.
 
 
@@ -2197,6 +2217,9 @@ subroutine gw_rdg_calc( &
       do m = 1, pcnst
          do k = 1, pver
             ptend%q(:ncol,k,m) = ptend%q(:ncol,k,m) + qtgw(:,k,m)
+#ifdef lauritzen_fix
+            q(:ncol,k,m) =  q(:ncol,k,m) + dt*qtgw(:,k,m)
+#endif
          end do
       end do
 
