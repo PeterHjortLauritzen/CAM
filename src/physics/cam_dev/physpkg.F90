@@ -1,4 +1,8 @@
 module physpkg
+#ifdef N2O_diag
+  use cam_history,    only: outfld
+  use constituents,   only: cnst_get_ind
+#endif
   !-----------------------------------------------------------------------
   ! Purpose:
   !
@@ -1451,7 +1455,15 @@ contains
     real(r8), pointer, dimension(:,:) :: ducore
     real(r8), pointer, dimension(:,:) :: dvcore
     real(r8), pointer, dimension(:,:) :: ast     ! relative humidity cloud fraction
-
+#ifdef N2O_diag
+    integer :: idx_N2O, idx_TT_LW, idx_TT_MD, idx_TT_HI, idx_TT_UN, idx_TTRMD
+    call cnst_get_ind('N2O' , idx_N2O   , abort=.false.)
+    call cnst_get_ind('TT_LW' , idx_TT_LW   , abort=.false.)
+    call cnst_get_ind('TT_MD' , idx_TT_MD   , abort=.false.)
+    call cnst_get_ind('TT_HI' , idx_TT_HI   , abort=.false.)
+    call cnst_get_ind('TTRMD' , idx_TTRMD   , abort=.false.)
+    call cnst_get_ind('TT_UN' , idx_TT_UN   , abort=.false.)
+#endif
     !-----------------------------------------------------------------------
     lchnk = state%lchnk
     ncol  = state%ncol
@@ -1543,12 +1555,17 @@ contains
                     fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
     end if
 
+#ifdef N2O_diag
+    call outfld('N2O_AC1', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
     if (carma_do_emission) then
        ! carma emissions
        call carma_emission_tend (state, ptend, cam_in, ztodt)
        call physics_update(state, ptend, ztodt, tend)
     end if
-
+#ifdef N2O_diag
+    call outfld('N2O_AC2', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
     ! get nstep and zero array for energy checker
     zero = 0._r8
     zero_sc(:) = 0._r8
@@ -1594,6 +1611,9 @@ contains
           call check_energy_chng(state, tend, "carma_tend", nstep, ztodt, zero, prec_str, snow_str, zero)
        end if
     end if
+#ifdef N2O_diag
+    call outfld('N2O_AC3', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
 
     call t_stopf('carma_timestep_tend')
 
@@ -1613,6 +1633,17 @@ contains
        !                        https://doi.org/10.1029/2011MS000105
        call ssatcontrail_d0(state, pbuf, ztodt, ptend)
        call physics_update(state, ptend, ztodt, tend)
+#ifdef N2O_diag
+    call outfld('N2O_AC4', state%q(:,:, idx_N2O)       , pcols, lchnk   )
+
+    call outfld('TT1_AC4', state%q(:,:, idx_TT_LW)   , pcols, lchnk   )
+    call outfld('TT2_AC4', state%q(:,:, idx_TT_MD)   , pcols, lchnk   )
+    call outfld('TT3_AC4', state%q(:,:, idx_TT_HI)   , pcols, lchnk   )
+    call outfld('TT4_AC4', state%q(:,:, idx_TTRMD), pcols, lchnk   )
+    call outfld('TT5_AC4', state%q(:,:, idx_TT_UN)   , pcols, lchnk   )
+
+    call calc_te_and_aam_budgets(state, 'phB1')
+#endif
 
        ! initialize ptend structures where macro and microphysics tendencies are
        ! accumulated over macmic substeps
@@ -1634,7 +1665,6 @@ contains
                 call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf, &
                      fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
              end if
-
              call clubb_tend_cam(state, ptend, pbuf, cld_macmic_ztodt,&
                 cmfmc, cam_in, macmic_it, cld_macmic_num_steps, &
                 dlf, det_s, det_ice)
@@ -1664,7 +1694,6 @@ contains
                 call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf, &
                       fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
              end if
-
              ! Use actual qflux (not lhf/latvap) for consistency with surface fluxes and revised code
              call check_energy_chng(state, tend, "clubb_tend", nstep, ztodt, &
                 cam_in%cflx(:ncol,1)/cld_macmic_num_steps, &
@@ -1759,7 +1788,6 @@ contains
                 call cam_snapshot_ptend_outfld(ptend, lchnk)
              end if
              call physics_update (state_sc, ptend_sc, ztodt, tend_sc)
-
              if (trim(cam_take_snapshot_after) == "microp_driver_tend_subcol") then
                 call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state_sc, tend_sc, cam_in, cam_out, pbuf, &
                    fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
@@ -1791,7 +1819,6 @@ contains
              call cam_snapshot_ptend_outfld(ptend, lchnk)
           end if
           call physics_update (state, ptend, ztodt, tend)
-
           if (trim(cam_take_snapshot_after) == "microp_section") then
              call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf, &
                   fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
@@ -1809,6 +1836,17 @@ contains
           snow_pcw_macmic(:ncol) = snow_pcw_macmic(:ncol) + snow_pcw(:ncol)
 
        end do ! end substepping over macrophysics/microphysics
+#ifdef N2O_diag
+    call outfld('N2O_AC5', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+
+    call outfld('TT1_AC5', state%q(:,:, idx_TT_LW)   , pcols, lchnk   )
+    call outfld('TT2_AC5', state%q(:,:, idx_TT_MD)   , pcols, lchnk   )
+    call outfld('TT3_AC5', state%q(:,:, idx_TT_HI)   , pcols, lchnk   )
+    call outfld('TT4_AC5', state%q(:,:, idx_TTRMD), pcols, lchnk   )
+    call outfld('TT5_AC5', state%q(:,:, idx_TT_UN)   , pcols, lchnk   )
+
+    call calc_te_and_aam_budgets(state, 'phA1')
+#endif
 
        call outfld( 'UTEND_MACROP', ptend_macp_all%u, pcols, lchnk)
        call outfld( 'VTEND_MACROP', ptend_macp_all%v, pcols, lchnk)
@@ -1859,6 +1897,9 @@ contains
           call cam_snapshot_ptend_outfld(ptend, lchnk)
        end if
        call physics_update(state, ptend, ztodt, tend)
+#ifdef N2O_diag
+    call outfld('N2O_AC6', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
 
        if (trim(cam_take_snapshot_after) == "aero_model_wetdep") then
           call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf, &
@@ -1878,11 +1919,16 @@ contains
           call physics_update(state, ptend, ztodt, tend)
           call t_stopf ('carma_wetdep_tend')
        end if
-
+#ifdef N2O_diag
+    call outfld('N2O_AC7', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
        call t_startf ('convect_deep_tend2')
        call convect_deep_tend_2( state,   ptend,  ztodt,  pbuf )
        call physics_update(state, ptend, ztodt, tend)
        call t_stopf ('convect_deep_tend2')
+#ifdef N2O_diag
+    call outfld('N2O_AC8', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
 
        ! check tracer integrals
        call check_tracers_chng(state, tracerint, "cmfmca", nstep, ztodt,  zero_tracers)
@@ -1972,6 +2018,10 @@ contains
     end if
     call check_tracers_chng(state, tracerint, "aoa_tracers_timestep_tend", nstep, ztodt,   &
          cam_in%cflx)
+#ifdef N2O_diag
+    call outfld('N2O_AC9', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+    call outfld('N2O_CFLX', cam_in%cflx(:, idx_N2O)      , pcols, lchnk   )
+#endif
 
     if (trim(cam_take_snapshot_before) == "co2_cycle_set_ptend") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
@@ -2023,7 +2073,9 @@ contains
             cam_in%cflx)
     end if
     call t_stopf('adv_tracer_src_snk')
-
+#ifdef N2O_diag
+    call outfld('N2O_AC10', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
     !===================================================
     ! Vertical diffusion/pbl calculation
     ! Call vertical diffusion (apply tracer emissions, molecular diffusion and pbl form drag)
@@ -2058,6 +2110,11 @@ contains
     end if
     call physics_update(state, ptend, ztodt, tend)
 
+#ifdef N2O_diag
+    call outfld('N2O_AC11', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
+
+
     if (trim(cam_take_snapshot_after) == "vertical_diffusion_section") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
@@ -2077,6 +2134,9 @@ contains
       call outfld( 'VTEND_RAYLEIGH', ptend%v, pcols, lchnk)
     end if
     call physics_update(state, ptend, ztodt, tend)
+#ifdef N2O_diag
+    call outfld('N2O_AC11b', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
     call t_stopf('rayleigh_friction')
 
     if (do_clubb_sgs) then
@@ -2102,7 +2162,9 @@ contains
        call cam_snapshot_ptend_outfld(ptend, lchnk)
     end if
     call physics_update(state, ptend, ztodt, tend)
-
+#ifdef N2O_diag
+    call outfld('N2O_AC11c', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
    if (trim(cam_take_snapshot_after) == "aero_model_drydep") then
       call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
@@ -2129,7 +2191,15 @@ contains
      call check_energy_chng(state, tend, "carma_tend", nstep, ztodt, zero, zero, zero, zero)
      call t_stopf('carma_timestep_tend')
    end if
+#ifdef N2O_diag
+    call outfld('N2O_AC11d', state%q(:,:, idx_N2O)      , pcols, lchnk   )
 
+    call outfld('TT1_AC11d', state%q(:,:, idx_TT_LW)   , pcols, lchnk   )
+    call outfld('TT2_AC11d', state%q(:,:, idx_TT_MD)   , pcols, lchnk   )
+    call outfld('TT3_AC11d', state%q(:,:, idx_TT_HI)   , pcols, lchnk   )
+    call outfld('TT4_AC11d', state%q(:,:, idx_TTRMD), pcols, lchnk   )
+    call outfld('TT5_AC11d', state%q(:,:, idx_TT_UN)   , pcols, lchnk   )
+#endif
     !---------------------------------------------------------------------------------
     !   ... enforce charge neutrality
     !---------------------------------------------------------------------------------
@@ -2158,7 +2228,15 @@ contains
       call outfld( 'VTEND_GWDTOT', ptend%v, pcols, lchnk)
     end if
     call physics_update(state, ptend, ztodt, tend)
+#ifdef N2O_diag
+    call outfld('N2O_AC11e', state%q(:,:, idx_N2O)      , pcols, lchnk   )
 
+    call outfld('TT1_AC11e', state%q(:,:, idx_TT_LW)   , pcols, lchnk   )
+    call outfld('TT2_AC11e', state%q(:,:, idx_TT_MD)   , pcols, lchnk   )
+    call outfld('TT3_AC11e', state%q(:,:, idx_TT_HI)   , pcols, lchnk   )
+    call outfld('TT4_AC11e', state%q(:,:, idx_TTRMD), pcols, lchnk   )
+    call outfld('TT5_AC11e', state%q(:,:, idx_TT_UN)   , pcols, lchnk   )
+#endif
     if (trim(cam_take_snapshot_after) == "gw_tend") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
@@ -2188,7 +2266,9 @@ contains
       call outfld( 'VTEND_QBORLX', ptend%v, pcols, lchnk)
     end if
     call physics_update(state, ptend, ztodt, tend)
-
+#ifdef N2O_diag
+    call outfld('N2O_AC11f', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
     if (trim(cam_take_snapshot_after) == "qbo_relax") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
@@ -2208,7 +2288,9 @@ contains
     call physics_update(state, ptend, ztodt, tend)
     ! Check energy integrals
     call check_energy_chng(state, tend, "lunar_tides", nstep, ztodt, zero, zero, zero, zero)
-
+#ifdef N2O_diag
+    call outfld('N2O_AC11g', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
     ! Ion drag calculation
     call t_startf ( 'iondrag' )
 
@@ -2240,13 +2322,18 @@ contains
       call outfld( 'VTEND_IONDRG', ptend%v, pcols, lchnk)
     end if
     call physics_update(state, ptend, ztodt, tend)
-
+#ifdef N2O_diag
+    call outfld('N2O_AC11h', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
     if (trim(cam_take_snapshot_after) == "iondrag_calc_section") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
     end if
     call calc_te_and_aam_budgets(state, 'phAP')
     call calc_te_and_aam_budgets(state, 'dyAP',vc=vc_dycore)
+#ifdef N2O_diag
+    call outfld('N2O_AC12', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
 
     !---------------------------------------------------------------------------------
     ! Enforce charge neutrality after O+ change from ionos_tend
@@ -2359,6 +2446,15 @@ contains
          qini, cldliqini, cldiceini)
 
     call clybry_fam_set( ncol, lchnk, map2chm, state%q, pbuf )
+#ifdef N2O_diag
+    call outfld('N2O_AC13', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+
+    call outfld('TT1_AC13', state%q(:,:, idx_TT_LW)   , pcols, lchnk   )
+    call outfld('TT2_AC13', state%q(:,:, idx_TT_MD)   , pcols, lchnk   )
+    call outfld('TT3_AC13', state%q(:,:, idx_TT_HI)   , pcols, lchnk   )
+    call outfld('TT4_AC13', state%q(:,:, idx_TTRMD), pcols, lchnk   )
+    call outfld('TT5_AC13', state%q(:,:, idx_TT_UN)   , pcols, lchnk   )
+#endif
 
   end subroutine tphysac
 
@@ -2505,6 +2601,15 @@ contains
     logical   :: lq(pcnst)
 
     !-----------------------------------------------------------------------
+#ifdef N2O_diag
+    integer :: idx_N2O, idx_TT_LW, idx_TT_MD, idx_TT_HI, idx_TT_UN, idx_TTRMD
+    call cnst_get_ind('N2O' , idx_N2O   , abort=.false.)
+    call cnst_get_ind('TT_LW' , idx_TT_LW   , abort=.false.)
+    call cnst_get_ind('TT_MD' , idx_TT_MD   , abort=.false.)
+    call cnst_get_ind('TT_HI' , idx_TT_HI   , abort=.false.)
+    call cnst_get_ind('TTRMD' , idx_TTRMD   , abort=.false.)
+    call cnst_get_ind('TT_UN' , idx_TT_UN   , abort=.false.)
+#endif
 
     call t_startf('bc_init')
 
@@ -2574,7 +2679,15 @@ contains
     ! Global mean total energy fixer
     !===================================================
     call t_startf('energy_fixer')
+#ifdef N2O_diag
+    call outfld('N2O_BC1', state%q(:,:, idx_N2O)      , pcols, lchnk   )
 
+    call outfld('TT1_BC1', state%q(:,:, idx_TT_LW)   , pcols, lchnk   )
+    call outfld('TT2_BC1', state%q(:,:, idx_TT_MD)   , pcols, lchnk   )
+    call outfld('TT3_BC1', state%q(:,:, idx_TT_HI)   , pcols, lchnk   )
+    call outfld('TT4_BC1', state%q(:,:, idx_TTRMD), pcols, lchnk   )
+    call outfld('TT5_BC1', state%q(:,:, idx_TT_UN)   , pcols, lchnk   )
+#endif
     call calc_te_and_aam_budgets(state, 'phBF')
     call calc_te_and_aam_budgets(state, 'dyBF',vc=vc_dycore)
 
@@ -2772,6 +2885,9 @@ contains
     call t_startf('diag_export')
     call diag_export(cam_out)
     call t_stopf('diag_export')
+#ifdef N2O_diag
+    call outfld('N2O_BC2', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+#endif
 
   end subroutine tphysbc
 

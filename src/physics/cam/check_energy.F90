@@ -1,4 +1,3 @@
-
 module check_energy
 
 !---------------------------------------------------------------------------------
@@ -863,9 +862,11 @@ end subroutine check_energy_get_integrals
            state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), temp(1:ncol,1:pver),        &
            vc_loc, ps = state%ps(1:ncol), phis = state%phis(1:ncol),                   &
            z = state%z_ini(1:ncol,:), se = se, ke = ke, wv = wv, liq = liq, ice = ice)
-
+#ifdef N2O_diag
+      call cnst_get_ind('N2O' , ixtt    , abort=.false.)
+#else
       call cnst_get_ind('TT_LW' , ixtt    , abort=.false.)
-
+#endif
       tt    = 0._r8
       if (ixtt > 1) then
         if (name_out6 == 'TT_pAM'.or.name_out6 == 'TT_zAM') then

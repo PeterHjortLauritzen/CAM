@@ -867,6 +867,13 @@ subroutine dyn_init(dyn_in, dyn_out)
       if (use_gw_front .or. use_gw_front_igw) call gws_init(elem)
    end if  ! iam < par%nprocs
 
+#ifdef N2O_diag
+   call addfld ('N2O_DP',   (/ 'lev' /), 'A', '', 'N2O d_p_coupling', gridname='GLL')
+   call addfld ('N2O_dyn1',   (/ 'lev' /), 'A', '', 'N2O before apply physics', gridname='GLL')
+   call addfld ('N2O_dyn2',   (/ 'lev' /), 'A', '', 'N2O after apply physics', gridname='GLL')
+   call addfld ('N2O_dyn_remap1',   (/ 'lev' /), 'A', '', 'N2O before remapping', gridname='GLL')
+   call addfld ('N2O_dyn_remap2',   (/ 'lev' /), 'A', '', 'N2O after remapping', gridname='GLL')
+#endif
    call addfld ('nu_kmvis',   (/ 'lev' /), 'A', '', 'Molecular viscosity Laplacian coefficient'            , gridname='GLL')
    call addfld ('nu_kmcnd',   (/ 'lev' /), 'A', '', 'Thermal conductivity Laplacian coefficient'           , gridname='GLL')
    call addfld ('nu_kmcnd_dp',(/ 'lev' /), 'A', '', 'Thermal conductivity like Laplacian coefficient on dp', gridname='GLL')

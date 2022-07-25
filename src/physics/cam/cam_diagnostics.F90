@@ -189,8 +189,13 @@ contains
     !
     integer                                    :: istage, ivars
     character (len=108)                        :: str1, str2, str3
+#ifdef N2O_diag
+    integer, parameter                         :: num_stages = 10, num_vars = 8
+    character (len = 4), dimension(num_stages) :: stage = (/"phBF","phBP","phAP","phAM","dyBF","dyBP","dyAP","dyAM","phB1","phA1"/)
+#else
     integer, parameter                         :: num_stages = 8, num_vars = 8
     character (len = 4), dimension(num_stages) :: stage = (/"phBF","phBP","phAP","phAM","dyBF","dyBP","dyAP","dyAM"/)
+#endif
     character (len = 45),dimension(num_stages) :: stage_txt = (/&
          " before energy fixer                     ",& !phBF - physics energy
          " before parameterizations                ",& !phBF - physics energy
@@ -199,7 +204,13 @@ contains
          " before energy fixer (dycore)            ",& !dyBF - dynamics energy
          " before parameterizations (dycore)       ",& !dyBF - dynamics energy
          " after parameterizations (dycore)        ",& !dyAP - dynamics energy
+#ifdef N2O_diag
+         " after dry mass correction (dycore)      ",& !dyAM - dynamics energy
+         " before CLUBB                            ",& !before CLUBB
+         " after CLUBB                             " & !after CLUBB
+#else
          " after dry mass correction (dycore)      " & !dyAM - dynamics energy
+#endif
          /)
     character (len = 2)  , dimension(num_vars) :: vars  = (/"WV"  ,"WL"  ,"WI"  ,"SE"   ,"KE"   ,"MR"   ,"MO"   ,"TT"   /)
     character (len = 45) , dimension(num_vars) :: vars_descriptor = (/&
@@ -216,6 +227,72 @@ contains
          "kg/m2        ","kg/m2        ","kg/m2        ","J/m2         ",&
          "J/m2         ","kg*m2/s*rad2 ","kg*m2/s*rad2 ","kg/m2        "/)
 
+#ifdef N2O_diag
+    call addfld ('N2O_BC1',(/ 'lev' /), 'A','kg/kg','begin tphysbc')
+    call addfld ('N2O_BC2',(/ 'lev' /), 'A','kg/kg','end tphysbc')
+
+    call addfld ('N2O_AC1',(/ 'lev' /), 'A','kg/kg','begin tphysac')
+    call addfld ('N2O_AC2',(/ 'lev' /), 'A','kg/kg','Carma')
+    call addfld ('N2O_AC3',(/ 'lev' /), 'A','kg/kg','CARMA bin microphysics')
+    call addfld ('N2O_AC4',(/ 'lev' /), 'A','kg/kg','contrials')
+    call addfld ('N2O_AC5',(/ 'lev' /), 'A','kg/kg','CLUBB MG')
+    call addfld ('N2O_AC6',(/ 'lev' /), 'A','kg/kg','Wet Scavenging')
+    call addfld ('N2O_AC7',(/ 'lev' /), 'A','kg/kg','Carma wet deposition')
+    call addfld ('N2O_AC8',(/ 'lev' /), 'A','kg/kg','ZM mixing')
+    call addfld ('N2O_AC9',(/ 'lev' /), 'A','kg/kg','source-sink for adv. tracers')
+    call addfld ('N2O_CFLX',(/ 'lev' /), 'A','kg/kg','surface flux')
+    call addfld ('N2O_AC10',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('N2O_AC11',(/ 'lev' /), 'A','kg/kg','vertical diffusion')
+    call addfld ('N2O_AC11b',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('N2O_AC11c',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('N2O_AC11d',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('N2O_AC11e',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('N2O_AC11f',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('N2O_AC11g',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('N2O_AC11h',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+
+    call addfld ('N2O_AC12',(/ 'lev' /), 'A','kg/kg','misc.')
+    call addfld ('N2O_AC13',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')
+
+
+    call addfld ('TT1_BC1',(/ 'lev' /), 'A','kg/kg','begin tphysbc')!done
+    call addfld ('TT2_BC1',(/ 'lev' /), 'A','kg/kg','begin tphysbc')
+    call addfld ('TT3_BC1',(/ 'lev' /), 'A','kg/kg','begin tphysbc')
+    call addfld ('TT4_BC1',(/ 'lev' /), 'A','kg/kg','begin tphysbc')
+    call addfld ('TT5_BC1',(/ 'lev' /), 'A','kg/kg','begin tphysbc')
+
+    call addfld ('TT1_AC4',(/ 'lev' /), 'A','kg/kg','contrials')!done
+    call addfld ('TT2_AC4',(/ 'lev' /), 'A','kg/kg','contrials')
+    call addfld ('TT3_AC4',(/ 'lev' /), 'A','kg/kg','contrials')
+    call addfld ('TT4_AC4',(/ 'lev' /), 'A','kg/kg','contrials')
+    call addfld ('TT5_AC4',(/ 'lev' /), 'A','kg/kg','contrials')
+
+
+    call addfld ('TT1_AC5',(/ 'lev' /), 'A','kg/kg','CLUBB MG')!done
+    call addfld ('TT2_AC5',(/ 'lev' /), 'A','kg/kg','CLUBB MG')
+    call addfld ('TT3_AC5',(/ 'lev' /), 'A','kg/kg','CLUBB MG')
+    call addfld ('TT4_AC5',(/ 'lev' /), 'A','kg/kg','CLUBB MG')
+    call addfld ('TT5_AC5',(/ 'lev' /), 'A','kg/kg','CLUBB MG')
+
+    call addfld ('TT1_AC11d',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')!done
+    call addfld ('TT2_AC11d',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('TT3_AC11d',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('TT4_AC11d',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('TT5_AC11d',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+
+    call addfld ('TT1_AC11e',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')!done
+    call addfld ('TT2_AC11e',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('TT3_AC11e',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('TT4_AC11e',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('TT5_AC11e',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+
+    call addfld ('TT1_AC13',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')!done
+    call addfld ('TT2_AC13',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')
+    call addfld ('TT3_AC13',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')
+    call addfld ('TT4_AC13',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')
+    call addfld ('TT5_AC13',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')
+
+#endif
     ! outfld calls in diag_phys_writeout
     call addfld (cnst_name(1), (/ 'lev' /), 'A', 'kg/kg',    cnst_longname(1))
     call addfld ('NSTEP',      horiz_only,  'A', 'timestep', 'Model timestep')

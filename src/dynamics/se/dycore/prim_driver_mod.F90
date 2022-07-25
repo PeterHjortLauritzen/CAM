@@ -1,6 +1,10 @@
 !#define _DBG_ print *,"file: ",__FILE__," line: ",__LINE__," ithr: ",hybrid%ithr
 #define _DBG_
 module prim_driver_mod
+#ifdef N2O_diag
+  use cam_history,    only: outfld
+  use constituents,   only: cnst_get_ind
+#endif
   use shr_kind_mod,           only: r8=>shr_kind_r8
   use cam_logfile,            only: iulog
   use cam_abortutils,         only: endrun
@@ -238,6 +242,10 @@ contains
     real (kind=r8)  :: dp_np1(np,np)
     real (kind=r8)  :: dp_start(np,np,nlev+1,nets:nete),dp_end(np,np,nlev,nets:nete)
     logical         :: compute_diagnostics
+#ifdef N2O_diag
+    integer :: idx_N2O
+    call cnst_get_ind('N2O' , idx_N2O   , abort=.false.)
+#endif
 
     ! ===================================
     ! Main timestepping loop
@@ -274,10 +282,28 @@ contains
 
 
     call TimeLevel_Qdp( tl, qsplit, n0_qdp)
+#ifdef N2O_diag
+    if (nsubstep==1) then
+      do ie = nets, nete
+        call outfld('N2O_dyn1',&
+             RESHAPE(elem(ie)%state%QDP(:,:,:,idx_N2O,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+      end do
+    end if
+#endif
 
     call calc_tot_energy_dynamics(elem,fvm,nets,nete,tl%n0,n0_qdp,'dAF')
     call ApplyCAMForcing(elem,fvm,tl%n0,n0_qdp,dt_remap,dt_phys,nets,nete,nsubstep)
     call calc_tot_energy_dynamics(elem,fvm,nets,nete,tl%n0,n0_qdp,'dBD')    
+#ifdef N2O_diag
+    if (nsubstep==1) then
+      do ie = nets, nete
+        call outfld('N2O_dyn2',&
+             RESHAPE(elem(ie)%state%QDP(:,:,:,idx_N2O,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+      end do
+    end if
+#endif
+
+
     do r=1,rsplit
       if (r.ne.1) call TimeLevel_update(tl,"leapfrog")
       call prim_step(elem, fvm, hybrid,nets,nete, dt, tl, hvcoord,r)
@@ -303,10 +329,21 @@ contains
         dp_end(:,:,:,ie) = elem(ie)%state%dp3d(:,:,:,tl%np1)
       end do
     end if
+#ifdef N2O_diag
+    do ie = nets, nete
+      call outfld('N2O_dyn_remap1',&
+           RESHAPE(elem(ie)%state%QDP(:,:,:,idx_N2O,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+    end do
+#endif
     call t_startf('vertical_remap')
     call vertical_remap(hybrid,elem,fvm,hvcoord,tl%np1,np1_qdp,nets,nete)
     call t_stopf('vertical_remap')
-
+#ifdef N2O_diag
+    do ie = nets, nete
+      call outfld('N2O_dyn_remap2',&
+           RESHAPE(elem(ie)%state%QDP(:,:,:,idx_N2O,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+    end do
+#endif
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! time step is complete.
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

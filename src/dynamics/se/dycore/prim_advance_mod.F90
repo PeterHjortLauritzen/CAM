@@ -1517,7 +1517,11 @@ contains
         call strlist_get_ind(cnst_name_gll, 'CLDLIQ' , ixcldliq, abort=.false.)
         call strlist_get_ind(cnst_name_gll, 'CLDICE' , ixcldice, abort=.false.)
       end if
+#ifdef N2O_diag
+      call cnst_get_ind('N2O' , ixtt    , abort=.false.)
+#else
       call cnst_get_ind('TT_LW' , ixtt    , abort=.false.)
+#endif
       !
       ! Compute frozen static energy in 3 parts:  KE, SE, and energy associated with vapor and liquid
       !

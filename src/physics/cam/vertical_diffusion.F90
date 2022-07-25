@@ -1386,7 +1386,7 @@ subroutine vertical_diffusion_tend( &
                          'MASSCHECK vert diff : nstep,lon,lat,mass1,mass2,sum3,sflx,rel-diff : ', &
                          trim(cnst_name(m)), ' : ', nstep, state%lon(i)*180._r8/pi, state%lat(i)*180._r8/pi, &
                          sum1, sum2, sum3, sflx, abs(sum2-sum1)/sum1
-!xxx                    call endrun('vertical_diffusion_tend : mass not conserved' )
+                    call endrun('vertical_diffusion_tend : mass not conserved' )
                  endif
               endif
            enddo col_loop

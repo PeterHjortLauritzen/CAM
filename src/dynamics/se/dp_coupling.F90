@@ -3,7 +3,10 @@ module dp_coupling
 !-------------------------------------------------------------------------------
 ! dynamics - physics coupling module
 !-------------------------------------------------------------------------------
-
+#ifdef N2O_diag
+use cam_history,    only: outfld
+use constituents,   only: cnst_get_ind
+#endif
 use shr_kind_mod,   only: r8=>shr_kind_r8
 use ppgrid,         only: begchunk, endchunk, pcols, pver, pverp
 use constituents,   only: pcnst, cnst_type
@@ -97,6 +100,10 @@ subroutine d_p_coupling(phys_state, phys_tend,  pbuf2d, dyn_out)
    integer                      :: tl_f, tl_qdp_np0, tl_qdp_np1
 
    type(physics_buffer_desc), pointer :: pbuf_chnk(:)
+#ifdef N2O_diag
+   integer :: idx_N2O
+   call cnst_get_ind('N2O' , idx_N2O   , abort=.false.)
+#endif
    !----------------------------------------------------------------------------
 
    if (.not. local_dp_map) then
@@ -176,6 +183,9 @@ subroutine d_p_coupling(phys_state, phys_tend,  pbuf2d, dyn_out)
            do m=1,pcnst
              qgll(:,:,:,m) = elem(ie)%state%Qdp(:,:,:,m,tl_qdp_np0)*inv_dp3d(:,:,:)
            end do
+#ifdef N2O_diag           
+           call outfld('N2O_DP',RESHAPE(qgll(:,:,:,idx_N2O),(/np*np,nlev/)), np*np, ie)
+#endif
             ncols = elem(ie)%idxP%NumUniquePts
             call UniquePoints(elem(ie)%idxP, elem(ie)%state%psdry(:,:), ps_tmp(1:ncols,ie))
             call UniquePoints(elem(ie)%idxP, nlev, elem(ie)%state%dp3d(:,:,:,tl_f), dp3d_tmp(1:ncols,:,ie))
