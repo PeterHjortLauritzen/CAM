@@ -1641,6 +1641,7 @@ contains
     call outfld('TT3_AC4', state%q(:,:, idx_TT_HI)   , pcols, lchnk   )
     call outfld('TT4_AC4', state%q(:,:, idx_TTRMD), pcols, lchnk   )
     call outfld('TT5_AC4', state%q(:,:, idx_TT_UN)   , pcols, lchnk   )
+    call outfld('Q_AC4', state%q(:,:, 1)   , pcols, lchnk   )
 
     call calc_te_and_aam_budgets(state, 'phB1')
 #endif
@@ -1844,6 +1845,7 @@ contains
     call outfld('TT3_AC5', state%q(:,:, idx_TT_HI)   , pcols, lchnk   )
     call outfld('TT4_AC5', state%q(:,:, idx_TTRMD), pcols, lchnk   )
     call outfld('TT5_AC5', state%q(:,:, idx_TT_UN)   , pcols, lchnk   )
+    call outfld('Q_AC5', state%q(:,:, 1)   , pcols, lchnk   )
 
     call calc_te_and_aam_budgets(state, 'phA1')
 #endif
@@ -2199,6 +2201,7 @@ contains
     call outfld('TT3_AC11d', state%q(:,:, idx_TT_HI)   , pcols, lchnk   )
     call outfld('TT4_AC11d', state%q(:,:, idx_TTRMD), pcols, lchnk   )
     call outfld('TT5_AC11d', state%q(:,:, idx_TT_UN)   , pcols, lchnk   )
+    call outfld('Q_AC11d', state%q(:,:, 1)   , pcols, lchnk   )
 #endif
     !---------------------------------------------------------------------------------
     !   ... enforce charge neutrality
@@ -2236,6 +2239,7 @@ contains
     call outfld('TT3_AC11e', state%q(:,:, idx_TT_HI)   , pcols, lchnk   )
     call outfld('TT4_AC11e', state%q(:,:, idx_TTRMD), pcols, lchnk   )
     call outfld('TT5_AC11e', state%q(:,:, idx_TT_UN)   , pcols, lchnk   )
+    call outfld('Q_AC11e', state%q(:,:, 1)   , pcols, lchnk   )
 #endif
     if (trim(cam_take_snapshot_after) == "gw_tend") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
@@ -2333,6 +2337,13 @@ contains
     call calc_te_and_aam_budgets(state, 'dyAP',vc=vc_dycore)
 #ifdef N2O_diag
     call outfld('N2O_AC12', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+
+    call outfld('TT1_AC12', state%q(:,:, idx_TT_LW)   , pcols, lchnk   )
+    call outfld('TT2_AC12', state%q(:,:, idx_TT_MD)   , pcols, lchnk   )
+    call outfld('TT3_AC12', state%q(:,:, idx_TT_HI)   , pcols, lchnk   )
+    call outfld('TT4_AC12', state%q(:,:, idx_TTRMD), pcols, lchnk   )
+    call outfld('TT5_AC12', state%q(:,:, idx_TT_UN)   , pcols, lchnk   )
+
 #endif
 
     !---------------------------------------------------------------------------------
@@ -2448,12 +2459,6 @@ contains
     call clybry_fam_set( ncol, lchnk, map2chm, state%q, pbuf )
 #ifdef N2O_diag
     call outfld('N2O_AC13', state%q(:,:, idx_N2O)      , pcols, lchnk   )
-
-    call outfld('TT1_AC13', state%q(:,:, idx_TT_LW)   , pcols, lchnk   )
-    call outfld('TT2_AC13', state%q(:,:, idx_TT_MD)   , pcols, lchnk   )
-    call outfld('TT3_AC13', state%q(:,:, idx_TT_HI)   , pcols, lchnk   )
-    call outfld('TT4_AC13', state%q(:,:, idx_TTRMD), pcols, lchnk   )
-    call outfld('TT5_AC13', state%q(:,:, idx_TT_UN)   , pcols, lchnk   )
 #endif
 
   end subroutine tphysac
@@ -2687,6 +2692,7 @@ contains
     call outfld('TT3_BC1', state%q(:,:, idx_TT_HI)   , pcols, lchnk   )
     call outfld('TT4_BC1', state%q(:,:, idx_TTRMD), pcols, lchnk   )
     call outfld('TT5_BC1', state%q(:,:, idx_TT_UN)   , pcols, lchnk   )
+    call outfld('Q_BC1', state%q(:,:, 1)   , pcols, lchnk   )
 #endif
     call calc_te_and_aam_budgets(state, 'phBF')
     call calc_te_and_aam_budgets(state, 'dyBF',vc=vc_dycore)

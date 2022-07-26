@@ -1,7 +1,7 @@
 #!/bin/tcsh
 setenv short "T"
-setenv proj "P93300642"
-#setenv proj "P03010039"
+#setenv proj "P93300642"
+setenv proj "P03010039"
 unset src
 setenv src "bug-N2O"
 unset res
@@ -15,7 +15,7 @@ unset wall
 unset pes
 if ($short == "T") then
   setenv pes "900"
-  setenv wall "00:20:00"
+  setenv wall "00:12:00"
 else
   if ($res == "ne30_ne30_mg17" || $res == "ne30pg3_ne30pg3_mg17") then
     setenv pes "1800"
@@ -53,7 +53,7 @@ cd /glade/scratch/$USER/$caze
 ./xmlchange NTHRDS=1
 if ($short == "T") then
   ./xmlchange STOP_OPTION=ndays
-  ./xmlchange STOP_N=2
+  ./xmlchange STOP_N=1
 else
   ./xmlchange STOP_OPTION=ndays
   ./xmlchange STOP_N=60
@@ -83,7 +83,7 @@ endif
 echo "inithist = 'MONTHLY'" >>user_nl_cam
 echo "empty_htapes      = .true.                                        ">>user_nl_cam
 if ($short == "T") then
-  echo "mfilt  = 48,48,48,48,48,48,365,73,365                                                                    ">>user_nl_cam
+  echo "mfilt  = 1,1,1,1,1,73,365                                                                    ">>user_nl_cam
 else
   echo "mfilt  = 1,1,1,1,1,1                                                        ">>user_nl_cam
 endif
@@ -99,12 +99,6 @@ echo "         'N2O_AC11','N2O_AC12', 'N2O_AC13',                 ">>user_nl_cam
 echo "	       'N2O_BC1','N2O_BC2'                                ">>user_nl_cam
 
 
-echo "fincl4 = 'TT1_BC1','TT2_BC1','TT3_BC1','TT4_BC1','TT5_BC1',">>user_nl_cam
-echo "         'TT1_AC4','TT2_AC4','TT3_AC4','TT4_AC4','TT5_AC4',">>user_nl_cam
-echo "         'TT1_AC5','TT2_AC5','TT3_AC5','TT4_AC5','TT5_AC5',">>user_nl_cam
-echo "         'TT1_AC11d','TT2_AC11d','TT3_AC11d','TT4_AC11d','TT5_AC11d',">>user_nl_cam
-echo "         'TT1_AC11e','TT2_AC11e','TT3_AC11e','TT4_AC11e','TT5_AC11e',">>user_nl_cam
-echo "         'TT1_AC13','TT2_AC13','TT3_AC13','TT4_AC13','TT5_AC13'">>user_nl_cam
 
 if ($res == "ne30_ne30_mg17" || $res == "ne30pg3_ne30pg3_mg17") then
   echo " ,'N2O_DP','N2O_dyn1','N2O_dyn2'                         ">>user_nl_cam
@@ -117,6 +111,22 @@ if ($res == "ne30_ne30_mg17" || $res == "ne30pg3_ne30pg3_mg17") then
     echo "se_statefreq      = 144                                            ">>user_nl_cam
   endif
 endif
+
+
+echo "fincl4 = 'TT1_BC1',       'TT2_BC1',       'TT3_BC1',       'TT4_BC1',       'TT5_BC1',       'Q_BC1',">>user_nl_cam
+echo "         'TT1_AC4',       'TT2_AC4',       'TT3_AC4',       'TT4_AC4',       'TT5_AC4',       'Q_AC4',">>user_nl_cam
+echo "         'TT1_AC5',       'TT2_AC5',       'TT3_AC5',       'TT4_AC5',       'TT5_AC5',       'Q_AC5',">>user_nl_cam
+echo "         'TT1_AC11d',     'TT2_AC11d',     'TT3_AC11d',     'TT4_AC11d',     'TT5_AC11d',     'Q_AC11d',">>user_nl_cam
+echo "         'TT1_AC11e',     'TT2_AC11e',     'TT3_AC11e',     'TT4_AC11e',     'TT5_AC11e',     'Q_AC11e',">>user_nl_cam
+echo "         'TT1_AC12',      'TT2_AC12',      'TT3_AC12',      'TT4_AC12',      'TT5_AC12',      'Q_AC12' ">>user_nl_cam
+if ($res == "ne30_ne30_mg17" || $res == "ne30pg3_ne30pg3_mg17") then
+echo "        ,'TT1_DP',        'TT2_DP',        'TT3_DP',        'TT4_DP',        'TT5_DP',        'Q_DP',">>user_nl_cam
+echo "         'TT1_dyn1',      'TT2_dyn1',      'TT3_dyn1',      'TT4_dyn1',      'TT5_dyn1',      'Q_dyn1',">>user_nl_cam
+echo "         'TT1_dyn2',      'TT2_dyn2',      'TT3_dyn2',      'TT4_dyn2',      'TT5_dyn2',      'Q_dyn2',">>user_nl_cam
+echo "         'TT1_dyn_remap1','TT1_dyn_remap1','TT3_dyn_remap1','TT4_dyn_remap1','TT5_dyn_remap1','Q_dyn_remap1',">>user_nl_cam
+echo "         'TT1_dyn_remap2','TT1_dyn_remap2','TT3_dyn_remap2','TT4_dyn_remap2','TT5_dyn_remap2','Q_dyn_remap2'">>user_nl_cam
+endif
+
 
 if ($res == "ne30_ne30_mg17" || $res == "ne30pg3_ne30pg3_mg17") then
   echo "fincl3 = 'N2O',               " >>user_nl_cam                
@@ -158,12 +168,14 @@ if ($short == "T") then
   echo "avgflag_pertape(1) = 'A'                                   ">>user_nl_cam
   echo "avgflag_pertape(2) = 'A'                                   ">>user_nl_cam
   echo "avgflag_pertape(3) = 'A'                                   ">>user_nl_cam
-  echo "nhtfrq             =1,1,1                                    ">>user_nl_cam
+  echo "avgflag_pertape(4) = 'A'                                   ">>user_nl_cam
+  echo "nhtfrq             =1,1,1,1                                ">>user_nl_cam
 else
   echo "avgflag_pertape(1) = 'A'                                   ">>user_nl_cam
   echo "avgflag_pertape(2) = 'A'                                   ">>user_nl_cam
   echo "avgflag_pertape(3) = 'A'                                   ">>user_nl_cam
-  echo "nhtfrq             =-24,-24,-24                                    ">>user_nl_cam
+  echo "avgflag_pertape(4) = 'A'                                   ">>user_nl_cam
+  echo "nhtfrq             =-24,-24,-24,-24                        ">>user_nl_cam
 endif
 
 #phl cp /glade/u/home/aherring/src/cam6_3_058.dtsens/usr_src/n2o/wetexit/* /glade/scratch/$USER/$caze/SourceMods/src.cam/
@@ -174,4 +186,4 @@ endif
 
 qcmd -- ./case.build
 #qcmd -- ./case.build --skip-provenance-check
-./case.submit
+#./case.submit

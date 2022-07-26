@@ -101,8 +101,13 @@ subroutine d_p_coupling(phys_state, phys_tend,  pbuf2d, dyn_out)
 
    type(physics_buffer_desc), pointer :: pbuf_chnk(:)
 #ifdef N2O_diag
-   integer :: idx_N2O
+   integer :: idx_N2O, idx_TT_LW, idx_TT_MD, idx_TT_HI, idx_TT_UN, idx_TTRMD
    call cnst_get_ind('N2O' , idx_N2O   , abort=.false.)
+   call cnst_get_ind('TT_LW' , idx_TT_LW   , abort=.false.)
+   call cnst_get_ind('TT_MD' , idx_TT_MD   , abort=.false.)
+   call cnst_get_ind('TT_HI' , idx_TT_HI   , abort=.false.)
+   call cnst_get_ind('TTRMD' , idx_TTRMD   , abort=.false.)
+   call cnst_get_ind('TT_UN' , idx_TT_UN   , abort=.false.)
 #endif
    !----------------------------------------------------------------------------
 
@@ -185,6 +190,11 @@ subroutine d_p_coupling(phys_state, phys_tend,  pbuf2d, dyn_out)
            end do
 #ifdef N2O_diag           
            call outfld('N2O_DP',RESHAPE(qgll(:,:,:,idx_N2O),(/np*np,nlev/)), np*np, ie)
+           call outfld('TT1_DP',RESHAPE(qgll(:,:,:,idx_TT_LW),(/np*np,nlev/)), np*np, ie)
+           call outfld('TT2_DP',RESHAPE(qgll(:,:,:,idx_TT_MD),(/np*np,nlev/)), np*np, ie)
+           call outfld('TT3_DP',RESHAPE(qgll(:,:,:,idx_TT_HI),(/np*np,nlev/)), np*np, ie)
+           call outfld('TT4_DP',RESHAPE(qgll(:,:,:,idx_TTRMD),(/np*np,nlev/)), np*np, ie)
+           call outfld('TT5_DP',RESHAPE(qgll(:,:,:,idx_TT_UN),(/np*np,nlev/)), np*np, ie)
 #endif
             ncols = elem(ie)%idxP%NumUniquePts
             call UniquePoints(elem(ie)%idxP, elem(ie)%state%psdry(:,:), ps_tmp(1:ncols,ie))

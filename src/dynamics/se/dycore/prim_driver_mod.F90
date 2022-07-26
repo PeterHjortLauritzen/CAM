@@ -243,8 +243,13 @@ contains
     real (kind=r8)  :: dp_start(np,np,nlev+1,nets:nete),dp_end(np,np,nlev,nets:nete)
     logical         :: compute_diagnostics
 #ifdef N2O_diag
-    integer :: idx_N2O
+    integer :: idx_N2O, idx_TT_LW, idx_TT_MD, idx_TT_HI, idx_TT_UN, idx_TTRMD
     call cnst_get_ind('N2O' , idx_N2O   , abort=.false.)
+    call cnst_get_ind('TT_LW' , idx_TT_LW   , abort=.false.)
+    call cnst_get_ind('TT_MD' , idx_TT_MD   , abort=.false.)
+    call cnst_get_ind('TT_HI' , idx_TT_HI   , abort=.false.)
+    call cnst_get_ind('TTRMD' , idx_TTRMD   , abort=.false.)
+    call cnst_get_ind('TT_UN' , idx_TT_UN   , abort=.false.)
 #endif
 
     ! ===================================
@@ -287,6 +292,18 @@ contains
       do ie = nets, nete
         call outfld('N2O_dyn1',&
              RESHAPE(elem(ie)%state%QDP(:,:,:,idx_N2O,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+        call outfld('TT1_dyn1',&
+             RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_LW,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+        call outfld('TT2_dyn1',&
+             RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_MD,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+        call outfld('TT3_dyn1',&
+             RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_HI,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+        call outfld('TT4_dyn1',&
+             RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TTRMD,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+        call outfld('TT5_dyn1',&
+             RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_UN,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+        call outfld('Q_dyn1',&
+             RESHAPE(elem(ie)%state%QDP(:,:,:,1,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
       end do
     end if
 #endif
@@ -299,6 +316,19 @@ contains
       do ie = nets, nete
         call outfld('N2O_dyn2',&
              RESHAPE(elem(ie)%state%QDP(:,:,:,idx_N2O,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+        call outfld('TT1_dyn2',&
+             RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_LW,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+        call outfld('TT2_dyn2',&
+             RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_MD,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+        call outfld('TT3_dyn2',&
+             RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_HI,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+        call outfld('TT4_dyn2',&
+             RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TTRMD,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+        call outfld('TT5_dyn2',&
+             RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_UN,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+        call outfld('Q_dyn2',&
+             RESHAPE(elem(ie)%state%QDP(:,:,:,1,n0_qdp)/elem(ie)%state%dp3d(:,:,:,tl%n0), (/np*np,nlev/)), np*np, ie)
+
       end do
     end if
 #endif
@@ -333,6 +363,19 @@ contains
     do ie = nets, nete
       call outfld('N2O_dyn_remap1',&
            RESHAPE(elem(ie)%state%QDP(:,:,:,idx_N2O,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+      call outfld('TT1_dyn_remap1',&
+           RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_LW,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+      call outfld('TT2_dyn_remap1',&
+           RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_MD,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+      call outfld('TT3_dyn_remap1',&
+           RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_HI,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+      call outfld('TT4_dyn_remap1',&
+           RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TTRMD,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+      call outfld('TT5_dyn_remap1',&
+           RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_UN,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+      call outfld('Q_dyn_remap1',&
+           RESHAPE(elem(ie)%state%QDP(:,:,:,1,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+
     end do
 #endif
     call t_startf('vertical_remap')
@@ -342,6 +385,19 @@ contains
     do ie = nets, nete
       call outfld('N2O_dyn_remap2',&
            RESHAPE(elem(ie)%state%QDP(:,:,:,idx_N2O,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+      call outfld('TT1_dyn_remap2',&
+           RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_LW,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+      call outfld('TT2_dyn_remap2',&
+           RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_MD,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+      call outfld('TT3_dyn_remap2',&
+           RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_HI,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+      call outfld('TT4_dyn_remap2',&
+           RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TTRMD,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+      call outfld('TT5_dyn_remap2',&
+           RESHAPE(elem(ie)%state%QDP(:,:,:,idx_TT_UN,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+      call outfld('Q_dyn_remap2',&
+           RESHAPE(elem(ie)%state%QDP(:,:,:,1,np1_qdp)/elem(ie)%state%dp3d(:,:,:,tl%np1), (/np*np,nlev/)), np*np, ie)
+
     end do
 #endif
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

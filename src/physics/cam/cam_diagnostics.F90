@@ -260,12 +260,14 @@ contains
     call addfld ('TT3_BC1',(/ 'lev' /), 'A','kg/kg','begin tphysbc')
     call addfld ('TT4_BC1',(/ 'lev' /), 'A','kg/kg','begin tphysbc')
     call addfld ('TT5_BC1',(/ 'lev' /), 'A','kg/kg','begin tphysbc')
+    call addfld ('Q_BC1',(/ 'lev' /), 'A','kg/kg','begin tphysbc')!done
 
     call addfld ('TT1_AC4',(/ 'lev' /), 'A','kg/kg','contrials')!done
     call addfld ('TT2_AC4',(/ 'lev' /), 'A','kg/kg','contrials')
     call addfld ('TT3_AC4',(/ 'lev' /), 'A','kg/kg','contrials')
     call addfld ('TT4_AC4',(/ 'lev' /), 'A','kg/kg','contrials')
     call addfld ('TT5_AC4',(/ 'lev' /), 'A','kg/kg','contrials')
+    call addfld ('Q_AC4',(/ 'lev' /), 'A','kg/kg','contrials')
 
 
     call addfld ('TT1_AC5',(/ 'lev' /), 'A','kg/kg','CLUBB MG')!done
@@ -273,24 +275,29 @@ contains
     call addfld ('TT3_AC5',(/ 'lev' /), 'A','kg/kg','CLUBB MG')
     call addfld ('TT4_AC5',(/ 'lev' /), 'A','kg/kg','CLUBB MG')
     call addfld ('TT5_AC5',(/ 'lev' /), 'A','kg/kg','CLUBB MG')
+    call addfld ('Q_AC5',(/ 'lev' /), 'A','kg/kg','CLUBB MG')
 
     call addfld ('TT1_AC11d',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')!done
     call addfld ('TT2_AC11d',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
     call addfld ('TT3_AC11d',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
     call addfld ('TT4_AC11d',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
     call addfld ('TT5_AC11d',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('Q_AC11d',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+
 
     call addfld ('TT1_AC11e',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')!done
     call addfld ('TT2_AC11e',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
     call addfld ('TT3_AC11e',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
     call addfld ('TT4_AC11e',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
     call addfld ('TT5_AC11e',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
+    call addfld ('Q_AC11e',(/ 'lev' /), 'A','kg/kg','Co2 cycle + chemistry')
 
-    call addfld ('TT1_AC13',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')!done
-    call addfld ('TT2_AC13',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')
-    call addfld ('TT3_AC13',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')
-    call addfld ('TT4_AC13',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')
-    call addfld ('TT5_AC13',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')
+    call addfld ('TT1_AC12',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')!done
+    call addfld ('TT2_AC12',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')
+    call addfld ('TT3_AC12',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')
+    call addfld ('TT4_AC12',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')
+    call addfld ('TT5_AC12',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')
+    call addfld ('Q_AC12',(/ 'lev' /), 'A','kg/kg','dme_adj + end of tphysac')
 
 #endif
     ! outfld calls in diag_phys_writeout
