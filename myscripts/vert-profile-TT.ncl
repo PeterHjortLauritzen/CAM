@@ -2,18 +2,26 @@ begin
   frames = False
   fv = True
 
-  str_TT = "TT_LW" ;1
+  optional_identifier = "vertical_diff_no_conversion"
 
-;  var = "TT5"
-;  str_TT = "TT_UN" ;5
+  str_TT = "TT_LW" ;1
+  fact = 1.0
+
+  var = "TT5"
+  str_TT = "TT_UN" ;5
+  fact = 1.0
 
 ;  str_TT = "TTRMD" ;4
 
-  var = "Q"
-  str_TT = "Q"
+;  var = "Q"
+;  str_TT = "Q"
+  fact = 1.0
 
+  var = "N2O"
+  str_TT = "N2O"
+  fact = 1E9
 
-  f = addfile("h0.nc","r")
+  f = addfile("h0-TT.nc","r")
 
   lat = f->lat
   lon = f->lon 
@@ -125,10 +133,10 @@ begin
    end if
   str = str+str_TT
   if (frames) then
-    str   = str + "vert-profile-frames."+str_point
+    str   = str + "vert-profile-frames."+optional_identifier+"."+str_point
     wks   = gsn_open_wks ("pdf",str)               ; send graphics to PNG file
   else
-    str   = str + "vert-profile."+str_point
+    str   = str + "vert-profile."+optional_identifier+"."+str_point
     wks   = gsn_open_wks ("pdf",str)               ; send graphics to PNG file
   end if
 
@@ -157,10 +165,10 @@ begin
     res@tiMainString     = "Incr. tphysac all"          ; add title
     if (frames) then
       fld=TT_AC12(t,:)-TT_BC1(t,:)
-      plot(1)  = gsn_csm_xy (wks,fld,ilev,res) ; create plot
+      plot(1)  = gsn_csm_xy (wks,fact*fld,ilev,res) ; create plot
     else
       fld=TT_AC12-TT_BC1
-      plot(1)  = gsn_csm_xy (wks,fld(:,:),ilev,res) ; create plot 
+      plot(1)  = gsn_csm_xy (wks,fact*fld(:,:),ilev,res) ; create plot 
     end if
 
 
@@ -170,7 +178,7 @@ begin
     else
       fld=TT_AC5-TT_AC4
     end if
-    plot(2)  = gsn_csm_xy (wks,fld,ilev,res) ; create plot
+    plot(2)  = gsn_csm_xy (wks,fact*fld,ilev,res) ; create plot
 
 
     res@tiMainString     = "Incr. gw_drag"          ; add title
@@ -179,7 +187,7 @@ begin
     else
       fld=TT_AC11e-TT_AC11d
     end if
-    plot(3)  = gsn_csm_xy (wks,fld,ilev,res) ; create plot
+    plot(3)  = gsn_csm_xy (wks,fact*fld,ilev,res) ; create plot
 
     if (fv) then
     else
@@ -189,7 +197,7 @@ begin
       else
         fld=TT_remap1-TT_dyn2
       end if
-      plot(4)  = gsn_csm_xy (wks,fld,ilev,res) ; create plot
+      plot(4)  = gsn_csm_xy (wks,fact*fld,ilev,res) ; create plot
 
       res@tiMainString     = "vertical remap dycore"          ; add title
       if (frames) then
@@ -197,7 +205,7 @@ begin
       else
         fld=TT_remap2-TT_remap1
       end if
-      plot(5)  = gsn_csm_xy (wks,fld,ilev,res) ; create plot
+      plot(5)  = gsn_csm_xy (wks,fact*fld,ilev,res) ; create plot
     end if
 
     res@tiMainString     = str_TT +" (tphysbc start)"         ; add title
@@ -206,7 +214,7 @@ begin
     else
       fld=TT_BC1
     end if
-    plot(0)  = gsn_csm_xy (wks,fld,ilev,res) ; create plot
+    plot(0)  = gsn_csm_xy (wks,fact*fld,ilev,res) ; create plot
 
 
     resP = True
