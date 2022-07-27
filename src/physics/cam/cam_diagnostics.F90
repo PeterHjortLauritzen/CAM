@@ -231,6 +231,9 @@ contains
     call addfld ('N2O_BC1',(/ 'lev' /), 'A','kg/kg','begin tphysbc')
     call addfld ('N2O_BC2',(/ 'lev' /), 'A','kg/kg','end tphysbc')
 
+    call addfld ('Exner',(/ 'lev' /), 'A','kg/kg','begin tphysac')
+    call addfld ('zi',(/ 'lev' /), 'A','kg/kg','begin tphysac')
+
     call addfld ('N2O_AC1',(/ 'lev' /), 'A','kg/kg','begin tphysac')
     call addfld ('N2O_AC2',(/ 'lev' /), 'A','kg/kg','Carma')
     call addfld ('N2O_AC3',(/ 'lev' /), 'A','kg/kg','CARMA bin microphysics')

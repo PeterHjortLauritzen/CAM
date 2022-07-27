@@ -14,7 +14,7 @@ unset wall
 
 unset pes
 if ($short == "T") then
-  setenv pes "900"
+  setenv pes "450"
   setenv wall "00:12:00"
 else
   if ($res == "ne30_ne30_mg17" || $res == "ne30pg3_ne30pg3_mg17") then
@@ -52,8 +52,8 @@ cd /glade/scratch/$USER/$caze
 #./xmlchange REST_OPTION=nmonths
 ./xmlchange NTHRDS=1
 if ($short == "T") then
-  ./xmlchange STOP_OPTION=ndays
-  ./xmlchange STOP_N=1
+  ./xmlchange STOP_OPTION=nsteps
+  ./xmlchange STOP_N=3
 else
   ./xmlchange STOP_OPTION=ndays
   ./xmlchange STOP_N=60
@@ -186,4 +186,4 @@ endif
 
 qcmd -- ./case.build
 #qcmd -- ./case.build --skip-provenance-check
-#./case.submit
+./case.submit

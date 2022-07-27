@@ -98,7 +98,7 @@ begin
   res          = True
   res@gsnDraw  = False                          ; don't draw
   res@gsnFrame = False                          ; don't advance frame
-
+  res@trYReverse = True		; reverse the Y-axis
 
   ilev = ispan(0,nlev-1,1)
 

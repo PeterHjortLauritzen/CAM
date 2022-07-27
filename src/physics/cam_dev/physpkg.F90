@@ -1557,6 +1557,8 @@ contains
 
 #ifdef N2O_diag
     call outfld('N2O_AC1', state%q(:,:, idx_N2O)      , pcols, lchnk   )
+    call outfld('Exner', state%exner(:,:)      , pcols, lchnk   )
+    call outfld('zi', state%zi(:,:)      , pcols, lchnk   )
 #endif
     if (carma_do_emission) then
        ! carma emissions
