@@ -1,21 +1,21 @@
 begin
-  frames = False
-  fv = True
+  frames = True
+  fv = False
 
-  optional_identifier = "vertical_diff_no_conversion"
+  optional_identifier = "ref"
 
-  str_TT = "TT_LW" ;1
-  fact = 1.0
+;  str_TT = "TT_LW" ;1
+;  fact = 1.0
 
-  var = "TT5"
-  str_TT = "TT_UN" ;5
-  fact = 1.0
+;  var = "TT5"
+;  str_TT = "TT_UN" ;5
+;  fact = 1.0
 
 ;  str_TT = "TTRMD" ;4
 
 ;  var = "Q"
 ;  str_TT = "Q"
-  fact = 1.0
+;  fact = 1.0
 
   var = "N2O"
   str_TT = "N2O"

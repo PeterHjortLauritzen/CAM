@@ -1,3 +1,4 @@
+#define column_io
 module dyn_comp
 
 !----------------------------------------------------------------------
@@ -81,6 +82,10 @@ use te_map_mod,         only: te_map
 implicit none
 private
 save
+
+#ifdef column_io
+  real(r8) :: lat_point,lon_point
+#endif
 
 public :: &
    dyn_readnl,   &
@@ -3046,7 +3051,21 @@ subroutine read_inidat(dyn_in)
   ! These always happen
   call process_inidat(grid, dyn_in, 'PS')
   call process_inidat(grid, dyn_in, 'T')
-
+#ifdef column_io
+  lat_point = 0.53456419498_r8
+  lon_point = 1.3962634016_r8
+  do j=jfirstxy,jlastxy
+    do i=ifirstxy,ilastxy
+      if (abs(clat(j)-lat_point)<0.00001_r8.and. abs(clon(i,1)-lon_point)<0.00001_r8) then
+        write(*,*) "fvfvfv clat,clon",clat(j),clon(i,1)
+        do jf=1,SIZE(dyn_in%tracer(i,j,:,11))
+          write(*,*) "xxx",jf,dyn_in%tracer(i,j,jf,11)
+        end do
+        write(*,*) "xxx end fvfvfvfv"
+      end if
+    end do
+  end do
+#endif
 end subroutine read_inidat
 
 !=========================================================================================

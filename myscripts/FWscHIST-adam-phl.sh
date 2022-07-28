@@ -5,16 +5,16 @@ setenv proj "P03010039"
 unset src
 setenv src "bug-N2O"
 unset res
-setenv res "ne30_ne30_mg17"
+#setenv res "ne30_ne30_mg17"
 #setenv res "ne30pg3_ne30pg3_mg17"
-#setenv res "f09_f09_mg17"
+setenv res "f09_f09_mg17"
 unset comp
 setenv comp "HIST_CAM60%WCSC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV"
 unset wall
 
 unset pes
 if ($short == "T") then
-  setenv pes "450"
+  setenv pes "225"
   setenv wall "00:12:00"
 else
   if ($res == "ne30_ne30_mg17" || $res == "ne30pg3_ne30pg3_mg17") then
@@ -52,8 +52,8 @@ cd /glade/scratch/$USER/$caze
 #./xmlchange REST_OPTION=nmonths
 ./xmlchange NTHRDS=1
 if ($short == "T") then
-  ./xmlchange STOP_OPTION=nsteps
-  ./xmlchange STOP_N=3
+  ./xmlchange STOP_OPTION=ndays
+  ./xmlchange STOP_N=1
 else
   ./xmlchange STOP_OPTION=ndays
   ./xmlchange STOP_N=60

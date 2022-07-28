@@ -1,3 +1,4 @@
+#define column_io
 #define lauritzen_fix
 module gw_drag
 
@@ -54,6 +55,9 @@ module gw_drag
   public :: gw_init                  ! Initialization
   public :: gw_tend                  ! interface to actual parameterization
 
+#ifdef column_io
+  real(r8) :: lat_point,lon_point
+#endif
 !
 ! PRIVATE: Rest of the data and interfaces are private to this module
 !
@@ -1228,7 +1232,9 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
   !-----------------------------------------------------------------------
   ! Interface for multiple gravity wave drag parameterization.
   !-----------------------------------------------------------------------
-
+#ifdef column_io
+  use dycore,             only: dycore_is
+#endif
   use physics_types,  only: physics_state_copy, set_dry_to_wet
   use constituents,   only: cnst_type
   use physics_buffer, only: physics_buffer_desc, pbuf_get_field
@@ -1389,7 +1395,15 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
   real(r8) :: zm(state%ncol,pver)
   real(r8) :: zi(state%ncol,pver+1)
   !------------------------------------------------------------------------
-
+#ifdef column_io
+  if(dycore_is('LR')) then
+    lat_point = 0.53456419498_r8
+    lon_point = 1.3962634016_r8
+  else
+    lat_point = 0.53158608587_r8
+    lon_point = 1.39924477989_r8
+  end if
+#endif
   ! Make local copy of input state.
   call physics_state_copy(state, state1)
 
@@ -1410,12 +1424,31 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
   zm = state1%zm(:ncol,:)
   zi = state1%zi(:ncol,:)
 
+
   lq = .true.
   call physics_ptend_init(ptend, state1%psetcols, "Gravity wave drag", &
        ls=.true., lu=.true., lv=.true., lq=lq)
 
   ! Profiles of background state variables
   call gw_prof(ncol, p, cpair, t, rhoi, nm, ni)
+
+#ifdef column_io
+!8000              format(i2,f7.3,f7.3,f7.3,f7.3,f7.3,f7.3)
+  do m=1,ncol
+   if (abs(state1%lat(m)-lat_point)<0.00001_r8.and. abs(state1%lon(m)-lon_point)<0.00001_r8) then
+     write(*,*) "xxx gw_drag state start"
+     write(*,*) "lat,lon",state1%lat(m)*57.2957795131_r8,state1%lon(m)*57.2957795131_r8
+     write(*,*) "k,T,u,v,lnpint,s,rhoi"
+     do k=1,pver
+       write(*,*) k,state1%t(m,k),state1%u(m,k),state1%v(m,k),state1%lnpint(m,k),state1%s(m,k),rhoi(m,k)
+     end do
+     k=pver+1
+     write(*,*)     "-------,-------,-------,",state1%lnpint(m,k),",-------,",rhoi(m,k)
+     write(*,*) "xxx gw_drag state end"
+   end if
+  end do
+#endif
+
 
   if (do_molec_diff) then
      !--------------------------------------------------------
@@ -1485,6 +1518,22 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
           effgw,   c,       kvtt, q,  dse,  tau,  utgw,  vtgw, &
           ttgw, qtgw, egwdffi,  gwut, dttdf, dttke,            &
           lapply_effgw_in=gw_apply_tndmax)
+
+#ifdef column_io
+!8003              format(i3,f7.3,f7.3)
+      do m=1,ncol
+        if (abs(state1%lat(m)-lat_point)<0.00001_r8.and. abs(state1%lon(m)-lon_point)<0.00001_r8) then
+          write(*,*) "xxx gw_drag convective start"
+          write(*,*) "k,kvtt(m,k),dt*qtgw(m,k,11)"
+          do k=1,pver+1
+            write(*,*) k,kvtt(m,k),dt*qtgw(m,k,11)
+          end do
+          write(*,*) "xxx gw_drag convective end"
+        end if
+      end do
+#endif
+
+
 
      ! Project stress into directional components.
      taucd = calc_taucd(ncol, band_mid%ngwv, tend_level, tau, c, xv, yv, ubi)
@@ -1573,6 +1622,20 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
           effgw,   c,       kvtt, q,  dse,  tau,  utgw,  vtgw, &
           ttgw, qtgw, egwdffi,  gwut, dttdf, dttke,            &
           lapply_effgw_in=gw_apply_tndmax)
+
+#ifdef column_io
+!8004              format(i3,f7.3,f7.3)
+      do m=1,ncol
+        if (abs(state1%lat(m)-lat_point)<0.00001_r8.and. abs(state1%lon(m)-lon_point)<0.00001_r8) then
+          write(*,*) "xxx gw_drag convective2 start"
+          write(*,*) "k,kvtt(m,k),dt*qtgw(m,k,11)"
+          do k=1,pver+1
+            write(*,*) k,kvtt(m,k),dt*qtgw(m,k,11)
+          end do
+          write(*,*) "xxx gw_drag convective2 end"
+        end if
+      end do
+#endif
 
      ! Project stress into directional components.
      taucd = calc_taucd(ncol, band_mid%ngwv, tend_level, tau, c, xv, yv, ubi)
@@ -1665,6 +1728,21 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
      ! Project stress into directional components.
      taucd = calc_taucd(ncol, band_mid%ngwv, tend_level, tau, c, xv, yv, ubi)
 
+#ifdef column_io
+!8005              format(i3,f7.3,f7.3)
+      do m=1,ncol
+        if (abs(state1%lat(m)-lat_point)<0.00001_r8.and. abs(state1%lon(m)-lon_point)<0.00001_r8) then
+          write(*,*) "xxx gw_drag frontal start"
+          write(*,*) "k,kvtt,dt*qtgw(m,k,11)"
+          do k=1,pver+1
+            write(*,*) k,kvtt(m,k),dt*qtgw(m,k,11)
+          end do
+          write(*,*) "xxx gw_drag frontal end"
+        end if
+      end do
+#endif
+
+
      !  add the diffusion coefficients
      do k = 1, pver+1
         egwdffi_tot(:,k) = egwdffi_tot(:,k) + egwdffi(:,k)
@@ -1751,6 +1829,20 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
           effgw,   c,       kvtt, q,  dse,  tau,  utgw,  vtgw, &
           ttgw, qtgw, egwdffi,  gwut, dttdf, dttke, ro_adjust=ro_adjust, &
           lapply_effgw_in=gw_apply_tndmax)
+
+#ifdef column_io
+!8006              format(i3,f7.3,f7.3)
+      do m=1,ncol
+        if (abs(state1%lat(m)-lat_point)<0.00001_r8.and. abs(state1%lon(m)-lon_point)<0.00001_r8) then
+          write(*,*) "xxx gw_drag frontal2 start"
+          write(*,*) "k,kvtt(m,k),dt*qtgw(m,k,11)"
+          do k=1,pver+1
+            write(*,*) k,kvtt(m,k),dt*qtgw(m,k,11)
+          end do
+          write(*,*) "xxx gw_drag frontal2 end"
+        end if
+      end do
+#endif
 
      ! Project stress into directional components.
      taucd = calc_taucd(ncol, band_long%ngwv, tend_level, tau, c, xv, yv, ubi)
@@ -1849,7 +1941,19 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
           effgw,c,          kvtt, q,  dse,  tau,  utgw,  vtgw, &
           ttgw, qtgw, egwdffi,  gwut, dttdf, dttke,            &
           lapply_effgw_in=gw_apply_tndmax)
-
+#ifdef column_io
+!8007              format(i3,f7.3,f7.3)
+      do m=1,ncol
+        if (abs(state1%lat(m)-lat_point)<0.00001_r8.and. abs(state1%lon(m)-lon_point)<0.00001_r8) then
+          write(*,*) "xxx gw_drag oro start"
+          write(*,*) "k,kvtt(m,k),dt*qtgw(m,k,11)"
+          do k=1,pver+1
+            write(*,*) k,kvtt(m,k),dt*qtgw(m,k,11)
+          end do
+          write(*,*) "xxx gw_drag oro end"
+        end if
+      end do
+#endif
      ! For orographic waves, don't bother with taucd, since there are no
      ! momentum conservation routines or directional diagnostics.
 
@@ -1936,7 +2040,11 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
         effgw_rdg_beta, effgw_rdg_beta_max,       &
         hwdth, clngt, gbxar, mxdis, angll, anixy, &
         rdg_beta_cd_llb, trpd_leewv_rdg_beta,     &
+#ifdef column_io
+        ptend, flx_heat, state1%lat(:ncol), state1%lon(:ncol))
+#else
         ptend, flx_heat)
+#endif
 
   end if
 
@@ -1966,8 +2074,11 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
         effgw_rdg_gamma, effgw_rdg_gamma_max,          &
         hwdthg, clngtg, gbxar, mxdisg, angllg, anixyg, &
         rdg_gamma_cd_llb, trpd_leewv_rdg_gamma,        &
+#ifdef column_io
+        ptend, flx_heat, state1%lat(:ncol), state1%lon(:ncol))
+#else
         ptend, flx_heat)
-
+#endif
   endif
 
   ! Convert the tendencies for the dry constituents to dry air basis.
@@ -1980,6 +2091,22 @@ subroutine gw_tend(state, pbuf, dt, ptend, cam_in, flx_heat)
         end do
      end if
   end do
+
+#ifdef column_io
+!8003              format(i3,f7.3,f7.3)
+      do m=1,ncol
+        if (abs(state1%lat(m)-lat_point)<0.00001_r8.and. abs(state1%lon(m)-lon_point)<0.00001_r8) then
+          write(*,*) "xxx dt*ptend%q start"
+          write(*,*) "k,ptend%q; dt=",dt
+          do k=1,pver+1
+            write(*,*) k,ptend%q(m,k,11),state1%q(m,k,11)
+          end do
+          write(*,*) "xxx dt*ptend%q end"
+        end if
+      end do
+#endif
+
+
 
   ! Write totals to history file.
   call outfld('EKGW', egwdffi_tot , ncol, lchnk)
@@ -2007,8 +2134,11 @@ subroutine gw_rdg_calc( &
    hwdth, clngt, gbxar, &
    mxdis, angll, anixy, &
    rdg_cd_llb, trpd_leewv, &
+#ifdef column_io
+   ptend, flx_heat,lat,lon)
+#else
    ptend, flx_heat)
-
+#endif
    use coords_1d,  only: Coords1D
    use gw_rdg,     only: gw_rdg_src, gw_rdg_belowpeak, gw_rdg_break_trap, gw_rdg_do_vdiff
    use gw_common,  only: gw_drag_prof, energy_change
@@ -2052,8 +2182,10 @@ subroutine gw_rdg_calc( &
    logical,          intent(in) :: trpd_leewv
 
    type(physics_ptend), intent(inout):: ptend   ! Parameterization net tendencies.
-
    real(r8),        intent(out) :: flx_heat(pcols)
+#ifdef column_io
+   real(r8) , intent(in) :: lat(ncol),lon(ncol)
+#endif
 
    !---------------------------Local storage-------------------------------
 
@@ -2201,6 +2333,21 @@ subroutine gw_rdg_calc( &
          ttgw, qtgw, egwdffi,   gwut, dttdf, dttke, &
          kwvrdg=kwvrdg, & 
          satfac_in = 1._r8, lapply_vdiff=gw_rdg_do_vdiff , tau_diag=tau_diag )
+
+#ifdef column_io
+!8001              format(i2,i3,f7.3,f7.3)
+      do m=1,ncol
+        if (abs(lat(m) - lat_point)<0.00001_r8.and. abs(lon(m) -lon_point)<0.00001_r8) then
+          write(*,*) "xxx gw_drag ridge start"
+          write(*,*) "k,nn,kvtt(m,k),dt*qtgw(m,k,11)"
+          do k=1,pver+1
+            write(*,*) k,nn,kvtt(m,k),dt*qtgw(m,k,11)
+          end do
+          write(*,*) "xxx gw_drag ridge end"
+        end if
+      end do
+#endif
+
 
       ! Add the tendencies from each ridge to the totals.
       do k = 1, pver

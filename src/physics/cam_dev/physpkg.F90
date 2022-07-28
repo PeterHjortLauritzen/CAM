@@ -1,3 +1,4 @@
+#define column_io
 module physpkg
 #ifdef N2O_diag
   use cam_history,    only: outfld
@@ -39,7 +40,9 @@ module physpkg
   implicit none
   private
   save
-
+#ifdef column_io
+  real(r8) :: lat_point,lon_point
+#endif
   ! Public methods
   public phys_register ! was initindx  - register physics methods
   public phys_init   ! Public initialization method
@@ -1458,6 +1461,7 @@ contains
 #ifdef N2O_diag
     integer :: idx_N2O, idx_TT_LW, idx_TT_MD, idx_TT_HI, idx_TT_UN, idx_TTRMD
     call cnst_get_ind('N2O' , idx_N2O   , abort=.false.)
+    if (masterproc) write(iulog,*) 'xxx idx_N2O=',idx_N2O
     call cnst_get_ind('TT_LW' , idx_TT_LW   , abort=.false.)
     call cnst_get_ind('TT_MD' , idx_TT_MD   , abort=.false.)
     call cnst_get_ind('TT_HI' , idx_TT_HI   , abort=.false.)
@@ -1560,6 +1564,19 @@ contains
     call outfld('Exner', state%exner(:,:)      , pcols, lchnk   )
     call outfld('zi', state%zi(:,:)      , pcols, lchnk   )
 #endif
+#ifdef column_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          write(*,*) "yyy tphysac1"
+          do k=1,pver
+            write(*,*) k,state%q(m,k,idx_N2O)
+          end do
+          write(*,*) "yyy tphysac1"
+        end if
+      end do
+#endif
+
+
     if (carma_do_emission) then
        ! carma emissions
        call carma_emission_tend (state, ptend, cam_in, ztodt)
@@ -1647,6 +1664,18 @@ contains
 
     call calc_te_and_aam_budgets(state, 'phB1')
 #endif
+#ifdef column_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          write(*,*) "yyy before CLUBB"
+          do k=1,pver
+            write(*,*) k,state%q(m,k,idx_N2O)
+          end do
+          write(*,*) "yyy before CLUBB"
+        end if
+      end do
+#endif
+
 
        ! initialize ptend structures where macro and microphysics tendencies are
        ! accumulated over macmic substeps
@@ -1851,6 +1880,17 @@ contains
 
     call calc_te_and_aam_budgets(state, 'phA1')
 #endif
+#ifdef column_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          write(*,*) "yyy after CLUBB"
+          do k=1,pver
+            write(*,*) k,state%q(m,k,idx_N2O)
+          end do
+          write(*,*) "yyy after CLUBB"
+        end if
+      end do
+#endif
 
        call outfld( 'UTEND_MACROP', ptend_macp_all%u, pcols, lchnk)
        call outfld( 'VTEND_MACROP', ptend_macp_all%v, pcols, lchnk)
@@ -2026,6 +2066,18 @@ contains
     call outfld('N2O_AC9', state%q(:,:, idx_N2O)      , pcols, lchnk   )
     call outfld('N2O_CFLX', cam_in%cflx(:, idx_N2O)      , pcols, lchnk   )
 #endif
+#ifdef column_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          write(*,*) "yyy before chem"
+          do k=1,pver
+            write(*,*) k,state%q(m,k,idx_N2O)
+          end do
+          write(*,*) "yyy before chem"
+        end if
+      end do
+#endif
+
 
     if (trim(cam_take_snapshot_before) == "co2_cycle_set_ptend") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
@@ -2080,6 +2132,18 @@ contains
 #ifdef N2O_diag
     call outfld('N2O_AC10', state%q(:,:, idx_N2O)      , pcols, lchnk   )
 #endif
+#ifdef column_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          write(*,*) "yyy after chem"
+          do k=1,pver
+            write(*,*) k,state%q(m,k,idx_N2O)
+          end do
+          write(*,*) "yyy after chem"
+        end if
+      end do
+#endif
+
     !===================================================
     ! Vertical diffusion/pbl calculation
     ! Call vertical diffusion (apply tracer emissions, molecular diffusion and pbl form drag)
@@ -2219,8 +2283,30 @@ contains
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
     end if
+#ifdef column_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          write(*,*) "yyy before gw_drag"
+          do k=1,pver
+            write(*,*) k,state%q(m,k,idx_N2O)
+          end do
+          write(*,*) "yyy before gw_drag"
+        end if
+      end do
+#endif
 
     call gw_tend(state, pbuf, ztodt, ptend, cam_in, flx_heat)
+#ifdef column_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          write(*,*) "yyy ptend after gw_drag"
+          do k=1,pver
+            write(*,*) k,ptend%q(m,k,idx_N2O)
+          end do
+          write(*,*) "yyy ptend after gw_drag"
+        end if
+      end do
+#endif
 
     if ( (trim(cam_take_snapshot_after) == "gw_tend") .and.                   &
          (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
@@ -2243,6 +2329,20 @@ contains
     call outfld('TT5_AC11e', state%q(:,:, idx_TT_UN)   , pcols, lchnk   )
     call outfld('Q_AC11e', state%q(:,:, 1)   , pcols, lchnk   )
 #endif
+#ifdef column_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          write(*,*) "yyy after gw_drag"
+          do k=1,pver
+            write(*,*) k,state%q(m,k,idx_N2O)
+          end do
+          write(*,*) "yyy after gw_drag"
+        end if
+      end do
+#endif
+
+
+
     if (trim(cam_take_snapshot_after) == "gw_tend") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
@@ -2520,7 +2620,6 @@ contains
     use cam_snapshot,    only: cam_snapshot_all_outfld_tphysbc
     use cam_snapshot_common, only: cam_snapshot_ptend_outfld
     use dyn_tests_utils, only: vc_dycore
-
     ! Arguments
 
     real(r8), intent(in) :: ztodt                          ! 2 delta t (model time increment)
@@ -2609,13 +2708,22 @@ contains
 
     !-----------------------------------------------------------------------
 #ifdef N2O_diag
-    integer :: idx_N2O, idx_TT_LW, idx_TT_MD, idx_TT_HI, idx_TT_UN, idx_TTRMD
+  integer :: idx_N2O, idx_TT_LW, idx_TT_MD, idx_TT_HI, idx_TT_UN, idx_TTRMD
     call cnst_get_ind('N2O' , idx_N2O   , abort=.false.)
     call cnst_get_ind('TT_LW' , idx_TT_LW   , abort=.false.)
     call cnst_get_ind('TT_MD' , idx_TT_MD   , abort=.false.)
     call cnst_get_ind('TT_HI' , idx_TT_HI   , abort=.false.)
     call cnst_get_ind('TTRMD' , idx_TTRMD   , abort=.false.)
     call cnst_get_ind('TT_UN' , idx_TT_UN   , abort=.false.)
+#endif
+#ifdef column_io
+  if(dycore_is('LR')) then
+    lat_point = 0.53456419498_r8
+    lon_point = 1.3962634016_r8
+  else
+    lat_point = 0.53158608587_r8
+    lon_point = 1.39924477989_r8
+  end if
 #endif
 
     call t_startf('bc_init')
