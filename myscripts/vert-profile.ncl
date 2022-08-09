@@ -1,7 +1,8 @@
 begin
-  frames = True
+  frames = False
   fv = False
-
+  mpas = True
+  se = False
   f = addfile("h0.nc","r")
 
   lat = f->lat
@@ -49,12 +50,16 @@ begin
     N2O_AC11e = f->N2O_AC11e(:,:,ilat,ilon)
     N2O_AC12 = f->N2O_AC12(:,:,ilat,ilon)
   else
-    N2O      = f->N2O(:,:,icol)
+      N2O      = f->N2O(:,:,icol)
+    if (se) then
 
-    N2O_dyn1 = f->N2O_dyn1(:,:,icol)
-    N2O_dyn2 = f->N2O_dyn2(:,:,icol)
-    N2O_DP   = f->N2O_DP(:,:,icol)
-  
+
+      N2O_dyn1 = f->N2O_dyn1(:,:,icol)
+      N2O_dyn2 = f->N2O_dyn2(:,:,icol)
+      N2O_DP   = f->N2O_DP(:,:,icol)
+      N2O_dyn_remap1 = f->N2O_dyn_remap1(:,:,icol)
+      N2O_dyn_remap2 = f->N2O_dyn_remap2(:,:,icol)
+    end if
     N2O_BC1 = f->N2O_BC1(:,:,icol)
     N2O_BC2 = f->N2O_BC2(:,:,icol)
  
@@ -71,8 +76,7 @@ begin
     N2O_AC11e = f->N2O_AC11e(:,:,icol)
     N2O_AC12 = f->N2O_AC12(:,:,icol)
 
-    N2O_dyn_remap1 = f->N2O_dyn_remap1(:,:,icol)
-    N2O_dyn_remap2 = f->N2O_dyn_remap2(:,:,icol)
+
   end if
 
   nt   = dimsizes(N2O(:,0))
@@ -81,8 +85,12 @@ begin
 
   if (fv) then
     str = "fv-"
-  else
+  end if
+  if (se) then
     str = "se-"
+   end if
+  if (mpas) then
+    str = "mpas-"
    end if
 
   if (frames) then
@@ -191,8 +199,7 @@ begin
     plot(9)  = gsn_csm_xy (wks,1E9*fld,ilev,res) ; create plot
 
 
-    if (fv) then
-    else
+    if (se) then
       res@tiMainString     = "Floating dyn incr. "          ; add title
       if (frames) then
         fld=N2O_dyn_remap1(t,:)-N2O_dyn2(t,:)

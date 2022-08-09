@@ -1,20 +1,32 @@
+!
 #!/bin/tcsh
 setenv short "T"
-#setenv proj "P93300642"
-setenv proj "P03010039"
+unset proj
+setenv proj "P93300642"
+#setenv proj "P03010039"
 unset src
 setenv src "bug-N2O"
 unset res
 #setenv res "ne30_ne30_mg17"
-#setenv res "ne30pg3_ne30pg3_mg17"
-setenv res "f09_f09_mg17"
+setenv res "ne30pg3_ne30pg3_mg17"
+#setenv res "mpasa120_mpasa120"
+#setenv res "f09_f09_mg17"
 unset comp
-setenv comp "HIST_CAM60%WCSC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV"
+if ($res == "mpasa120_mpasa120") then
+  setenv comp "HIST_CAM60%WCSC_CLM50%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV"
+else
+  setenv comp "HIST_CAM60%WCSC_CLM50%BGC-CROP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV"
+endif
 unset wall
 
 unset pes
 if ($short == "T") then
-  setenv pes "225"
+  if ($res == "mpasa120_mpasa120") then
+    unset pes
+    setenv pes "192"
+  else
+    setenv pes "225"
+  endif
   setenv wall "00:12:00"
 else
   if ($res == "ne30_ne30_mg17" || $res == "ne30pg3_ne30pg3_mg17") then
@@ -74,8 +86,14 @@ if ($res == "ne30_ne30_mg17" || $res == "ne30pg3_ne30pg3_mg17") then
   echo "ncdata = '/glade/p/cesm/amwg_dev/juliob/FWsc_ne30pg3_58L_GRID_48_taperstart10km_lowtop_BL10_v3_beta1p75_Top_43km.nc'">>user_nl_cam
 ##echo "ncdata = '/glade/p/acom/acom-climate/jzhan166/acclip/ncdata/FCnudged_f09.mam.mar27.2000_2021.001.cam.i.2011-01-01-00000.ncne0np4_58L_cdf5.nc'">>user_nl_cam
 #echo "ncdata         = '/glade/scratch/jzhan166/archive/f.e21.FCnudged_58L.ne30_ne30_mg17.cam6_3_058.dtsens.2011_fvIC_wetexit/atm/hist/f.e21.FCnudged_58L.ne30_ne30_mg17.cam6_3_058.dtsens.2011_fvIC_wetexit.cam.i.2011-05-01-00000.nc'">>user_nl_cam
-else
+endif
+
+if ($res == "f09_f09_mg17") then
   echo "ncdata = '/glade/p/cesm/amwg_dev/juliob/cam_ic_files/fv_dycore/cami_test_FV_1_0.9x1.25_58L_GRID_48_taperstart10km_lowtop_BL10_v3p1_beta1p75_Top_43km.nc'">>user_nl_cam
+endif
+
+if ($res == "mpasa120_mpasa120") then
+  echo "ncdata = '/glade/work/skamaroc/MPAS_develop/MPAS-Model/x1.40962.pel.58levels_2011010100_init.nc'">>user_nl_cam
 endif
 
 #echo "ncdata = '/glade/p/cesm/amwg_dev/juliob/FWsc_ne30pg3_58L_GRID_48_taperstart10km_lowtop_BL10_v3_beta1p75_Top_43km.nc'">>user_nl_cam
@@ -127,17 +145,18 @@ echo "         'TT1_dyn_remap1','TT1_dyn_remap1','TT3_dyn_remap1','TT4_dyn_remap
 echo "         'TT1_dyn_remap2','TT1_dyn_remap2','TT3_dyn_remap2','TT4_dyn_remap2','TT5_dyn_remap2','Q_dyn_remap2'">>user_nl_cam
 endif
 
+echo "fincl3 = 'N2O','N2O_AC1','U','V','T','OMEGA500','OMEGA850','CLDLIQ','CLDICE','RAINQM','SNOWQM','PS'" >> user_nl_cam
 
-if ($res == "ne30_ne30_mg17" || $res == "ne30pg3_ne30pg3_mg17") then
-  echo "fincl3 = 'N2O',               " >>user_nl_cam                
-  echo "         'N2O_AC1','N2O_AC2','N2O_AC3','N2O_AC4','N2O_AC5', ">>user_nl_cam     
-  echo "         'N2O_AC6','N2O_AC7','N2O_AC8','N2O_AC9','N2O_AC10',">>user_nl_cam  
-  echo "	       'N2O_AC11b','N2O_AC11c','N2O_AC11d','N2O_AC11e',   ">>user_nl_cam
-  echo "	       'N2O_AC11f','N2O_AC11g','N2O_AC11h',               ">>user_nl_cam
-  echo "         'N2O_AC11','N2O_AC12', 'N2O_AC13',                 ">>user_nl_cam                                                              
-  echo "	       'N2O_BC1','N2O_BC2'                                ">>user_nl_cam
-  echo " ,'N2O_DP','N2O_dyn1','N2O_dyn2'                         ">>user_nl_cam
-endif
+#if ($res == "ne30_ne30_mg17" || $res == "ne30pg3_ne30pg3_mg17") then
+#  echo "fincl3 = 'N2O',               " >>user_nl_cam                
+#  echo "         'N2O_AC1','N2O_AC2','N2O_AC3','N2O_AC4','N2O_AC5', ">>user_nl_cam     
+#  echo "         'N2O_AC6','N2O_AC7','N2O_AC8','N2O_AC9','N2O_AC10',">>user_nl_cam  
+#  echo "	       'N2O_AC11b','N2O_AC11c','N2O_AC11d','N2O_AC11e',   ">>user_nl_cam
+#  echo "	       'N2O_AC11f','N2O_AC11g','N2O_AC11h',               ">>user_nl_cam
+#  echo "         'N2O_AC11','N2O_AC12', 'N2O_AC13',                 ">>user_nl_cam                                                              
+#  echo "	       'N2O_BC1','N2O_BC2'                                ">>user_nl_cam
+#  echo " ,'N2O_DP','N2O_dyn1','N2O_dyn2'                         ">>user_nl_cam
+#endif
 
 echo "fincl2 =   'WV_phBF','WL_phBF','WI_phBF','SE_phBF','KE_phBF','TT_phBF',  ">> user_nl_cam
 echo "           'WV_phBP','WL_phBP','WI_phBP','SE_phBP','KE_phBP','TT_phBP',  ">> user_nl_cam
@@ -176,6 +195,11 @@ else
   echo "avgflag_pertape(3) = 'A'                                   ">>user_nl_cam
   echo "avgflag_pertape(4) = 'A'                                   ">>user_nl_cam
   echo "nhtfrq             =-24,-24,-24,-24                        ">>user_nl_cam
+endif
+
+if ($res == "mpasa120_mpasa120") then
+  echo "flanduse_timeseries = '/glade/p/cesmdata/inputdata/lnd/clm2/surfdata_map/landuse.timeseries_mpasa120_hist_78pfts_CMIP6_simyr1850-2015_c211108.nc'" >> user_nl_clm
+  echo "fsurdat = '/glade/p/cesmdata/inputdata/lnd/clm2/surfdata_map/surfdata_mpasa120_hist_78pfts_CMIP6_simyr2000_c211108.nc'" >> user_nl_clm
 endif
 
 #phl cp /glade/u/home/aherring/src/cam6_3_058.dtsens/usr_src/n2o/wetexit/* /glade/scratch/$USER/$caze/SourceMods/src.cam/

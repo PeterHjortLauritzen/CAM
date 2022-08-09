@@ -1,3 +1,4 @@
+!#define phl_limiter
 !-------------------------------------------------------------------------------
 !physics data types module
 !-------------------------------------------------------------------------------
@@ -205,7 +206,7 @@ contains
 
   end subroutine physics_type_alloc
 !===============================================================================
-  subroutine physics_update(state, ptend, dt, tend)
+  subroutine physics_update(state, ptend, dt, tend, name)
 !-----------------------------------------------------------------------
 ! Update the state and or tendency structure with the parameterization tendencies
 !-----------------------------------------------------------------------
@@ -222,10 +223,11 @@ contains
     real(r8), intent(in) :: dt                     ! time step
 
     type(physics_tend ), intent(inout), optional  :: tend  ! Physics tendencies over timestep
+    character*(*),intent(in), optional :: name               ! xxx
     ! tend is usually only needed by calls from physpkg.
 !
 !---------------------------Local storage-------------------------------
-    integer :: k,m                                 ! column,level,constituent indices
+    integer :: k,m,i                               ! column,level,constituent indices
     integer :: ixcldice, ixcldliq                  ! indices for CLDICE and CLDLIQ
     integer :: ixnumice, ixnumliq
     integer :: ixnumsnow, ixnumrain
@@ -236,7 +238,9 @@ contains
 
     real(r8),allocatable :: cpairv_loc(:,:)
     real(r8),allocatable :: rairv_loc(:,:)
-
+#ifdef phl_limiter
+    real(r8) :: qbefore(pcols,pver),qafter(pcols,pver),qmax(pcols),qmin(pcols)
+#endif
     ! PERGRO limits cldliq/ice for macro/microphysics:
     character(len=24), parameter :: pergro_cldlim_names(4) = &
          (/ "stratiform", "cldwat    ", "micro_mg  ", "macro_park" /)
@@ -311,9 +315,35 @@ contains
 
     do m = 1, pcnst
        if(ptend%lq(m)) then
+#ifdef phl_limiter
+         if (m==11) then
+           qbefore(:ncol,:) = state%q(:ncol,:,m)
+           do i=1,ncol
+             qmax(i) = MAXVAL(qbefore(i,:))
+           end do
+         end if
+#endif
+
+
           do k = ptend%top_level, ptend%bot_level
              state%q(:ncol,k,m) = state%q(:ncol,k,m) + ptend%q(:ncol,k,m) * dt
           end do
+#ifdef phl_limiter
+         if (m==11) then
+           qafter(:ncol,:) = state%q(:ncol,:,m)
+           do k=1,pver
+             do i=1,ncol
+               if (qafter(i,k)>qmax(i)) then
+                 state%q(i,k,m) = qmax(i)
+                 if ((qafter(i,k)-qmax(i))/qmax(i)>1E-5) then
+                   if (present(name)) write(*,*) "ttt ",name
+                   write(*,*) "ttt ",i,k,qbefore(i,k),qafter(i,k),qmax(i)
+                 end if
+               end if
+             end do
+           end do
+         end if
+#endif
 
           ! now test for mixing ratios which are too small
           ! don't call qneg3 for number concentration variables

@@ -2513,7 +2513,7 @@ end subroutine clubb_init_cnst
      call physics_ptend_sum(ptend_loc, ptend_all, ncol)
 
     ! ptend_loc is reset to zero by this call
-     call physics_update(state1, ptend_loc, hdtime)
+     call physics_update(state1, ptend_loc, hdtime,name="local clubb_intr 1")
 
     !Write output for tendencies:
      temp2d(:ncol,:pver) =  stend(:ncol,:pver)/cpairv(:ncol,:pver,lchnk)
@@ -3763,7 +3763,7 @@ end subroutine clubb_init_cnst
    call outfld( 'CMELIQ',        cmeliq, pcols, lchnk)
 
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
-   call physics_update(state1,ptend_loc,hdtime)
+   call physics_update(state1,ptend_loc,hdtime,name="local clubb_intr 2")
  
     ! Due to the order of operation of CLUBB, which closes on liquid first, 
     ! then advances it's predictive equations second, this can lead to 
@@ -3806,7 +3806,7 @@ end subroutine clubb_init_cnst
       call physics_ptend_sum(ptend_loc, ptend_all, ncol)
  
       ! ptend_loc is reset to zero by this call
-      call physics_update(state1, ptend_loc, hdtime)
+      call physics_update(state1, ptend_loc, hdtime,name="local clubb_intr 3")
  
       ! Write output for tendencies:
       !        oufld: QVTENDICE,QCTENDICE,NCTENDICE,FQTENDICE
@@ -3917,7 +3917,7 @@ end subroutine clubb_init_cnst
    call outfld( 'DETNLIQTND', ptend_loc%q(:,:,ixnumliq),pcols, lchnk )
 
    call physics_ptend_sum(ptend_loc,ptend_all,ncol)
-   call physics_update(state1,ptend_loc,hdtime)
+   call physics_update(state1,ptend_loc,hdtime,name="local clubb_intr 4")
 
    ! ptend_all now has all accumulated tendencies.  Convert the tendencies for the
    ! dry constituents to dry air basis.

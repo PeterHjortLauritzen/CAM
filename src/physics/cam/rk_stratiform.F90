@@ -681,7 +681,7 @@ subroutine rk_stratiform_tend( &
    call physics_ptend_sum( ptend_loc, ptend_all, ncol )
 
    ! Update physics state type state1 with ptend_loc 
-   call physics_update( state1, ptend_loc, dtime )
+   call physics_update( state1, ptend_loc, dtime,name="local_rk_startiform_1")
 
    call t_stopf('stratiform_sediment')
 
@@ -714,7 +714,7 @@ subroutine rk_stratiform_tend( &
    ! Add hie detrainment tendency to tend from the other prior processes
 
    call physics_ptend_sum( ptend_loc, ptend_all, ncol )
-   call physics_update( state1, ptend_loc, dtime )
+   call physics_update( state1, ptend_loc, dtime,name="local_rk_startiform_2")
 
    ! Accumulate prec and snow, reserved liquid has now been used.
 
@@ -824,7 +824,7 @@ subroutine rk_stratiform_tend( &
    call outfld( 'REPARTLIQ', ptend_loc%q(:,:,ixcldliq), pcols, lchnk )
 
    call physics_ptend_sum( ptend_loc, ptend_all, ncol )
-   call physics_update( state1, ptend_loc, dtime )
+   call physics_update( state1, ptend_loc, dtime,name="local_rk_startiform_3")
 
    ! Determine repartition heating from change in cloud ice.
 
@@ -948,7 +948,7 @@ subroutine rk_stratiform_tend( &
    ! ------------------------------- !
 
    call physics_ptend_sum( ptend_loc, ptend_all, ncol )
-   call physics_update( state1, ptend_loc, dtime )
+   call physics_update( state1, ptend_loc, dtime,name="local_rk_startiform_4")
 
    if (.not. cam_physpkg_is('cam3')) then
 

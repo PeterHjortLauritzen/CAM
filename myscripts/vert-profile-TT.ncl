@@ -1,8 +1,8 @@
 begin
-  frames = True
+  frames = False
   fv = False
 
-  optional_identifier = "ref"
+  optional_identifier = "exp"
 
 ;  str_TT = "TT_LW" ;1
 ;  fact = 1.0

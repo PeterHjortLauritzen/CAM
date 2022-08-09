@@ -528,8 +528,10 @@ contains
             !DIR_VECTOR_ALIGNED
             do j=1,np
               do i=1,np
-                elem(ie)%derived%dpdiss_ave(i,j,k)=elem(ie)%derived%dpdiss_ave(i,j,k)+&
-                     rhypervis_subcycle*eta_ave_w*elem(ie)%state%dp3d(i,j,k,nt)
+                elem(ie)%derived%dpdiss_ave(i,j,k)=elem(ie)%derived%dpdiss_ave(i,j,k)+&                          !bugfix
+                     rhypervis_subcycle*eta_ave_w*(elem(ie)%state%dp3d(i,j,k,nt)-elem(ie)%derived%dp_ref(i,j,k)) !bugfix
+!bug                elem(ie)%derived%dpdiss_ave(i,j,k)=elem(ie)%derived%dpdiss_ave(i,j,k)+&
+!bug                     rhypervis_subcycle*eta_ave_w*elem(ie)%state%dp3d(i,j,k,nt)
                 elem(ie)%derived%dpdiss_biharmonic(i,j,k)=elem(ie)%derived%dpdiss_biharmonic(i,j,k)+&
                      rhypervis_subcycle*eta_ave_w*dptens(i,j,k,ie)
               enddo

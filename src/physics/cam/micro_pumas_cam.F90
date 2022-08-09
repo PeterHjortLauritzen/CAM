@@ -2416,7 +2416,7 @@ subroutine micro_pumas_cam_tend(state, ptend, dtime, pbuf)
       call physics_ptend_sum(ptend_loc, ptend, ncol)
 
       ! Update local state
-      call physics_update(state_loc, ptend_loc, dtime/num_steps)
+      call physics_update(state_loc, ptend_loc, dtime/num_steps,"local micro_pumas")
 
    end do
 

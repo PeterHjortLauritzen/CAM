@@ -3052,6 +3052,16 @@ subroutine read_inidat(dyn_in)
   call process_inidat(grid, dyn_in, 'PS')
   call process_inidat(grid, dyn_in, 'T')
 #ifdef column_io
+  do j=jfirstxy,jlastxy
+    do i=ifirstxy,ilastxy
+      do jf=1,SIZE(dyn_in%tracer(i,j,:,11))
+        !convert to wet
+        dyn_in%tracer(i,j,jf,11) = dyn_in%tracer(i,j,jf,11)/(1.0_r8+dyn_in%tracer(i,j,jf,1))
+      end do
+    end do
+  end do
+
+
   lat_point = 0.53456419498_r8
   lon_point = 1.3962634016_r8
   do j=jfirstxy,jlastxy

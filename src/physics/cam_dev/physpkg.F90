@@ -1,4 +1,6 @@
+#define phl_limiter
 #define column_io
+#define mass_io
 module physpkg
 #ifdef N2O_diag
   use cam_history,    only: outfld
@@ -42,6 +44,9 @@ module physpkg
   save
 #ifdef column_io
   real(r8) :: lat_point,lon_point
+#endif
+#ifdef mass_io
+  real(r8) :: mass1,mass2,minq1,maxq1,minq2,maxq2,qsurf,mass_tphysac1
 #endif
   ! Public methods
   public phys_register ! was initindx  - register physics methods
@@ -1460,6 +1465,7 @@ contains
     real(r8), pointer, dimension(:,:) :: ast     ! relative humidity cloud fraction
 #ifdef N2O_diag
     integer :: idx_N2O, idx_TT_LW, idx_TT_MD, idx_TT_HI, idx_TT_UN, idx_TTRMD
+    real(r8) :: qbefore(pcols,pver),qafter(pcols,pver),qmax(pcols)
     call cnst_get_ind('N2O' , idx_N2O   , abort=.false.)
     if (masterproc) write(iulog,*) 'xxx idx_N2O=',idx_N2O
     call cnst_get_ind('TT_LW' , idx_TT_LW   , abort=.false.)
@@ -1471,7 +1477,6 @@ contains
     !-----------------------------------------------------------------------
     lchnk = state%lchnk
     ncol  = state%ncol
-
     nstep = get_nstep()
     rtdt = 1._r8/ztodt
 
@@ -1558,7 +1563,25 @@ contains
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
     end if
-
+#ifdef mass_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          mass1 = 0.0_r8
+          do k=1,pver
+            mass1 = mass1+state%q(m,k,idx_N2O)*state%PDELDRY(m,k)
+          end do
+          mass_tphysac1 = mass1
+          write(*,*) "kkk============================================================="
+          write(*,*) "kkk mass tphysac1      ",mass1
+          minq1 = MINVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk min                ",MINVAL(state%q(m,:,idx_N2O))
+          maxq1 = MAXVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk max                ",MAXVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk qsurf              ",state%q(m,pver,idx_N2O)
+          write(*,*) "kkk "
+        end if
+      end do
+#endif
 #ifdef N2O_diag
     call outfld('N2O_AC1', state%q(:,:, idx_N2O)      , pcols, lchnk   )
     call outfld('Exner', state%exner(:,:)      , pcols, lchnk   )
@@ -1580,7 +1603,7 @@ contains
     if (carma_do_emission) then
        ! carma emissions
        call carma_emission_tend (state, ptend, cam_in, ztodt)
-       call physics_update(state, ptend, ztodt, tend)
+       call physics_update(state, ptend, ztodt, tend,"carma_emission_tend")
     end if
 #ifdef N2O_diag
     call outfld('N2O_AC2', state%q(:,:, idx_N2O)      , pcols, lchnk   )
@@ -1619,7 +1642,7 @@ contains
     if (carma_do_cldice .or. carma_do_cldliq) then
        call carma_timestep_tend(state, cam_in, cam_out, ptend, ztodt, pbuf, dlf=dlf, rliq=rliq, &
             prec_str=prec_str, snow_str=snow_str, prec_sed=prec_sed_carma, snow_sed=snow_sed_carma)
-       call physics_update(state, ptend, ztodt, tend)
+       call physics_update(state, ptend, ztodt, tend,"carma_tend")
 
        ! Before the detrainment, the reserved condensate is all liquid, but if
        ! CARMA is doing
@@ -1651,7 +1674,7 @@ contains
        !                        by CAM5 with the inventory of 2006 global aircraft emissions, JAMES
        !                        https://doi.org/10.1029/2011MS000105
        call ssatcontrail_d0(state, pbuf, ztodt, ptend)
-       call physics_update(state, ptend, ztodt, tend)
+       call physics_update(state, ptend, ztodt, tend,"ssatcontrail_d0")
 #ifdef N2O_diag
     call outfld('N2O_AC4', state%q(:,:, idx_N2O)       , pcols, lchnk   )
 
@@ -1675,11 +1698,46 @@ contains
         end if
       end do
 #endif
+#ifdef mass_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          mass2 = 0.0_r8
+          do k=1,pver
+            mass2 = mass2+state%q(m,k,idx_N2O)*state%PDELDRY(m,k)
+          end do
+          write(*,*) "kkk mass change ac1 to before clubb  ",(mass2-mass1)/mass1,mass1,mass2
+          minq2 = MINVAL(state%q(m,:,idx_N2O)) 
+          maxq2 = MAXVAL(state%q(m,:,idx_N2O)) 
+          if ((minq2-minq1)/minq1<-1E-10) then
+            write(*,*) "kkk WARNING undershot",(minq2-minq1)/minq1
+          end if
+          if ((maxq2-maxq1)/maxq1>1E-10) then
+            write(*,*) "kkk WARNING overshot",(maxq2-maxq1)/minq1
+          end if
+          write(*,*) "kkk min before after   ",minq1, MINVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk max before after   ",maxq1, MAXVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk qsurf before after ",qsurf,state%q(m,pver,idx_N2O)
+          minq1=minq2
+          maxq1=maxq2
+          mass1=mass2
 
+          write(*,*) "kkk "
+        end if
+      end do
+#endif
+
+#ifdef phl_limiter
+      qbefore(:ncol,:) = state%q(:ncol,:,11)
+      do i=1,ncol
+        qmax(i) = MAXVAL(qbefore(i,:))
+      end do
+#endif
 
        ! initialize ptend structures where macro and microphysics tendencies are
        ! accumulated over macmic substeps
        call physics_ptend_init(ptend_macp_all,state%psetcols,'macrophysics',lu=.true.,lv=.true.)
+
+
 
        do macmic_it = 1, cld_macmic_num_steps
 
@@ -1720,7 +1778,7 @@ contains
                 call cam_snapshot_ptend_outfld(ptend, lchnk)
              end if
              call physics_ptend_sum(ptend,ptend_macp_all,ncol)
-             call physics_update(state, ptend, ztodt, tend)
+             call physics_update(state, ptend, ztodt, tend,"clubb_tend_cam")
 
              if (trim(cam_take_snapshot_after) == "clubb_tend_cam") then
                 call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf, &
@@ -1819,7 +1877,7 @@ contains
                   (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
                 call cam_snapshot_ptend_outfld(ptend, lchnk)
              end if
-             call physics_update (state_sc, ptend_sc, ztodt, tend_sc)
+             call physics_update (state_sc, ptend_sc, ztodt, tend_sc,"microp_driver_tend_subcol")
              if (trim(cam_take_snapshot_after) == "microp_driver_tend_subcol") then
                 call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state_sc, tend_sc, cam_in, cam_out, pbuf, &
                    fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
@@ -1850,7 +1908,7 @@ contains
                (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
              call cam_snapshot_ptend_outfld(ptend, lchnk)
           end if
-          call physics_update (state, ptend, ztodt, tend)
+          call physics_update (state, ptend, ztodt, tend,"microp_section")
           if (trim(cam_take_snapshot_after) == "microp_section") then
              call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf, &
                   fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
@@ -1868,7 +1926,24 @@ contains
           snow_pcw_macmic(:ncol) = snow_pcw_macmic(:ncol) + snow_pcw(:ncol)
 
        end do ! end substepping over macrophysics/microphysics
+
+#ifdef phl_limiter
+       qafter(:ncol,pver) = state%q(:ncol,pver,11)
+       
+       do k=1,pver
+         do i=1,ncol 
+           if (qafter(i,k)>qmax(i)) then
+             if ((qafter(i,k)>qmax(i))/qmax(i)>1E-6_r8) then
+               write(*,*) "lll  limiter",i,k,qbefore(i,k),qmax(i),qafter(i,k)
+             end if
+             state%q(i,k,11) = qmax(i)             
+           end if
+         end do
+       end do
+#endif
+
 #ifdef N2O_diag
+
     call outfld('N2O_AC5', state%q(:,:, idx_N2O)      , pcols, lchnk   )
 
     call outfld('TT1_AC5', state%q(:,:, idx_TT_LW)   , pcols, lchnk   )
@@ -1888,6 +1963,32 @@ contains
             write(*,*) k,state%q(m,k,idx_N2O)
           end do
           write(*,*) "yyy after CLUBB"
+        end if
+      end do
+#endif
+#ifdef mass_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          mass2 = 0.0_r8
+          do k=1,pver
+            mass2 = mass2+state%q(m,k,idx_N2O)*state%PDELDRY(m,k)
+          end do
+          write(*,*) "kkk mass change CLUBB  ",(mass2-mass1)/mass1,mass1,mass2
+          minq2 = MINVAL(state%q(m,:,idx_N2O)) 
+          maxq2 = MAXVAL(state%q(m,:,idx_N2O)) 
+          if ((minq2-minq1)/minq1<-1E-10) then
+            write(*,*) "kkk WARNING undershot",(minq2-minq1)/minq1
+          end if
+          if ((maxq2-maxq1)/maxq1>1E-10) then
+            write(*,*) "kkk WARNING overshot",(maxq2-maxq1)/minq1
+          end if
+          minq1=minq2
+          maxq1=maxq2
+          mass1=mass2
+          write(*,*) "kkk min before after   ",MINVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk max before after   ",MAXVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk qsurf before after ",qsurf,state%q(m,pver,idx_N2O)
+          write(*,*) "kkk "
         end if
       end do
 #endif
@@ -1940,7 +2041,7 @@ contains
             (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
           call cam_snapshot_ptend_outfld(ptend, lchnk)
        end if
-       call physics_update(state, ptend, ztodt, tend)
+       call physics_update(state, ptend, ztodt, tend,"aero_model_wetdep")
 #ifdef N2O_diag
     call outfld('N2O_AC6', state%q(:,:, idx_N2O)      , pcols, lchnk   )
 #endif
@@ -1960,7 +2061,7 @@ contains
           ! to for CARMA aerosols.
           call t_startf ('carma_wetdep_tend')
           call carma_wetdep_tend(state, ptend, ztodt, pbuf, dlf, cam_out)
-          call physics_update(state, ptend, ztodt, tend)
+          call physics_update(state, ptend, ztodt, tend,"carma_wetdep_tend")
           call t_stopf ('carma_wetdep_tend')
        end if
 #ifdef N2O_diag
@@ -1968,7 +2069,7 @@ contains
 #endif
        call t_startf ('convect_deep_tend2')
        call convect_deep_tend_2( state,   ptend,  ztodt,  pbuf )
-       call physics_update(state, ptend, ztodt, tend)
+       call physics_update(state, ptend, ztodt, tend,"convect_deeep_tend2")
        call t_stopf ('convect_deep_tend2')
 #ifdef N2O_diag
     call outfld('N2O_AC8', state%q(:,:, idx_N2O)      , pcols, lchnk   )
@@ -2024,7 +2125,7 @@ contains
          (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
        call cam_snapshot_ptend_outfld(ptend, lchnk)
     end if
-    call physics_update(state, ptend, ztodt, tend)
+    call physics_update(state, ptend, ztodt, tend,"radiation_tend")
 
     if (trim(cam_take_snapshot_after) == "radiation_tend") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf, &
@@ -2055,7 +2156,7 @@ contains
          (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
        call cam_snapshot_ptend_outfld(ptend, lchnk)
     end if
-    call physics_update(state, ptend, ztodt, tend)
+    call physics_update(state, ptend, ztodt, tend,"aoa_tracers_timestep_tend")
     if (trim(cam_take_snapshot_after) == "aoa_tracers_timestep_tend") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
@@ -2077,6 +2178,33 @@ contains
         end if
       end do
 #endif
+#ifdef mass_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          mass2 = 0.0_r8
+          do k=1,pver
+            mass2 = mass2+state%q(m,k,idx_N2O)*state%PDELDRY(m,k)
+          end do
+          write(*,*) "kkk mass change from after CLUBB  to before chem",(mass2-mass1)/mass1,mass1,mass2
+          minq2 = MINVAL(state%q(m,:,idx_N2O)) 
+          maxq2 = MAXVAL(state%q(m,:,idx_N2O)) 
+          if ((minq2-minq1)/minq1<-1E-10) then
+            write(*,*) "kkk WARNING undershot",(minq2-minq1)/minq1
+          end if
+          if ((maxq2-maxq1)/maxq1>1E-10) then
+            write(*,*) "kkk WARNING overshot",(maxq2-maxq1)/minq1
+          end if
+          minq1=minq2
+          maxq1=maxq2
+          mass1=mass2
+          write(*,*) "kkk mass before chemist ",mass2
+          write(*,*) "kkk min                ",MINVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk max                ",MAXVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk qsurf              ",state%q(m,pver,idx_N2O)
+          write(*,*) "kkk "
+        end if
+      end do
+#endif
 
 
     if (trim(cam_take_snapshot_before) == "co2_cycle_set_ptend") then
@@ -2088,7 +2216,7 @@ contains
          (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
        call cam_snapshot_ptend_outfld(ptend, lchnk)
     end if
-    call physics_update(state, ptend, ztodt, tend)
+    call physics_update(state, ptend, ztodt, tend,"co2_cycle_set_ptend")
     if (trim(cam_take_snapshot_after) == "co2_cycle_set_ptend") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
@@ -2118,7 +2246,7 @@ contains
             (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
           call cam_snapshot_ptend_outfld(ptend, lchnk)
        end if
-       call physics_update(state, ptend, ztodt, tend)
+       call physics_update(state, ptend, ztodt, tend, "chem_timestep_tend")
 
        if (trim(cam_take_snapshot_after) == "chem_timestep_tend") then
           call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
@@ -2140,6 +2268,33 @@ contains
             write(*,*) k,state%q(m,k,idx_N2O)
           end do
           write(*,*) "yyy after chem"
+        end if
+      end do
+#endif
+#ifdef mass_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          mass2 = 0.0_r8
+          do k=1,pver
+            mass2 = mass2+state%q(m,k,idx_N2O)*state%PDELDRY(m,k)
+          end do
+          write(*,*) "kkk mass change in chem",(mass2-mass1)/mass1,mass1,mass2
+          minq2 = MINVAL(state%q(m,:,idx_N2O)) 
+          maxq2 = MAXVAL(state%q(m,:,idx_N2O)) 
+!          if ((minq2-minq1)/minq1<-1E-10) then
+!            write(*,*) "kkk WARNING undershot",(minq2-minq1)/minq1
+!          end if
+!          if ((maxq2-maxq1)/maxq1>1E-10) then
+!            write(*,*) "kkk WARNING overshot",(maxq2-maxq1)/minq1
+!          end if
+          minq1=minq2
+          maxq1=maxq2
+          mass1=mass2
+          write(*,*) "kkk mass after chemist ",mass2
+          write(*,*) "kkk min                ",MINVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk max                ",MAXVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk qsurf              ",state%q(m,pver,idx_N2O)
+          write(*,*) "kkk "
         end if
       end do
 #endif
@@ -2176,7 +2331,7 @@ contains
     if ( ptend%lv ) then
       call outfld( 'VTEND_VDIFF', ptend%v, pcols, lchnk)
     end if
-    call physics_update(state, ptend, ztodt, tend)
+    call physics_update(state, ptend, ztodt, tend, "vertical_diffusion_section")
 
 #ifdef N2O_diag
     call outfld('N2O_AC11', state%q(:,:, idx_N2O)      , pcols, lchnk   )
@@ -2189,7 +2344,33 @@ contains
     end if
 
     call t_stopf ('vertical_diffusion_tend')
-
+#ifdef mass_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          mass2 = 0.0_r8
+          do k=1,pver
+            mass2 = mass2+state%q(m,k,idx_N2O)*state%PDELDRY(m,k)
+          end do
+          write(*,*) "kkk mass change vertical diff",(mass2-mass1)/mass1,mass1,mass2
+          minq2 = MINVAL(state%q(m,:,idx_N2O)) 
+          maxq2 = MAXVAL(state%q(m,:,idx_N2O)) 
+          if ((minq2-minq1)/minq1<-1E-10) then
+            write(*,*) "kkk WARNING undershot",(minq2-minq1)/minq1
+          end if
+          if ((maxq2-maxq1)/maxq1>1E-10) then
+            write(*,*) "kkk WARNING overshot",(maxq2-maxq1)/minq1
+          end if
+          minq1=minq2
+          maxq1=maxq2
+          mass1=mass2
+          write(*,*) "kkk mass after vdiff ",mass2
+          write(*,*) "kkk min                ",MINVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk max                ",MAXVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk qsurf              ",state%q(m,pver,idx_N2O)
+          write(*,*) "kkk "
+        end if
+      end do
+#endif
     !===================================================
     ! Rayleigh friction calculation
     !===================================================
@@ -2201,7 +2382,7 @@ contains
     if ( ptend%lv ) then
       call outfld( 'VTEND_RAYLEIGH', ptend%v, pcols, lchnk)
     end if
-    call physics_update(state, ptend, ztodt, tend)
+    call physics_update(state, ptend, ztodt, tend,"rayleigh_friction")
 #ifdef N2O_diag
     call outfld('N2O_AC11b', state%q(:,:, idx_N2O)      , pcols, lchnk   )
 #endif
@@ -2229,7 +2410,7 @@ contains
          (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
        call cam_snapshot_ptend_outfld(ptend, lchnk)
     end if
-    call physics_update(state, ptend, ztodt, tend)
+    call physics_update(state, ptend, ztodt, tend,"aero_model_drydep")
 #ifdef N2O_diag
     call outfld('N2O_AC11c', state%q(:,:, idx_N2O)      , pcols, lchnk   )
 #endif
@@ -2254,7 +2435,7 @@ contains
    if (carma_do_aerosol) then
      call t_startf('carma_timestep_tend')
      call carma_timestep_tend(state, cam_in, cam_out, ptend, ztodt, pbuf, obklen=obklen, ustar=surfric)
-     call physics_update(state, ptend, ztodt, tend)
+     call physics_update(state, ptend, ztodt, tend,"carma_tend")
 
      call check_energy_chng(state, tend, "carma_tend", nstep, ztodt, zero, zero, zero, zero)
      call t_stopf('carma_timestep_tend')
@@ -2294,6 +2475,33 @@ contains
         end if
       end do
 #endif
+#ifdef mass_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          mass2 = 0.0_r8
+          do k=1,pver
+            mass2 = mass2+state%q(m,k,idx_N2O)*state%PDELDRY(m,k)
+          end do
+          write(*,*) "kkk mass change after vertical diff and before gw_drag",(mass2-mass1)/mass1,mass1,mass2
+          minq2 = MINVAL(state%q(m,:,idx_N2O)) 
+          maxq2 = MAXVAL(state%q(m,:,idx_N2O)) 
+          if ((minq2-minq1)/minq1<-1E-10) then
+            write(*,*) "kkk WARNING undershot",(minq2-minq1)/minq1
+          end if
+          if ((maxq2-maxq1)/maxq1>1E-10) then
+            write(*,*) "kkk WARNING overshot",(maxq2-maxq1)/minq1
+          end if
+          minq1=minq2
+          maxq1=maxq2
+          mass1=mass2
+          write(*,*) "kkk mass before gw_drag ",mass2
+          write(*,*) "kkk min                ",MINVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk max                ",MAXVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk qsurf              ",state%q(m,pver,idx_N2O)
+          write(*,*) "kkk "
+        end if
+      end do
+#endif
 
     call gw_tend(state, pbuf, ztodt, ptend, cam_in, flx_heat)
 #ifdef column_io
@@ -2318,7 +2526,7 @@ contains
     if ( ptend%lv ) then
       call outfld( 'VTEND_GWDTOT', ptend%v, pcols, lchnk)
     end if
-    call physics_update(state, ptend, ztodt, tend)
+    call physics_update(state, ptend, ztodt, tend,"gw_tend")
 #ifdef N2O_diag
     call outfld('N2O_AC11e', state%q(:,:, idx_N2O)      , pcols, lchnk   )
 
@@ -2340,6 +2548,34 @@ contains
         end if
       end do
 #endif
+#ifdef mass_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          mass2 = 0.0_r8
+          do k=1,pver
+            mass2 = mass2+state%q(m,k,idx_N2O)*state%PDELDRY(m,k)
+          end do
+          write(*,*) "kkk mass change gw_drag",(mass2-mass1)/mass1,mass1,mass2
+          minq2 = MINVAL(state%q(m,:,idx_N2O)) 
+          maxq2 = MAXVAL(state%q(m,:,idx_N2O)) 
+          if ((minq2-minq1)/minq1<-1E-10) then
+            write(*,*) "kkk WARNING undershot",(minq2-minq1)/minq1
+          end if
+          if ((maxq2-maxq1)/maxq1>1E-10) then
+            write(*,*) "kkk WARNING overshot",(maxq2-maxq1)/minq1
+          end if
+          minq1=minq2
+          maxq1=maxq2
+          mass1=mass2
+          write(*,*) "kkk mass after gw_drag ",mass2
+          write(*,*) "kkk min                ",MINVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk max                ",MAXVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk qsurf              ",state%q(m,pver,idx_N2O)
+          write(*,*) "kkk "
+        end if
+      end do
+#endif
+
 
 
 
@@ -2371,7 +2607,7 @@ contains
     if ( ptend%lv ) then
       call outfld( 'VTEND_QBORLX', ptend%v, pcols, lchnk)
     end if
-    call physics_update(state, ptend, ztodt, tend)
+    call physics_update(state, ptend, ztodt, tend, "qbo_relax")
 #ifdef N2O_diag
     call outfld('N2O_AC11f', state%q(:,:, idx_N2O)      , pcols, lchnk   )
 #endif
@@ -2391,7 +2627,7 @@ contains
     if ( ptend%lv ) then
       call outfld( 'VTEND_LUNART', ptend%v, pcols, lchnk)
     end if
-    call physics_update(state, ptend, ztodt, tend)
+    call physics_update(state, ptend, ztodt, tend,"lunar_tides")
     ! Check energy integrals
     call check_energy_chng(state, tend, "lunar_tides", nstep, ztodt, zero, zero, zero, zero)
 #ifdef N2O_diag
@@ -2427,7 +2663,7 @@ contains
     if ( ptend%lv ) then
       call outfld( 'VTEND_IONDRG', ptend%v, pcols, lchnk)
     end if
-    call physics_update(state, ptend, ztodt, tend)
+    call physics_update(state, ptend, ztodt, tend,"iondrag_calc_section")
 #ifdef N2O_diag
     call outfld('N2O_AC11h', state%q(:,:, idx_N2O)      , pcols, lchnk   )
 #endif
@@ -2448,6 +2684,51 @@ contains
 
 #endif
 
+#ifdef mass_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          mass2 = 0.0_r8
+          do k=1,pver
+            mass2 = mass2+state%q(m,k,idx_N2O)*state%PDELDRY(m,k)
+          end do
+          write(*,*) "kkk mass change after gw_drag to end tphysac",(mass2-mass1)/mass1,mass1,mass2
+          minq2 = MINVAL(state%q(m,:,idx_N2O)) 
+          maxq2 = MAXVAL(state%q(m,:,idx_N2O)) 
+          if ((minq2-minq1)/minq1<-1E-10) then
+            write(*,*) "kkk WARNING undershot",(minq2-minq1)/minq1
+          end if
+          if ((maxq2-maxq1)/maxq1>1E-10) then
+            write(*,*) "kkk WARNING overshot",(maxq2-maxq1)/minq1
+          end if
+          minq1=minq2
+          maxq1=maxq2
+          mass1=mass2
+          write(*,*) "kkk massend tphys_ac ",mass2
+          write(*,*) "kkk min                ",MINVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk max                ",MAXVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk qsurf              ",state%q(m,pver,idx_N2O)
+          write(*,*) "kkk "
+        end if
+      end do
+#endif
+
+
+#ifdef mass_io
+      do m=1,ncol
+        if (abs(state%lat(m)-lat_point)<0.00001_r8.and. abs(state%lon(m)-lon_point)<0.00001_r8) then
+          mass1 = 0.0_r8
+          do k=1,pver
+            mass1 = mass1+state%q(m,k,idx_N2O)*state%PDELDRY(m,k)
+          end do
+          write(*,*) "kkk mass change tphyac ",(mass1-mass_tphysac1)/mass_tphysac1
+          write(*,*) "kkk mass end tphysac   ",mass1
+          write(*,*) "kkk min                ",MINVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk max                ",MAXVAL(state%q(m,:,idx_N2O))
+          write(*,*) "kkk qsurf              ",state%q(m,pver,idx_N2O)
+          write(*,*) "kkk "
+        end if
+      end do
+#endif
     !---------------------------------------------------------------------------------
     ! Enforce charge neutrality after O+ change from ionos_tend
     !---------------------------------------------------------------------------------
@@ -2470,7 +2751,7 @@ contains
       if ( ptend%lv ) then
         call outfld( 'VTEND_NDG', ptend%v, pcols, lchnk)
       end if
-      call physics_update(state,ptend,ztodt,tend)
+      call physics_update(state,ptend,ztodt,tend,"nudging")
       call check_energy_chng(state, tend, "nudging", nstep, ztodt, zero, zero, zero, zero)
     endif
 
@@ -2562,7 +2843,6 @@ contains
 #ifdef N2O_diag
     call outfld('N2O_AC13', state%q(:,:, idx_N2O)      , pcols, lchnk   )
 #endif
-
   end subroutine tphysac
 
   subroutine tphysbc (ztodt, state,  &
@@ -2656,6 +2936,7 @@ contains
     integer ncol                               ! number of atmospheric columns
 
     integer :: i                               ! column indicex
+    integer :: k                               ! k
     integer :: ixcldice, ixcldliq, ixq         ! constituent indices for cloud liquid and ice water.
 
     ! physics buffer fields to compute tendencies for stratiform package
@@ -2724,6 +3005,21 @@ contains
     lat_point = 0.53158608587_r8
     lon_point = 1.39924477989_r8
   end if
+#endif
+#ifdef mass_io
+      do i=1,ncol
+        if (abs(state%lat(i)-lat_point)<0.00001_r8.and. abs(state%lon(i)-lon_point)<0.00001_r8) then
+          mass1 = 0.0_r8
+          do k=1,pver
+            mass1 = mass1+state%q(i,k,idx_N2O)*state%PDELDRY(i,k)
+          end do
+          write(*,*) "kkk mass tphysbc1      ",mass1
+          write(*,*) "kkk min                ",MINVAL(state%q(i,:,idx_N2O))
+          write(*,*) "kkk max                ",MAXVAL(state%q(i,:,idx_N2O))
+          write(*,*) "kkk qsurf              ",state%q(i,pver,idx_N2O)
+          write(*,*) "kkk " 
+        end if
+      end do
 #endif
 
     call t_startf('bc_init')
@@ -2809,7 +3105,7 @@ contains
 
     if (.not.dycore_is('EUL')) then
        call check_energy_fix(state, ptend, nstep, flx_heat)
-       call physics_update(state, ptend, ztodt, tend)
+       call physics_update(state, ptend, ztodt, tend,"chkengyfix")
        call check_energy_chng(state, tend, "chkengyfix", nstep, ztodt, zero, zero, zero, flx_heat)
        call outfld( 'EFIX', flx_heat    , pcols, lchnk   )
     end if
@@ -2860,7 +3156,7 @@ contains
          (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
             call cam_snapshot_ptend_outfld(ptend, lchnk)
     end if
-    call physics_update(state, ptend, ztodt, tend)
+    call physics_update(state, ptend, ztodt, tend,"dadadj_tend")
 
     if (trim(cam_take_snapshot_after) == "dadadj_tend") then
        call cam_snapshot_all_outfld_tphysbc(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf, &
@@ -2899,7 +3195,7 @@ contains
     if ( ptend%lv ) then
       call outfld( 'VTEND_DCONV', ptend%v, pcols, lchnk)
     end if
-    call physics_update(state, ptend, ztodt, tend)
+    call physics_update(state, ptend, ztodt, tend, "convect_deep_tend")
 
     if (trim(cam_take_snapshot_after) == "convect_deep_tend") then
        call cam_snapshot_all_outfld_tphysbc(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf, &

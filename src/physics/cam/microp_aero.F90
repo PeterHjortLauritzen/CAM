@@ -600,7 +600,7 @@ subroutine microp_aero_run ( &
    call nucleate_ice_cam_calc(state1, wsubi, pbuf, deltatin, ptend_loc)
 
    call physics_ptend_sum(ptend_loc, ptend_all, ncol)
-   call physics_update(state1, ptend_loc, deltatin)
+   call physics_update(state1, ptend_loc, deltatin,name="local_micro_aero_1")
 
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
    ! get liquid cloud fraction, check for minimum
@@ -682,7 +682,7 @@ subroutine microp_aero_run ( &
    end if
 
    call physics_ptend_sum(ptend_loc, ptend_all, ncol)
-   call physics_update(state1, ptend_loc, deltatin)
+   call physics_update(state1, ptend_loc, deltatin,name="local_micro_aero_2")
 
 
    !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
