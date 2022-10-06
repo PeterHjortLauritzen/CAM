@@ -1,0 +1,29 @@
+!ncdata = 'cam-mpas-pdc-paper_mpasa120_mpasa120_192_short.cam.i.0002-01-01-00000.nc'
+empty_htapes       = .true.
+fincl1 = 'PS','zint_mpas','zmid_mpas','zm_phBF','zm_phAP','zm_phAM','zi_phBF','zi_phAP','zi_phAM','PHIS',
+         'dPSdt','zi_dyBF','zm_dyBF','zm_diff_phAP_phBF','ptop_mpas','zm_dyBF_fv','zm_dyBF_se','zm_dyBF_mp',
+         'ptop_dztopdt','ztop_dPtopdt'
+fincl2 = 'PS','zint_mpas','zmid_mpas','zm_phBF','zm_phAP','zm_phAM','zi_phBF','zi_phAP','zi_phAM','PHIS',
+         'dPSdt','zi_dyBF','zm_dyBF','zm_diff_phAP_phBF','ptop_mpas','zm_dyBF_fv','zm_dyBF_se','zm_dyBF_mp',
+         'ptop_dztopdt','ztop_dPtopdt'
+
+
+fincl3 =   'WV_phBF','WL_phBF','WI_phBF','SE_phBF','PO_phBF''KE_phBF','TT_phBF',  
+           'WV_phBP','WL_phBP','WI_phBP','SE_phBP','PO_phBP','KE_phBP','TT_phBP',  
+           'WV_phAP','WL_phAP','WI_phAP','SE_phAP','PO_phAP','KE_phAP','TT_phAP',  
+           'WV_phAM','WL_phAM','WI_phAM','SE_phAM','PO_phAM','KE_phAM','TT_phAM'   
+          ,'WV_dyBF','WL_dyBF','WI_dyBF','SE_dyBF','PO_dyBF','KE_dyBF','TT_dyBF',  
+           'WV_dyBP','WL_dyBP','WI_dyBP','SE_dyBP','PO_dyBP','KE_dyBP','TT_dyBP',  
+           'WV_dyAP','WL_dyAP','WI_dyAP','SE_dyAP','PO_dyAP','KE_dyAP','TT_dyAP',  
+           'WV_dyAM','WL_dyAM','WI_dyAM','SE_dyAM','PO_dyAM','KE_dyAM','TT_dyAM'   
+          ,'WV_dBF','WL_dBF','WI_dBF','SE_dBF','PO_dBF','KE_dBF','PT_dBF','PS_dBF'
+           'WV_dAP','WL_dAP','WI_dAP','SE_dAP','PO_dAP','KE_dAP','PT_dAP','PS_dAP' 
+           'WV_dAM','WL_dAM','WI_dAM','SE_dAM','PO_dAM','KE_dAM','PT_dAM','PS_dAM'
+           'ztop_dPtopdt','ptop_dztopdt'
+avgflag_pertape(1) = 'A'                                         
+avgflag_pertape(2) = 'I'                                         
+avgflag_pertape(3) = 'A'                                         
+ndens = 2,2,1,2,2
+mfilt = 1,30,1,1,1
+nhtfrq             =-24,-6,-24,-24,-24                              
+!nhtfrq             =0,-24,0                              
