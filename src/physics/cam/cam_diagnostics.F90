@@ -189,7 +189,7 @@ contains
     !
     integer                                    :: istage, ivars
     character (len=108)                        :: str1, str2, str3
-    integer, parameter                         :: num_stages = 8, num_vars = 8
+    integer, parameter                         :: num_stages = 8, num_vars = 9
     character (len = 4), dimension(num_stages) :: stage = (/"phBF","phBP","phAP","phAM","dyBF","dyBP","dyAP","dyAM"/)
     character (len = 45),dimension(num_stages) :: stage_txt = (/&
          " before energy fixer                     ",& !phBF - physics energy
@@ -201,20 +201,21 @@ contains
          " after parameterizations (dycore)        ",& !dyAP - dynamics energy
          " after dry mass correction (dycore)      " & !dyAM - dynamics energy
          /)
-    character (len = 2)  , dimension(num_vars) :: vars  = (/"WV"  ,"WL"  ,"WI"  ,"SE"   ,"KE"   ,"MR"   ,"MO"   ,"TT"   /)
+    character (len = 2)  , dimension(num_vars) :: vars  = (/"WV"  ,"WL"  ,"WI"  ,"SE"   ,"KE", "PO"   ,"MR"   ,"MO"   ,"TT"   /)
     character (len = 45) , dimension(num_vars) :: vars_descriptor = (/&
          "Total column water vapor                ",&
          "Total column liquid water               ",&
          "Total column frozen water               ",&
-         "Total column dry static energy          ",&
+         "Total column internal or enthalpy       ",&
          "Total column kinetic energy             ",&
+         "Total column phis term or pot. energy   ",&
          "Total column wind axial angular momentum",&
          "Total column mass axial angular momentum",&
          "Total column test tracer                "/)
     character (len = 14), dimension(num_vars)  :: &
          vars_unit = (/&
          "kg/m2        ","kg/m2        ","kg/m2        ","J/m2         ",&
-         "J/m2         ","kg*m2/s*rad2 ","kg*m2/s*rad2 ","kg/m2        "/)
+         "J/m2         ","J/m2         ","kg*m2/s*rad2 ","kg*m2/s*rad2 ","kg/m2        "/)
 
     ! outfld calls in diag_phys_writeout
     call addfld (cnst_name(1), (/ 'lev' /), 'A', 'kg/kg',    cnst_longname(1))
@@ -225,6 +226,25 @@ contains
     call addfld ('T',          (/ 'lev' /), 'A', 'K',        'Temperature')
     call addfld ('U',          (/ 'lev' /), 'A', 'm/s',      'Zonal wind')
     call addfld ('V',          (/ 'lev' /), 'A', 'm/s',      'Meridional wind')
+
+    call addfld ('ztop_dPtopdt',         horiz_only,  'A', 'Pa',       'Surface pressure tenency')
+    call addfld ('ptop_dztopdt',         horiz_only,  'A', 'Pa',       'Surface pressure tenency')
+    call addfld ('ptop_mpas'   ,         horiz_only,  'A', 'Pa',       'model top pressure')
+    call addfld ('dPSdt',         horiz_only,  'A', 'Pa',       'Surface pressure tenency')
+    call addfld ('zm_phBF',          (/ 'lev' /), 'A', 'm',      'zm before physics')!phl
+    call addfld ('zm_dyBF',          (/ 'lev' /), 'A', 'm',      'zm before physics')!phl
+    call addfld ('zm_dyBF_fv',          (/ 'lev' /), 'A', 'm',      'zm before physics')!phl
+    call addfld ('zm_dyBF_se',          (/ 'lev' /), 'A', 'm',      'zm before physics')!phl
+    call addfld ('zm_dyBF_mp',          (/ 'lev' /), 'A', 'm',      'zm before physics')!phl
+    call addfld ('zi_dyBF',          (/ 'lev' /), 'A', 'm',      'zi dp_coupling')!phl
+    call addfld ('zm_phAP',          (/ 'lev' /), 'A', 'm',      'zm after physics' )!phl
+    call addfld ('zm_phAM',          (/ 'lev' /), 'A', 'm',      'zm after dme adjust')!phl
+    call addfld ('zi_phBF',          (/ 'lev' /), 'A', 'm',      'zi before physics')!phl
+    call addfld ('zi_phAP',          (/ 'lev' /), 'A', 'm',      'zi after physics' )!phl
+    call addfld ('zi_phAM',          (/ 'lev' /), 'A', 'm',      'zi after dme adjust')!phl
+    call addfld ('zm_diff_phAP_phBF',          (/ 'lev' /), 'A', 'm',      'zi after dme adjust')!phl
+    call addfld ('zm_diff_phAM_phAP',          (/ 'lev' /), 'A', 'm',      'zi after dme adjust')!phl
+
 
     call register_vector_field('U','V')
 

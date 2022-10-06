@@ -86,7 +86,13 @@ module physics_types
           lnpmid,  &! ln(pmid)
           lnpmiddry,&! log midpoint pressure dry (Pa)
           exner,   &! inverse exner function w.r.t. surface pressure (ps/p)^(R/cp)
-          zm        ! geopotential height above surface at midpoints (m)
+          zm      ,&
+          zm_phBF, &! zi beginning physics !phl
+          zm_phAP,   &! zi end physics !phl - currently not used
+          zi_phBF   ! zm beginning physics !phl
+     real(r8), dimension(:),allocatable        :: &
+          ps_old,&   ! old PS for computation of dp/dt
+          p_top      ! old ptop for computation of d(ztop*ptop)/dt
 
      real(r8), dimension(:,:,:),allocatable      :: &
           q         ! constituent mixing ratio (kg/kg moist or dry air depending on type)
@@ -96,7 +102,8 @@ module physics_types
           pintdry,  &! interface pressure dry (Pa)
           lnpint,   &! ln(pint)
           lnpintdry,&! log interface pressure dry (Pa)
-          zi         ! geopotential height above surface at interfaces (m)
+          zi       ,&! geopotential height above surface at interfaces (m)
+          zi_ini     !phl
 
      real(r8), dimension(:,:),allocatable          :: &
                            ! Second dimension is (phys_te_idx) CAM physics total energy and
@@ -108,6 +115,7 @@ module physics_types
      real(r8), dimension(:,:),allocatable          :: &
           temp_ini,       &! Temperature of initial state (used for energy computations)
           z_ini            ! Height of initial state (used for energy computations)
+
      integer :: count ! count of values with significant energy or water imbalances
      integer, dimension(:),allocatable           :: &
           latmapback, &! map from column to unique lat for that column
@@ -578,6 +586,20 @@ contains
          varname="state%exner",     msg=msg)
     call shr_assert_in_domain(state%zm(:ncol,:),        is_nan=.false., &
          varname="state%zm",        msg=msg)
+    !
+    !phl start
+    !
+    call shr_assert_in_domain(state%zm_phBF(:ncol,:),        is_nan=.false., & 
+         varname="state%zm_phBF",        msg=msg)
+    call shr_assert_in_domain(state%zm_phBF(:ncol,:),        is_nan=.false., & 
+         varname="state%zi_phBF",        msg=msg)
+    call shr_assert_in_domain(state%zm_phAP(:ncol,:),        is_nan=.false., & 
+         varname="state%zm_phAP",        msg=msg)
+
+    call shr_assert_in_domain(state%ps_old(:ncol),        is_nan=.false., & 
+         varname="state%ps_old",        msg=msg)
+    call shr_assert_in_domain(state%p_top(:ncol),        is_nan=.false., & 
+         varname="state%p_top",        msg=msg)
 
     ! 2-D variables (at interfaces)
     call shr_assert_in_domain(state%pint(:ncol,:),      is_nan=.false., &
@@ -590,6 +612,8 @@ contains
          varname="state%lnpintdry", msg=msg)
     call shr_assert_in_domain(state%zi(:ncol,:),        is_nan=.false., &
          varname="state%zi",        msg=msg)
+    call shr_assert_in_domain(state%zi_ini(:ncol,:),        is_nan=.false., &!phl
+         varname="state%zi_ini",        msg=msg)!phl
 
     ! 3-D variables
     call shr_assert_in_domain(state%q(:ncol,:,:),       is_nan=.false., &
@@ -656,6 +680,25 @@ contains
          varname="state%exner",     msg=msg)
     call shr_assert_in_domain(state%zm(:ncol,:),        lt=posinf_r8, gt=neginf_r8, &
          varname="state%zm",        msg=msg)
+    !
+    ! phl start
+    !
+    call shr_assert_in_domain(state%zm_phBF(:ncol,:),        lt=posinf_r8, gt=neginf_r8, &
+         varname="state%zm_phBF",        msg=msg)
+    call shr_assert_in_domain(state%zm_phAP(:ncol,:),        lt=posinf_r8, gt=neginf_r8, &
+         varname="state%zm_phAP",        msg=msg)
+    call shr_assert_in_domain(state%zi_phBF(:ncol,:),        lt=posinf_r8, gt=neginf_r8, &
+         varname="state%zi_phBF",        msg=msg)
+    call shr_assert_in_domain(state%ps_old(:ncol),        lt=posinf_r8, gt=neginf_r8, &
+         varname="state%ps_old",        msg=msg)
+    call shr_assert_in_domain(state%p_top(:ncol),        lt=posinf_r8, gt=neginf_r8, &
+         varname="state%p_top",        msg=msg)
+
+
+
+    !
+    ! phl end
+    !
 
     ! 2-D variables (at interfaces)
     call shr_assert_in_domain(state%pint(:ncol,:),      lt=posinf_r8, gt=0._r8, &
@@ -668,6 +711,8 @@ contains
          varname="state%lnpintdry", msg=msg)
     call shr_assert_in_domain(state%zi(:ncol,:),        lt=posinf_r8, gt=neginf_r8, &
          varname="state%zi",        msg=msg)
+    call shr_assert_in_domain(state%zi_ini(:ncol,:),        lt=posinf_r8, gt=neginf_r8, &!phl
+         varname="state%zi_ini",        msg=msg)!ph
 
     ! 3-D variables
     do m = 1,pcnst
@@ -1390,6 +1435,7 @@ end subroutine physics_ptend_copy
           state_out%pint(i,k)      = state_in%pint(i,k)
           state_out%lnpint(i,k)    = state_in%lnpint(i,k)
           state_out%zi(i,k)        = state_in% zi(i,k)
+          state_out%zi_ini(i,k)        = state_in% zi_ini(i,k)!phl
        end do
     end do
 
@@ -1624,6 +1670,22 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   allocate(state%zm(psetcols,pver), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%zm')
 
+  !
+  ! phl start
+  !
+  allocate(state%zm_phBF(psetcols,pver), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%zm')  
+  allocate(state%zm_phAP(psetcols,pver), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%zm')  
+  allocate(state%zi_phBF(psetcols,pver), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%zi')  
+  allocate(state%ps_old(psetcols), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%zi')  
+  allocate(state%p_top(psetcols), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%p_top')  
+  !
+  ! phl end
+  !
   allocate(state%q(psetcols,pver,pcnst), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%q')
 
@@ -1641,6 +1703,9 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
 
   allocate(state%zi(psetcols,pver+1), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%zi')
+
+  allocate(state%zi_ini(psetcols,pver+1), stat=ierr)!phl
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%zi_ini')!phl
 
   allocate(state%te_ini(psetcols,2), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%te_ini')
@@ -1691,6 +1756,17 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   state%lnpmiddry(:,:) = inf
   state%exner(:,:) = inf
   state%zm(:,:) = inf
+  !
+  ! phl start
+  !
+  state%zm_phBF(:,:) = inf
+  state%zm_phAP(:,:) = inf
+  state%zi_phBF(:,:) = inf
+  state%ps_old(:) = inf
+  state%p_top(:) = inf
+  !
+  ! phl end
+  !
   state%q(:,:,:) = inf
 
   state%pint(:,:) = inf
@@ -1698,6 +1774,7 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   state%lnpint(:,:) = inf
   state%lnpintdry(:,:) = inf
   state%zi(:,:) = inf
+  state%zi_ini(:,:) = inf!phl
 
   state%te_ini(:,:) = inf
   state%te_cur(:,:) = inf
@@ -1783,6 +1860,22 @@ subroutine physics_state_dealloc(state)
   deallocate(state%zm, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%zm')
 
+  !
+  ! phl start
+  !
+  deallocate(state%zm_phBF, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%zm')
+  deallocate(state%zm_phAP, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%zm')
+  deallocate(state%zi_phBF, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%zi')
+  deallocate(state%ps_old, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%zi')
+  deallocate(state%p_top, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%zi')
+  !
+  ! phl end
+  !
   deallocate(state%q, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%q')
 
@@ -1800,6 +1893,9 @@ subroutine physics_state_dealloc(state)
 
   deallocate(state%zi, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%zi')
+
+  deallocate(state%zi_ini, stat=ierr)!phl
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%zi_ini')!phl
 
   deallocate(state%te_ini, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%te_ini')

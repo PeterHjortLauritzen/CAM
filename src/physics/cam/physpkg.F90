@@ -10,6 +10,7 @@ module physpkg
   !                            initialization of grid info in phys_state.
   ! Nov 2010    A. Gettelman   Put micro/macro physics into separate routines
   !-----------------------------------------------------------------------
+  use physconst,          only: rair, cpair, gravit, zvir!xxx
 
   use shr_kind_mod,     only: r8 => shr_kind_r8
   use spmd_utils,       only: masterproc
@@ -1033,6 +1034,10 @@ contains
     dtcore_idx = pbuf_get_index('DTCORE')
     dqcore_idx = pbuf_get_index('DQCORE')
 
+    do lchnk = begchunk, endchunk !phl
+      phys_state(lchnk)%ps_old = 0.0_r8!phl
+      phys_state(lchnk)%p_top  = 0.0_r8!phl
+    end do!phl
   end subroutine phys_init
 
   !
@@ -1339,6 +1344,8 @@ contains
     !   o Ion Drag ( Only for WACCM )
     !   o Scale Dry Mass Energy
     !-----------------------------------------------------------------------
+    use physconst,          only: rair, gravit,zvir!phl
+    use geopotential,     only: geopotential_t!phl
     use physics_buffer, only: physics_buffer_desc, pbuf_set_field, pbuf_get_index, pbuf_get_field, pbuf_old_tim_idx
     use shr_kind_mod,       only: r8 => shr_kind_r8
     use chemistry,          only: chem_is_active, chem_timestep_tend, chem_emissions
@@ -1437,7 +1444,9 @@ contains
     real(r8), pointer, dimension(:,:) :: ducore
     real(r8), pointer, dimension(:,:) :: dvcore
     real(r8), pointer, dimension(:,:) :: ast     ! relative humidity cloud fraction
-
+    real(r8), dimension(state%psetcols,pver) :: zvirv,rairv_loc,tmp  ! Local zvir array pointer
+    rairv_loc(:,:) = rair!phl
+    zvirv(:,:) = zvir!phl
     !-----------------------------------------------------------------------
     lchnk = state%lchnk
     ncol  = state%ncol
@@ -1810,6 +1819,25 @@ contains
     call calc_te_and_aam_budgets(state, 'phAP')
     call calc_te_and_aam_budgets(state, 'dyAP',vc=vc_dycore)
 
+    !
+    ! update z's
+    !
+    call geopotential_t(state%lnpint, state%lnpmid, state%pint,  &
+         state%pmid  , state%pdel    , state%rpdel,  &
+ !xxx        state%t     , state%q(:,:,1), rairv_loc, &
+         state%temp_ini     , qini(:,:), rairv_loc, &
+         gravit, zvirv, &
+         state%zi      , state%zm   , ncol,dycore_overwrite=2)!xxx temporary
+    !phl end
+
+    call outfld( 'zm_phAP', state%zm, pcols, lchnk ) !phl
+    call outfld( 'zi_phAP', state%zi(:,1:pver), pcols, lchnk )           !phl
+
+    call outfld( 'zm_phBF', state%zm_phBF, pcols, lchnk )           !phl -outfld here so no sampling error
+    call outfld( 'zi_phBF', state%zi_phBF(:,1:pver), pcols, lchnk ) !phl -outfld here so no sampling error
+    tmp = 0.0_r8
+    tmp(1:ncol,:) = state%zm_phAP(1:ncol,:)-state%zm_phBF(1:ncol,:)
+    call outfld( 'zm_diff_phAP_phBF', tmp, pcols, lchnk ) !phl
     !---------------------------------------------------------------------------------
     ! Enforce charge neutrality after O+ change from ionos_tend
     !---------------------------------------------------------------------------------
@@ -1874,25 +1902,49 @@ contains
 
     ! for dry mixing ratio dycore, physics_dme_adjust is called for energy diagnostic purposes only.
     ! So, save off tracers
-    if (.not.moist_mixing_ratio_dycore.and.&
-         (hist_fld_active('SE_phAM').or.hist_fld_active('KE_phAM').or.hist_fld_active('WV_phAM').or.&
-          hist_fld_active('WL_phAM').or.hist_fld_active('WI_phAM').or.hist_fld_active('MR_phAM').or.&
-          hist_fld_active('MO_phAM'))) then
+!phl    if (.not.moist_mixing_ratio_dycore.and.&
+!phl         (hist_fld_active('SE_phAM').or.hist_fld_active('KE_phAM').or.hist_fld_active('WV_phAM').or.&
+!phl          hist_fld_active('WL_phAM').or.hist_fld_active('WI_phAM').or.hist_fld_active('MR_phAM').or.&
+!phl          hist_fld_active('MO_phAM'))) then
       tmp_trac(:ncol,:pver,:pcnst) = state%q(:ncol,:pver,:pcnst)
       tmp_pdel(:ncol,:pver)        = state%pdel(:ncol,:pver)
       tmp_ps(:ncol)                = state%ps(:ncol)
 
       call set_dry_to_wet(state)
+      state%zi_phBF(:ncol,:) = state%zi(:ncol,:) !phl - save z for work term
 
       call physics_dme_adjust(state, tend, qini, ztodt)
 
+      !phl start
+      !
+      ! update z's
+      !
+      call geopotential_t(state%lnpint, state%lnpmid, state%pint,  &
+           state%pmid  , state%pdel    , state%rpdel,  &
+           state%temp_ini     , state%q(:,:,1), rairv_loc, &
+!xxx           state%t     , state%q(:,:,1), rairv_loc, &
+           gravit, zvirv, &
+           state%zi      , state%zm   , ncol,dycore_overwrite=2)!temporary
+      !phl end
+
+
       call calc_te_and_aam_budgets(state, 'phAM')
       call calc_te_and_aam_budgets(state, 'dyAM',vc=vc_dycore)
+
+
+      call outfld( 'zm_phAM', state%zm, pcols, lchnk )                                           !phl
+      call outfld( 'zi_phAM', state%zi(:,1:pver), pcols, lchnk )                                 !phl
+
+      state%ps_old(:ncol) = state%ps(:ncol)
+      state%p_top(:ncol) = state%pint(1,:ncol)
+      tmp(:ncol,:) = state%zm(:,:)-state%zm_phAP(:,:)                                            !phl
+      call outfld( 'zm_diff_phAM_phAP',tmp , pcols, lchnk )                                      !phl
+
       ! Restore pre-"physics_dme_adjust" tracers
       state%q(:ncol,:pver,:pcnst) = tmp_trac(:ncol,:pver,:pcnst)
       state%pdel(:ncol,:pver)     = tmp_pdel(:ncol,:pver)
       state%ps(:ncol)             = tmp_ps(:ncol)
-    end if
+!phl    end if
 
     if (moist_mixing_ratio_dycore) then
 
@@ -2200,7 +2252,10 @@ contains
     ! Global mean total energy fixer
     !===================================================
     call t_startf('energy_fixer')
-
+    state%zm_phBF(1:ncol,:) = state%zm(1:ncol,:)             !phl
+    state%zi_phBF(1:ncol,:) = state%zi(1:ncol,1:pver)        !phl
+    state%p_top  (1:ncol)   = state%pint(1:ncol,1)           !phl 
+    call outfld( 'ptop_mpas', state%p_top, pcols, lchnk )    !phl
     call calc_te_and_aam_budgets(state, 'phBF')
     call calc_te_and_aam_budgets(state, 'dyBF',vc=vc_dycore)
     if (.not.dycore_is('EUL')) then

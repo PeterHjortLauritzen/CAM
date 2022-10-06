@@ -1175,7 +1175,7 @@ end subroutine physconst_init
    !****************************************************************************************************************
    !
    subroutine get_hydrostatic_energy(i0,i1,j0,j1,nlev,ntrac,tracer,pdel,cp_or_cv,u,v,T,vcoord,ps,phis,z,dycore_idx,&
-        te,se,ke,wv,H2O,liq,ice)
+        te,po,se,ke,wv,H2O,liq,ice)
      use dyn_tests_utils, only: vc_moist_pressure, vc_height, vc_moist_pressure, vc_dry_pressure, vc_height
      use cam_logfile,     only: iulog
      integer,  intent(in)            :: i0,i1,j0,j1,nlev,ntrac
@@ -1195,12 +1195,13 @@ end subroutine physconst_init
      real(r8), intent(out), optional :: H2O(i0:i1,j0:j1) !vertically integrated total water
      real(r8), intent(out), optional :: te (i0:i1,j0:j1) !vertically integrated total energy
      real(r8), intent(out), optional :: ke (i0:i1,j0:j1) !vertically integrated kinetic energy
-     real(r8), intent(out), optional :: se (i0:i1,j0:j1) !vertically integrated internal+geopotential energy
+     real(r8), intent(out), optional :: po (i0:i1,j0:j1) !vertically integrated potential or phis energy
+     real(r8), intent(out), optional :: se (i0:i1,j0:j1) !vertically integrated internal or enthalpy energy
      real(r8), intent(out), optional :: wv (i0:i1,j0:j1) !vertically integrated water vapor
      real(r8), intent(out), optional :: liq(i0:i1,j0:j1) !vertically integrated liquid
      real(r8), intent(out), optional :: ice(i0:i1,j0:j1) !vertically integrated ice
 
-     real(r8), dimension(i0:i1,j0:j1):: ke_loc,se_loc,wv_loc,liq_loc,ice_loc !variables for vertical integrals
+     real(r8), dimension(i0:i1,j0:j1):: ke_loc,se_loc,po_loc,wv_loc,liq_loc,ice_loc !variables for vertical integrals
      real(r8)                        :: latsub         !latent heat of sublimation
      integer                         :: i,j,k,idx,ierr
      character(len=22)               :: subname='get_hydrostatic_energy' ! subroutine name
@@ -1236,6 +1237,7 @@ end subroutine physconst_init
          call endrun(subname // '::  ps and phis must be present for moist/dry pressure vertical coordinate')
        endif
        ke_loc = 0._r8
+       po_loc = 0._r8
        se_loc = 0._r8
        wv_loc = 0._r8
        do k = 1, nlev
@@ -1249,7 +1251,7 @@ end subroutine physconst_init
        end do
        do j = j0,j1
          do i = i0,i1
-           se_loc(i,j) = se_loc(i,j) + phis(i,j)*ps(i,j)/gravit
+           po_loc(i,j) = po_loc(i,j) + phis(i,j)*ps(i,j)/gravit
          end do
        end do
      case(vc_height)
@@ -1259,6 +1261,7 @@ end subroutine physconst_init
        endif
        ke_loc = 0._r8
        se_loc = 0._r8
+       po_loc = 0._r8
        wv_loc = 0._r8
        do k = 1, nlev
          do j = j0,j1
@@ -1266,7 +1269,7 @@ end subroutine physconst_init
              ke_loc(i,j) = ke_loc(i,j) + 0.5_r8*(u(i,j,k)**2 + v(i,j,k)**2)*pdel(i,j,k)/gravit
              se_loc(i,j) = se_loc(i,j) +         T(i,j,k)*cp_or_cv(i,j,k)  *pdel(i,j,k)/gravit!internal energy
              ! z is height above ground
-             se_loc(i,j) = se_loc(i,j) +         (z(i,j,k)+phis(i,j)/gravit)*pdel(i,j,k)       !potential energy
+             po_loc(i,j) = po_loc(i,j) +         (z(i,j,k)+phis(i,j)/gravit)*pdel(i,j,k)       !potential energy
              wv_loc(i,j) = wv_loc(i,j) +         tracer(i,j,k,1)            *pdel(i,j,k)/gravit
            end do
          end do
@@ -1275,8 +1278,9 @@ end subroutine physconst_init
        write(iulog, *) subname//' vertical coordinate not supported: ',vcoord
        call endrun(subname // ':: vertical coordinate not supported')
      end select
-     if (present(te)) te  = se_loc + ke_loc       
+     if (present(te)) te  = se_loc + ke_loc + po_loc
      if (present(se)) se = se_loc
+     if (present(po)) po = po_loc
      if (present(ke)) ke = ke_loc
      if (present(wv)) wv = wv_loc
      !

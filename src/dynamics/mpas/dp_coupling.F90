@@ -3,12 +3,12 @@ module dp_coupling
 !-------------------------------------------------------------------------------
 ! dynamics - physics coupling module
 !-------------------------------------------------------------------------------
-
+  use cam_history,    only: outfld !phl
 use shr_kind_mod,   only: r8=>shr_kind_r8
 use pmgrid,         only: plev
 use ppgrid,         only: begchunk, endchunk, pcols, pver, pverp
 use constituents,   only: pcnst, cnst_type
-use physconst,      only: gravit, cpairv, cappa, rairv, rh2o, zvir
+use physconst,      only: gravit, cpairv, cappa, rairv, rh2o, zvir, pi
 
 use spmd_dyn,       only: local_dp_map, block_buf_nrecs, chunk_buf_nrecs
 use spmd_utils,     only: mpicom, iam, masterproc
@@ -31,6 +31,10 @@ save
 logical :: compute_energy_diags=.false.
 integer :: index_qv_phys = -1
 
+real(r8), pointer     :: latvals_deg(:)!xxx
+real(r8), pointer     :: lonvals_deg(:)!xxx
+
+
 public :: &
    d_p_coupling, &
    p_d_coupling
@@ -46,6 +50,13 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
    ! dry air mass.
    use cam_history,    only : hist_fld_active
    use mpas_constants, only : Rv_over_Rd => rvord
+
+!new
+use cam_grid_support,   only: cam_grid_id, cam_grid_get_gcid, &
+                              cam_grid_dimensions, cam_grid_get_dim_names, &
+                              cam_grid_get_latvals, cam_grid_get_lonvals,  &
+                              max_hcoordname_len
+!end new
 
    ! arguments
    type(physics_state),       intent(inout) :: phys_state(begchunk:endchunk)
@@ -85,6 +96,10 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
    real(r8), allocatable:: pintdry(:,:)   !interface hydrostatic pressure consistent with MPAS discrete state
    real(r8), allocatable:: pmiddry(:,:)   !mid-level hydrostatic dry pressure consistent with MPAS discrete state
 
+
+
+   real(r8), allocatable:: arr_2d(:,:)!phl
+
    integer :: ierr
    character(len=*), parameter :: subname = 'd_p_coupling'
    !----------------------------------------------------------------------------
@@ -98,6 +113,7 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
    index_qv    = dyn_out % index_qv
    cam_from_mpas_cnst => dyn_out % cam_from_mpas_cnst
 
+
    zint     => dyn_out % zint
    zz       => dyn_out % zz
    rho_zz   => dyn_out % rho_zz
@@ -107,7 +123,29 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
    theta_m  => dyn_out % theta_m
    exner    => dyn_out % exner
    tracers  => dyn_out % tracers
+!new
+   ! lat/lon needed in radians
+   latvals_deg => cam_grid_get_latvals(cam_grid_id('mpas_cell'))
+   lonvals_deg => cam_grid_get_lonvals(cam_grid_id('mpas_cell'))
+!end new
 
+
+   allocate(arr_2d(nCellsSolve,plev))
+   do k = 1, plev
+     kk = plev - k + 2
+     do i = 1, nCellsSolve
+       arr_2d(i,k) = zint(kk,i)-zint(1,i)
+     end do
+   end do
+   call outfld('zint_mpas',arr_2d,ncellsSolve,1)!phl
+   do k = 1, plev
+     kk = plev - k + 2
+     do i = 1, nCellsSolve
+       arr_2d(i,k) = 0.5_r8*(zint(kk,i)+zint(kk-1,i))-zint(1,i)
+     end do
+   end do
+   call outfld('zmid_mpas',arr_2d,ncellsSolve,1)!phl
+   deallocate(arr_2d)
    if (compute_energy_diags) then
      call tot_energy(nCellsSolve, plev,size(tracers, 1), index_qv, zz(:,1:nCellsSolve), zint(:,1:nCellsSolve), &
           rho_zz(:,1:nCellsSolve), theta_m(:,1:nCellsSolve), tracers(:,:,1:nCellsSolve),&
@@ -125,9 +163,12 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
    allocate(pintdry(plev+1, nCellsSolve), stat=ierr)!note: .neq. dyn_out % pintdry since it is non-hydrostatic
    if( ierr /= 0 ) call endrun(subname//':failed to allocate pintdry array')
 
-   call hydrostatic_pressure( &
-        nCellsSolve, plev, zz, zint, rho_zz, theta_m, tracers(index_qv,:,:),&
+   call hydrostatic_pressure_new( &
+        nCellsSolve, plev, zz, zint, rho_zz, theta_m, exner, tracers(index_qv,:,:),&
         pmiddry, pintdry, pmid)
+!xxx   call hydrostatic_pressure( &
+!xxx        nCellsSolve, plev, zz, zint, rho_zz, theta_m, tracers(index_qv,:,:),&
+!xxx        pmiddry, pintdry, pmid)
 
    call t_startf('dpcopy')
 
@@ -447,11 +488,36 @@ subroutine derived_phys(phys_state, phys_tend, pbuf2d)
       ! Compute geopotential height above surface - based on full pressure
       ! Note that phys_state%zi(:,plev+1) = 0 whereas zint in MPAS is surface height
       !
+#define experimentz
+#ifdef experimentz
       call geopotential_t( &
          phys_state(lchnk)%lnpint, phys_state(lchnk)%lnpmid,   phys_state(lchnk)%pint,          &
          phys_state(lchnk)%pmid,   phys_state(lchnk)%pdel,     phys_state(lchnk)%rpdel,         &
          phys_state(lchnk)%t,      phys_state(lchnk)%q(:,:,1), rairv(:,:,lchnk), gravit, zvirv, &
-         phys_state(lchnk)%zi,     phys_state(lchnk)%zm,       ncol)
+         phys_state(lchnk)%zi,     phys_state(lchnk)%zm,       ncol, dycore_overwrite=0)
+      call outfld( 'zm_dyBF_fv', phys_state(lchnk)%zm, pcols, lchnk )           !phl -outfld here so no sampling error
+      call geopotential_t( &
+         phys_state(lchnk)%lnpint, phys_state(lchnk)%lnpmid,   phys_state(lchnk)%pint,          &
+         phys_state(lchnk)%pmid,   phys_state(lchnk)%pdel,     phys_state(lchnk)%rpdel,         &
+         phys_state(lchnk)%t,      phys_state(lchnk)%q(:,:,1), rairv(:,:,lchnk), gravit, zvirv, &
+         phys_state(lchnk)%zi,     phys_state(lchnk)%zm,       ncol, dycore_overwrite=1)
+      call outfld( 'zm_dyBF_se', phys_state(lchnk)%zm, pcols, lchnk )           !phl -outfld here so no sampling error
+      call geopotential_t( &
+         phys_state(lchnk)%lnpint, phys_state(lchnk)%lnpmid,   phys_state(lchnk)%pint,          &
+         phys_state(lchnk)%pmid,   phys_state(lchnk)%pdel,     phys_state(lchnk)%rpdel,         &
+         phys_state(lchnk)%t,      phys_state(lchnk)%q(:,:,1), rairv(:,:,lchnk), gravit, zvirv, &
+         phys_state(lchnk)%zi,     phys_state(lchnk)%zm,       ncol, dycore_overwrite=2)
+      call outfld( 'zm_dyBF_mp', phys_state(lchnk)%zm, pcols, lchnk )           !phl -outfld here so no sampling error
+#endif
+      call geopotential_t( &
+         phys_state(lchnk)%lnpint, phys_state(lchnk)%lnpmid,   phys_state(lchnk)%pint,          &
+         phys_state(lchnk)%pmid,   phys_state(lchnk)%pdel,     phys_state(lchnk)%rpdel,         &
+         phys_state(lchnk)%t,      phys_state(lchnk)%q(:,:,1), rairv(:,:,lchnk), gravit, zvirv, &
+         phys_state(lchnk)%zi,     phys_state(lchnk)%zm,       ncol, lat=phys_state(lchnk)%lat, &
+         lon=phys_state(lchnk)%lon)
+
+      call outfld( 'zi_dyBF', phys_state(lchnk)%zi(:,1:plev), pcols, lchnk )           !phl -outfld here so no sampling error
+      call outfld( 'zm_dyBF', phys_state(lchnk)%zm, pcols, lchnk )           !phl -outfld here so no sampling error
 
       ! Compute initial dry static energy, include surface geopotential
       do k = 1, pver
@@ -597,7 +663,6 @@ subroutine derived_tend(nCellsSolve, nCells, t_tend, u_tend, v_tend, q_tend, dyn
        exnerk    = (rgas*rhodk*theta_m(k,iCell)/p0)**(rgas/cv)
        tknew     = exnerk*thetak+(cp/cv)*dtime*t_tend(k,icell)
 
-
        thetaknew = (tknew**(cv/cp))*((rgas*rhodk*facold)/p0)**(-rgas/cp)
        !
        ! calculate theta_m tendency due to parameterizations (but no water adjustment)
@@ -609,7 +674,7 @@ subroutine derived_tend(nCellsSolve, nCells, t_tend, u_tend, v_tend, q_tend, dyn
        ! include water change in theta_m
        !
        facnew               = 1.0_r8 + Rv_over_Rd *tracers(index_qv,k,iCell)
-       thetaknew            = (tknew**(cv/cp))*((rgas*rhodk*facnew)/p0)**(-rgas/cp)
+!       thetaknew            = (tknew**(cv/cp))*((rgas*rhodk*facnew)/p0)**(-rgas/cp)
        rtheta_tend(k,iCell) = (thetaknew*facnew-thetak*facold)/dtime
        rtheta_tend(k,iCell) = rtheta_tend(k,iCell) * rho_zz(k,iCell)
      end do
@@ -726,14 +791,129 @@ subroutine hydrostatic_pressure(nCells, nVertLevels, zz, zgrid, rho_zz, theta_m,
       end do
 
       do k = nVertLevels, 1, -1
+#ifdef current_trunk
         !hydrostatic mid-level pressure - MPAS full pressure is (rhok*rgas*thetavk*kap1)**kap2 
         pmid   (k,iCell) = 0.5_r8*(pint(k+1)+pint(k))       
         !hydrostatic dry mid-level dry pressure - 
         !MPAS non-hydrostatic dry pressure is pmiddry(k,iCell) = (rhodryk*rgas*theta*kap1)**kap2
         pmiddry(k,iCell) = 0.5_r8*(pintdry(k+1,iCell)+pintdry(k,iCell))  
+#endif
+        pmid   (k,iCell) = (pint(k+1)-pint(k))/(log(pint(k+1))-log(pint(k)))
+        pmiddry(k,iCell) = (pintdry(k+1,iCell)-pintdry(k,iCell))/(log(pintdry(k+1,iCell))-log(pintdry(k,iCell)))
+#ifdef consistent
+        !
+        ! compute non-hydrostatic mid level pressures based on equation of state consistent with MPAS
+        !
+        rhodryk = zz(k,iCell) * rho_zz(k,iCell)
+        rhok    = (1.0_r8+q(k,iCell))*rhodryk
+        thetavk          = theta_m(k,iCell)/ (1.0_r8 + q(k,iCell))            !convert modified theta to virtual theta
+        pmid(k,iCell)    = (rhok*rgas*thetavk*kap1)**kap2                     !mid-level pressure
+        theta            = theta_m(k,iCell)/(1.0_r8 + Rv_over_Rd * q(k,iCell))!potential temperature
+        pmiddry(k,iCell) = (rhodryk*rgas*theta*kap1)**kap2                    !mid-level dry pressure
+#endif
       end do
     end do
 end subroutine hydrostatic_pressure
+
+subroutine hydrostatic_pressure_new(nCells, nVertLevels, zz, zgrid, rho_zz, theta_m, &
+     exner, q, pmiddry, pintdry,pmid,ps)
+
+   ! Compute dry hydrostatic pressure at layer interfaces and midpoints
+   !
+   ! Given arrays of zz, zgrid, rho_zz, and theta_m from the MPAS-A prognostic
+   ! state, compute dry hydrostatic pressure at layer interfaces and midpoints.
+   ! The vertical dimension for 3-d arrays is innermost, and k=1 represents
+   ! the lowest layer or level in the fields.
+   !
+  use mpas_constants, only : cp, rgas, cv, gravity, p0, Rv_over_Rd => rvord
+  use physconst,      only: zvir!xxx
+  use physconst,      only:  rair, cpair
+
+   ! Arguments
+   integer, intent(in) :: nCells
+   integer, intent(in) :: nVertLevels
+   real(r8), dimension(nVertLevels, nCells),   intent(in) :: zz      ! d(zeta)/dz [-]
+   real(r8), dimension(nVertLevels+1, nCells), intent(in) :: zgrid   ! geometric heights of layer interfaces [m]
+   real(r8), dimension(nVertLevels, nCells),   intent(in) :: rho_zz  ! dry density / zz [kg m^-3]
+   real(r8), dimension(nVertLevels, nCells),   intent(in) :: theta_m ! modified potential temperature
+   real(r8), dimension(nVertLevels, nCells),   intent(in) :: exner   ! 
+   real(r8), dimension(nVertLevels, nCells),   intent(in) :: q       ! water vapor dry mixing ratio
+   real(r8), dimension(nVertLevels, nCells),   intent(out):: pmiddry ! layer midpoint dry hydrostatic pressure [Pa]
+   real(r8), dimension(nVertLevels+1, nCells), intent(out):: pintdry ! layer interface dry hydrostatic pressure [Pa]
+   real(r8), dimension(nVertLevels, nCells),   intent(out):: pmid    ! layer midpoint hydrostatic pressure [Pa]
+   real(r8), dimension( nCells), optional,     intent(out):: ps      ! surface pressure
+
+   ! Local variables
+   integer :: iCell, k
+   real(r8), dimension(nVertLevels)          :: dz,dp,dpdry    ! Geometric layer thickness in column
+   real(r8), dimension(nVertLevels+1,nCells) :: pint  ! hydrostatic pressure at interface
+   real(r8) :: pi, t
+   real(r8) :: pk,rhok,rhodryk,theta,thetavk,kap1,kap2,tvk,tk
+   real(r8) :: tmp,tmpp1!xxx
+
+   !
+   ! For each column, integrate downward from model top to compute dry hydrostatic pressure at layer
+   ! midpoints and interfaces. The pressure averaged to layer midpoints should be consistent with
+   ! the ideal gas law using the rho_zz and theta values prognosed by MPAS at layer midpoints.
+   !
+   kap1 = p0**(-rgas/cp)           ! pre-compute constants
+   kap2 = cp/cv                    ! pre-compute constants
+   do iCell = 1, nCells
+
+      dz(:) = zgrid(2:nVertLevels+1,iCell) - zgrid(1:nVertLevels,iCell)
+
+      do k = nVertLevels, 1, -1
+        rhodryk  = zz(k,iCell)* rho_zz(k,iCell) !full CAM physics density
+        rhok     = (1.0_r8+q(k,iCell))*rhodryk  !not used                    !dry  CAM physics density
+        dp(k)    = gravit*dz(k)*rhok
+        dpdry(k) = gravit*dz(k)*rhodryk!not used
+      end do
+
+      k = nVertLevels
+      rhok    = (1.0_r8+q(k,iCell))*zz(k,iCell) * rho_zz(k,iCell) !full CAM physics density
+      thetavk = theta_m(k,iCell)/ (1.0_r8 + q(k,iCell))           !convert modified theta to virtual theta
+      tvk     = thetavk*exner(k,iCell)
+      pk      = (rhok*rgas*thetavk*kap1)**kap2                    !mid-level top pressure
+      !
+      ! model top pressure consistently diagnosed using the assumption that the mid level
+      ! is at height z(nVertLevels-1)+0.5*dz
+      !  
+      pintdry(nVertLevels+1,iCell) = pk-0.5_r8*dz(nVertLevels)*rhok*gravity  !hydrostatic
+      pint   (nVertLevels+1,iCell) = pintdry(nVertLevels+1,iCell)
+      do k = nVertLevels, 1, -1
+        !
+        ! compute hydrostatic dry interface pressure so that (pintdry(k+1)-pintdry(k))/g is pseudo density
+        !
+!xxx        rhodryk = zz(k,iCell) * rho_zz(k,iCell)
+!xxx        rhok    = (1.0_r8+q(k,iCell))*rhodryk
+!xxx        pintdry(k,iCell) = pintdry(k+1,iCell) + gravity * rhodryk * dz(k)
+        thetavk = theta_m(k,iCell)/ (1.0_r8 + q(k,iCell))           !convert modified theta to virtual theta
+        tvk     = thetavk*exner(k,iCell)
+        tk      = tvk*(1.0_r8+q(k,iCell))/(1.0_r8+Rv_over_Rd*q(k,iCell))
+        pint   (k,iCell) = pint   (k+1,iCell)+dp(k)
+        pintdry(k,iCell) = pintdry(k+1,iCell)+dpdry(k)
+        pmid(k,iCell)    = dp(k)   *rgas*tvk/(gravit*dz(k))
+        pmiddry(k,iCell) = dpdry(k)*rgas*tk /(gravit*dz(k))
+
+!        tmp = (rgas*tvk/gravit)*(1.0_r8/pmid(k,iCell))*dp(k)
+!        if (ABS(latvals_deg(iCell)-26.565051109797_r8)<1.0E-1_r8.and.&
+!            ABS(lonvals_deg(iCell)-185.04705480321_r8)<1.0E-1_r8) then
+!          write(*,*) "=========k=",k
+!          write(*,*) "xxx ",k,tmp-dz(k),dz(k)
+!          write(*,*) "dp",dp(k)
+!          write(*,*) "tv",tvk
+!          write(*,*) "rgas/gravit",Rgas/gravit
+!          write(*,*) "pmid",pmid(k,iCell)
+!          write(*,*) "dz  ",dz(k)
+!          write(*,*) "zi  ",zgrid(k,iCell),zgrid(k+1,iCell)
+!          write(*,*) "zm  ",0.5_r8*(zgrid(k,iCell)+zgrid(k+1,iCell))
+!        end if
+
+      end do
+    end do
+    if (present(ps)) ps = pint(1,:)
+
+end subroutine hydrostatic_pressure_new
 
 
 subroutine tot_energy(nCells, nVertLevels, qsize, index_qv, zz, zgrid, rho_zz, theta_m, q, ux,uy,outfld_name_suffix)
@@ -760,23 +940,34 @@ subroutine tot_energy(nCells, nVertLevels, qsize, index_qv, zz, zgrid, rho_zz, t
 
   ! Local variables
   integer :: iCell, k, idx
-  real(r8) :: rho_dz,zcell,temperature,theta,pk,ptop,exner
-  real(r8), dimension(nVertLevels, nCells) :: rhod, dz
+  real(r8) :: rho_dz,zcell,temperature,theta,pk
+  real(r8), dimension(nVertLevels, nCells) :: rhod, dz, exner
   real(r8), dimension(nCells)              :: kinetic_energy,potential_energy,internal_energy,water_vapor,water_liq,water_ice
 
   real(r8), dimension(nCells) :: liq !total column integrated liquid
   real(r8), dimension(nCells) :: ice !total column integrated ice
 
-  character(len=16) :: name_out1,name_out2,name_out3,name_out4,name_out5
+  character(len=16) :: name_out0,name_out1,name_out2,name_out3,name_out4,name_out5,name_out6,name_out7
 
+
+  real(r8), dimension(nVertLevels, nCells)   :: pmiddry !xxx layer midpoint dry hydrostatic pressure [Pa]
+  real(r8), dimension(nVertLevels+1, nCells) :: pintdry !xxx layer interface dry hydrostatic pressure [Pa]
+  real(r8), dimension(nVertLevels, nCells)   :: pmid    !xxx layer midpoint hydrostatic pressure [Pa]
+  real(r8), dimension( nCells)                :: ps      !xxx surface pressure [Pa]
+
+  name_out0 = 'PO_'   //trim(outfld_name_suffix)
   name_out1 = 'SE_'   //trim(outfld_name_suffix)
   name_out2 = 'KE_'   //trim(outfld_name_suffix)
   name_out3 = 'WV_'   //trim(outfld_name_suffix)
   name_out4 = 'WL_'   //trim(outfld_name_suffix)
   name_out5 = 'WI_'   //trim(outfld_name_suffix)
+  name_out6 = 'PT_'   //trim(outfld_name_suffix)
+  name_out7 = 'PS_'   //trim(outfld_name_suffix)
 
-  if ( hist_fld_active(name_out1).or.hist_fld_active(name_out2).or.hist_fld_active(name_out3).or.&
-       hist_fld_active(name_out4).or.hist_fld_active(name_out5)) then
+  if ( hist_fld_active(name_out0).or.hist_fld_active(name_out1).or.hist_fld_active(name_out2).or.&
+       hist_fld_active(name_out3).or.hist_fld_active(name_out4).or.hist_fld_active(name_out5).or.&
+       hist_fld_active(name_out6).or.hist_fld_active(name_out7)) then
+
 
     kinetic_energy   = 0.0_r8
     potential_energy = 0.0_r8
@@ -789,10 +980,9 @@ subroutine tot_energy(nCells, nVertLevels, qsize, index_qv, zz, zgrid, rho_zz, t
         zcell         = 0.5_r8*(zgrid(k,iCell)+zgrid(k+1,iCell))
         rhod(k,iCell) = zz(k,iCell) * rho_zz(k,iCell)
         rho_dz        = (1.0_r8+q(index_qv,k,iCell))*rhod(k,iCell)*dz(k,iCell)
+        exner(k,iCell)= (rgas*rhod(k,iCell)*theta_m(k,iCell)/p0)**(rgas/cv)
         theta         = theta_m(k,iCell)/(1.0_r8 + Rv_over_Rd *q(index_qv,k,iCell))!convert theta_m to theta
-
-        exner         = (rgas*rhod(k,iCell)*theta_m(k,iCell)/p0)**(rgas/cv)
-        temperature   = exner*theta
+        temperature   = exner(k,iCell)*theta
 
         water_vapor(iCell)      = water_vapor(iCell) + rhod(k,iCell)*q(index_qv,k,iCell)*dz(k,iCell)
         kinetic_energy(iCell)   = kinetic_energy(iCell)  + &
@@ -800,11 +990,19 @@ subroutine tot_energy(nCells, nVertLevels, qsize, index_qv, zz, zgrid, rho_zz, t
         potential_energy(iCell) = potential_energy(iCell)+ rho_dz*gravit*zcell
         internal_energy(iCell)  = internal_energy(iCell) + rho_dz*cv*temperature
       end do
-      internal_energy(iCell)  = internal_energy(iCell) + potential_energy(iCell) !static energy
     end do
+    call outfld(name_out0,potential_energy,ncells,1)
     call outfld(name_out1,internal_energy,ncells,1)
     call outfld(name_out2,kinetic_energy ,ncells,1)
     call outfld(name_out3,water_vapor    ,ncells,1)
+
+    call hydrostatic_pressure_new(nCells, nVertLevels, zz, zgrid, &
+         rho_zz, theta_m, exner, q(1,:,:), pmiddry, pintdry,pmid,ps=ps)
+    call outfld(name_out6,pintdry(nVertLevels+1,:ncells),ncells,1)
+    call outfld(name_out7,ps(:ncells),ncells,1)
+
+
+
     !
     ! vertical integral of total liquid water
     !

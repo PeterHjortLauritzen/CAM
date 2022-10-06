@@ -1,4 +1,3 @@
-
 module geopotential
 
 !---------------------------------------------------------------------------------
@@ -121,7 +120,7 @@ contains
   subroutine geopotential_t(                                 &
        piln   , pmln   , pint   , pmid   , pdel   , rpdel  , &
        t      , q      , rair   , gravit , zvir   ,          &
-       zi     , zm     , ncol   )
+       zi     , zm     , ncol   , dycore_overwrite, lat, lon)
 
 !----------------------------------------------------------------------- 
 ! 
@@ -132,7 +131,7 @@ contains
 !-----------------------------------------------------------------------
 
 use ppgrid, only : pcols
-
+use physconst,      only: pi!xxx
 !------------------------------Arguments--------------------------------
 !
 ! Input arguments
@@ -155,6 +154,11 @@ use ppgrid, only : pcols
 
     real(r8), intent(out) :: zi(:,:)      ! (pcols,pverp) - Height above surface at interfaces
     real(r8), intent(out) :: zm(:,:)      ! (pcols,pver)  - Geopotential height at mid level
+#define optional_dycore
+#ifdef optional_dycore
+    integer, optional, intent(in) :: dycore_overwrite
+    real(r8), intent(in), optional :: lat(:),lon(:)    ! (pcols,pver)  - rh2o/rair - 1
+#endif    
 !
 !---------------------------Local variables-----------------------------
 !
@@ -172,7 +176,7 @@ use ppgrid, only : pcols
 ! The surface height is zero by definition.
 
     do i = 1,ncol
-       zi(i,pverp) = 0.0_r8
+      zi(i,pverp) = 0.0_r8
     end do
 
 ! Compute zi, zm from bottom up. 
@@ -181,33 +185,82 @@ use ppgrid, only : pcols
     do k = pver, 1, -1
 
 ! First set hydrostatic elements consistent with dynamics
-
-      if ((dycore_is('LR') .or. dycore_is('FV3'))) then
-        do i = 1,ncol
-          hkl(i) = piln(i,k+1) - piln(i,k)
-          hkk(i) = 1._r8 - pint(i,k) * hkl(i) * rpdel(i,k)
-        end do
-      else!MPAS, SE or EUL
+#ifdef optional_dycore
+      if (.not.present(dycore_overwrite)) then
+#endif
+        if ((dycore_is('LR') .or. dycore_is('FV3'))) then
+          do i = 1,ncol
+            hkl(i) = piln(i,k+1) - piln(i,k)
+            hkk(i) = 1._r8 - pint(i,k) * hkl(i) * rpdel(i,k)
+          end do
+        else!MPAS, SE or EUL
+          !
+          ! For EUL and SE: pmid = 0.5*(pint(k+1)+pint(k))
+          ! For MPAS      : pmid is computed from theta_m, rhodry, etc.
+          !
+          do i = 1,ncol
+            hkl(i) = pdel(i,k) / pmid(i,k)
+            hkk(i) = 0.5_r8 * hkl(i)
+          end do
+        end if
+#ifdef optional_dycore
+      else
+      !
+      ! FV way
+      !
+        if (dycore_overwrite==0) then
+          do i = 1,ncol
+            hkl(i) = piln(i,k+1) - piln(i,k)
+            hkk(i) = 1._r8 - pint(i,k) * hkl(i) * rpdel(i,k)
+          end do
+        end if
         !
-        ! For EUL and SE: pmid = 0.5*(pint(k+1)+pint(k))
-        ! For MPAS      : pmid is computed from theta_m, rhodry, etc.
+        ! SE way
         !
-        do i = 1,ncol
-          hkl(i) = pdel(i,k) / pmid(i,k)
-          hkk(i) = 0.5_r8 * hkl(i)
-        end do
+        if (dycore_overwrite==1) then
+          do i = 1,ncol
+            hkl(i) = pdel(i,k) / (0.5_r8*(pint(i,k)+pint(i,k+1)))
+            hkk(i) = 0.5_r8 * hkl(i)
+          end do
+        end if
+        !
+        ! MPAS way
+        !
+        if (dycore_overwrite==2) then
+          do i = 1,ncol
+            hkl(i) = piln(i,k+1) - piln(i,k)
+            hkk(i) = 0.5_r8 * hkl(i)
+          end do
+        end if
       end if
-
+#endif
 ! Now compute tv, zm, zi
 
-       do i = 1,ncol
+        do i = 1,ncol
           tvfac   = 1._r8 + zvir(i,k) * q(i,k)
           tv      = t(i,k) * tvfac
-
+          
           zm(i,k) = zi(i,k+1) + rog(i,k) * tv * hkk(i)
           zi(i,k) = zi(i,k+1) + rog(i,k) * tv * hkl(i)
-       end do
-    end do
+
+
+!          if (present(lat)) then
+!            if (ABS(lat(i)*180._r8/pi-26.565051109797_r8)<1.0E-1_r8.and.&!xxx *180._r8/pix pi/180
+!                 ABS(lon(i)*180._r8/pi-185.04705480321_r8)<1.0E-1_r8) then
+!              write(*,*) "==geopot===k=",k
+!              write(*,*) "xxx ",k,zi(i,k+1)-zi(i,k)
+!              write(*,*) "dp",pdel(i,k)
+!              write(*,*) "tv",tv
+!              write(*,*) "rgas/gravit",rog(i,k)
+!              write(*,*) "pmid",pmid(i,k)
+!              write(*,*) "dz  ",zi(i,k+1)-zi(i,k)
+!              write(*,*) "zi  ",zi(i,k),zi(i,k+1)
+!              write(*,*) "zm  ",zm(i,k),zm(i,k+1)
+!            end if
+!          end if
+
+        end do
+      end do
 
     return
   end subroutine geopotential_t

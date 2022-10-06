@@ -266,6 +266,7 @@ end subroutine check_energy_get_integrals
     !
     state%temp_ini(:ncol,:) = state%T(:ncol,:)
     state%z_ini(:ncol,:)    = state%zm(:ncol,:)
+    state%zi_ini(:ncol,:)    = state%zi(:ncol,:)
     if (vc_dycore == vc_height) then
       !
       ! compute cv if vertical coordinate is height: cv = cp - R
@@ -796,7 +797,8 @@ end subroutine check_energy_get_integrals
     integer, optional,   intent(in)    :: vc                 ! vertical coordinate
 
 !---------------------------Local storage-------------------------------
-    real(r8) :: se(pcols)                          ! Dry Static energy (J/m2)
+    real(r8) :: po(pcols)                          ! potential or phis term (J/m2)
+    real(r8) :: se(pcols)                          ! internal or enthalpy (J/m2)
     real(r8) :: ke(pcols)                          ! kinetic energy    (J/m2)
     real(r8) :: wv(pcols)                          ! column integrated vapor       (kg/m2)
     real(r8) :: liq(pcols)                         ! column integrated liquid      (kg/m2)
@@ -815,9 +817,10 @@ end subroutine check_energy_get_integrals
     integer :: i,k                                 ! column, level indices
     integer :: vc_loc                              ! local vertical coordinate variable
     integer :: ixtt                                ! test tracer index
-    character(len=16) :: name_out1,name_out2,name_out3,name_out4,name_out5,name_out6
+    character(len=16) :: name_out0,name_out1,name_out2,name_out3,name_out4,name_out5,name_out6
 !-----------------------------------------------------------------------
 
+    name_out0 = 'PO_'   //trim(outfld_name_suffix)
     name_out1 = 'SE_'   //trim(outfld_name_suffix)
     name_out2 = 'KE_'   //trim(outfld_name_suffix)
     name_out3 = 'WV_'   //trim(outfld_name_suffix)
@@ -825,8 +828,9 @@ end subroutine check_energy_get_integrals
     name_out5 = 'WI_'   //trim(outfld_name_suffix)
     name_out6 = 'TT_'   //trim(outfld_name_suffix)
 
-    if ( hist_fld_active(name_out1).or.hist_fld_active(name_out2).or.hist_fld_active(name_out3).or.&
-         hist_fld_active(name_out4).or.hist_fld_active(name_out5).or.hist_fld_active(name_out6)) then
+    if ( hist_fld_active(name_out0).or.hist_fld_active(name_out1).or.hist_fld_active(name_out2).or.&
+         hist_fld_active(name_out3).or.hist_fld_active(name_out4).or.hist_fld_active(name_out5).or.&
+         hist_fld_active(name_out6)) then
 
       lchnk = state%lchnk
       ncol  = state%ncol
@@ -857,12 +861,11 @@ end subroutine check_energy_get_integrals
       end if
       ! scale accumulated temperature increment for constant volume (otherwise effectively do nothing)
       temp(1:ncol,:) = state%temp_ini(1:ncol,:)+scaling(1:ncol,:)*(state%T(1:ncol,:)- state%temp_ini(1:ncol,:))
-
       call get_hydrostatic_energy(1,ncol,1,1,pver,pcnst,state%q(1:ncol,1:pver,1:pcnst),&
            state%pdel(1:ncol,1:pver), cp_or_cv,                                        &
            state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), temp(1:ncol,1:pver),        &
            vc_loc, ps = state%ps(1:ncol), phis = state%phis(1:ncol),                   &
-           z = state%z_ini(1:ncol,:), se = se, ke = ke, wv = wv, liq = liq, ice = ice)
+           z = state%z_ini(1:ncol,:), po = po, se = se, ke = ke, wv = wv, liq = liq, ice = ice)
 
       call cnst_get_ind('TT_LW' , ixtt    , abort=.false.)
 
@@ -890,6 +893,7 @@ end subroutine check_energy_get_integrals
 
       ! Output energy diagnostics
 
+      call outfld(name_out0  ,po      , pcols   ,lchnk   )
       call outfld(name_out1  ,se      , pcols   ,lchnk   )
       call outfld(name_out2  ,ke      , pcols   ,lchnk   )
       call outfld(name_out3  ,wv      , pcols   ,lchnk   )

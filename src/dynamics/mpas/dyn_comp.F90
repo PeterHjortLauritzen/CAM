@@ -21,7 +21,6 @@ use cam_map_utils,      only: iMap
 
 use inic_analytic,      only: analytic_ic_active, dyn_set_inic_col
 use dyn_tests_utils,    only: vcoord=>vc_height
-
 use cam_history,        only: addfld, add_default, horiz_only, register_vector_field, &
                               outfld, hist_fld_active
 use cam_history_support, only: max_fieldname_len
@@ -315,6 +314,7 @@ subroutine dyn_init(dyn_in, dyn_out)
    use mpas_derived_types, only : mpas_pool_type
    use mpas_constants,     only : mpas_constants_compute_derived
    use dyn_tests_utils,    only : vc_dycore, vc_height, string_vc, vc_str_lgth
+   use dyn_tests_utils,    only : vc_dry_pressure
    use constituents,       only : cnst_get_ind
    ! arguments:
    type(dyn_import_t), intent(inout)  :: dyn_in
@@ -347,7 +347,7 @@ subroutine dyn_init(dyn_in, dyn_out)
    character(len=*), parameter :: subname = 'dyn_comp::dyn_init'
 
    ! variables for initializing energy and axial angular momentum diagnostics
-   integer, parameter                         :: num_stages = 3, num_vars = 5
+   integer, parameter                         :: num_stages = 3, num_vars = 8!xx
    character (len = 3), dimension(num_stages) :: stage = (/"dBF","dAP","dAM"/)
    character (len = 55),dimension(num_stages) :: stage_txt = (/&
       " dynamics state before physics (d_p_coupling)       ",&
@@ -355,17 +355,21 @@ subroutine dyn_init(dyn_in, dyn_out)
       " dynamics state with full physics increment (incl.q)" &
       /)
 
-   character (len = 2)  , dimension(num_vars) :: vars  = (/"WV"  ,"WL"  ,"WI"  ,"SE"   ,"KE"/)
+   character (len = 2)  , dimension(num_vars) :: vars  = (/"WV"  ,"WL"  ,"WI"  , "PO","SE"   ,"KE","PT","PS"/)!xxx
    character (len = 45) , dimension(num_vars) :: vars_descriptor = (/&
       "Total column water vapor                ",&
       "Total column cloud water                ",&
       "Total column cloud ice                  ",&
-      "Total column static energy              ",&
-      "Total column kinetic energy             "/)
+      "Total potential energy                  ",&
+      "Total internal energy                   ",&
+      "Total column kinetic energy             ",&
+      "Model top pressure                      ",&!xxx
+      "Surface pressure                        "/) !xxx
+
    character (len = 14), dimension(num_vars)  :: &
       vars_unit = (/&
       "kg/m2        ","kg/m2        ","kg/m2        ","J/m2         ",&
-      "J/m2         "/)
+      "J/m2         ","J/m2         ","Pa           ","Pa           "/)
 
    integer :: istage, ivars, m
    character (len=108)         :: str1, str2, str3
@@ -545,6 +549,15 @@ subroutine dyn_init(dyn_in, dyn_out)
         call addfld (TRIM(ADJUSTL(str1)),   horiz_only, 'A', TRIM(ADJUSTL(str3)),TRIM(ADJUSTL(str2)), gridname='mpas_cell')
       end do
     end do
+    !
+    ! phl start
+    !
+    call addfld ('zint_mpas',   (/ 'lev' /), 'A', 'm','interface MPAS z', gridname='mpas_cell')
+    call addfld ('zmid_mpas',   (/ 'lev' /), 'A', 'm','mid-level MPAS z', gridname='mpas_cell')
+    call addfld ('ztop_dptopdt_phys_mpas', horiz_only  , 'A', 'm','top work', gridname='mpas_cell')
+    !
+    ! phl end
+    !
 
    !
    ! initialize CAM thermodynamic infrastructure
