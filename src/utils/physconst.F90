@@ -53,8 +53,8 @@ module physconst
    real(r8), public, parameter :: latvap      = shr_const_latvap     ! Latent heat of vaporization (J kg-1)
    real(r8), public, parameter :: pi          = shr_const_pi         ! 3.14...
 #ifdef planet_mars
-   real(r8), public, parameter :: pstd        = 6.0E1_r8             ! Standard pressure (Pascals)
-   real(r8), public, parameter :: tref        = 230._r8              ! Reference temperature
+   real(r8), public, parameter :: pstd        = 6.1E2_r8             ! Standard pressure (Pascals)
+   real(r8), public, parameter :: tref        = 160._r8              ! Reference temperature
    real(r8), public, parameter :: lapse_rate  = 0.0025_r8            ! reference lapse rate [K/m]
 #else
    real(r8), public, parameter :: pstd        = shr_const_pstd       ! Standard pressure (Pascals)

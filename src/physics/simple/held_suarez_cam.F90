@@ -64,7 +64,7 @@ contains
     use cam_abortutils,     only: endrun
     use cam_history,        only: outfld
     use held_suarez_1994,   only: held_suarez_1994_run
-
+    use std_atm_profile,    only: std_atm_height, std_atm_temp
     !
     ! Input arguments
     !
@@ -82,6 +82,10 @@ contains
 
     real(r8)                           :: clat(pcols)      ! latitudes(radians) for columns
     real(r8)                           :: pmid(pcols,pver) ! mid-point pressure
+#ifdef planet_mars
+    real(r8)                           :: zmid(pcols,pver) ! mid-point pseudo-height
+    real(r8)                           :: tref(pcols,pver) ! reference temp
+#endif
     integer                            :: i, k             ! Longitude, level indices
 
     character(len=512)            :: errmsg
@@ -100,13 +104,22 @@ contains
         pmid(i,k) = state%pmid(i,k)
       end do
     end do
+#ifdef planet_mars
+    do i = 1, ncol
+      call std_atm_height(state%pmid(i,:), zmid(i,:))
+      call std_atm_temp  (zmid(i,:), clat(i), tref(i,:))
+    end do
+#endif
 
     ! initialize individual parameterization tendencies
     call physics_ptend_init(ptend, state%psetcols, 'held_suarez', ls=.true., lu=.true., lv=.true.)
-
+#ifdef planet_mars
+    call held_suarez_1994_run(pver, ncol, clat, state%pmid, tref,&
+         state%u, state%v, state%t, ptend%u, ptend%v, ptend%s, errmsg, errflg)
+#else
     call held_suarez_1994_run(pver, ncol, clat, state%pmid, &
          state%u, state%v, state%t, ptend%u, ptend%v, ptend%s, errmsg, errflg)
-
+#endif
     ! Note, we assume that there are no subcolumns in simple physics
     pmid(:ncol,:) = ptend%s(:ncol, :)/cpairv(:ncol,:,lchnk)
     if (pcols > ncol) then

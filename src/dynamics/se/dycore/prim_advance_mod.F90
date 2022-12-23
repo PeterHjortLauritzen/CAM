@@ -948,9 +948,9 @@ contains
               !
               ! frictional heating
               !
-              heating = 0.5_r8*(v1new*v1new+v2new*v2new-(v1*v1+v2*v2))
-              elem(ie)%state%T(i,j,k,nt)=elem(ie)%state%T(i,j,k,nt) &
-                   -heating*inv_cp_full(i,j,k,ie)
+!xxx              heating = 0.5_r8*(v1new*v1new+v2new*v2new-(v1*v1+v2*v2))
+!xxx              elem(ie)%state%T(i,j,k,nt)=elem(ie)%state%T(i,j,k,nt) &
+!xxx                   -heating*inv_cp_full(i,j,k,ie)
             enddo
           enddo
         enddo

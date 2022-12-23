@@ -11,7 +11,7 @@ use shr_kind_mod,        only: r8 => shr_kind_r8
 use spmd_utils,          only: masterproc
 
 use hycoef,              only: ps0, hyam, hybm
-use physconst,           only: gravit
+use physconst,           only: gravit, pi
 use constituents,        only: cnst_name
 use const_init,          only: cnst_init_default
 
@@ -64,6 +64,7 @@ subroutine us_std_atm_set_ic(latvals, lonvals, zint, U, V, T, PS, PHIS_IN, &
    integer                           :: ncnst
    character(len=*), parameter       :: subname = 'us_std_atm_set_ic'
    real(r8)                          :: psurf(1)
+   real(r8)                          :: deg2rad = pi/180.0_r8
    real(r8), allocatable             :: pmid(:), zmid(:), zmid2d(:,:)
    !----------------------------------------------------------------------------
 
@@ -138,7 +139,11 @@ subroutine us_std_atm_set_ic(latvals, lonvals, zint, U, V, T, PS, PHIS_IN, &
                ! get height of pressure level            
                call std_atm_height(pmid, zmid)
                ! given height get temperature
+#ifdef planet_mars
+               call std_atm_temp(zmid, latvals(i),T(i,:))
+#else
                call std_atm_temp(zmid, T(i,:))
+#endif
             end if
          end do
 
@@ -148,7 +153,11 @@ subroutine us_std_atm_set_ic(latvals, lonvals, zint, U, V, T, PS, PHIS_IN, &
             if (mask_use(i)) then
                zmid = 0.5_r8*(zint(i,1:nlev) + zint(i,2:nlev+1))
                ! given height get temperature
+#ifdef planet_mars
+               call std_atm_temp(zmid, latvals(i)*deg2rad,T(i,:))
+#else
                call std_atm_temp(zmid, T(i,:))
+#endif
             end if
          end do
 

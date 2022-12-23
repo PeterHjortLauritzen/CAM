@@ -101,7 +101,11 @@ CONTAINS
       nlev = size(T, 2)
       do k = 1, nlev
         where(mask_use)
+#ifdef planet_mars
+          T(:,k) = 160.0_r8
+#else
           T(:,k) = 250.0_r8
+#endif
         end where
       end do
       if(masterproc .and. verbose_use) then
@@ -111,7 +115,11 @@ CONTAINS
 
     if (present(PS)) then
       where(mask_use)
+#ifdef planet_mars
+        PS = 610.0_r8
+#else
         PS = 100000.0_r8
+#endif
       end where
       if(masterproc .and. verbose_use) then
         write(iulog,*) '          PS initialized by "',subname,'"'
