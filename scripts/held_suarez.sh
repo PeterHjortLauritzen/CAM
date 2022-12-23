@@ -50,11 +50,11 @@ echo "interpolate_nlon   = 288,288,288"             >> user_nl_cam
 echo "empty_htapes       = .true." >> user_nl_cam
 #held_suarez_1994,moist_baroclinic_wave_dcmip2016,dry_baroclinic_wave_dcmip2016,dry_baroclinic_wave_jw2006,us_standard_atmosphere
 #echo "analytic_ic_type='dry_baroclinic_wave_dcmip2016'"  >> user_nl_cam
-echo "ncdata = 'ncdata = '/glade/u/home/pel/src/cam-mars/scripts/mars_cam_vcoords_L49_c221221.cdf5.nc'" >> user_nl_cam
+#echo "ncdata = 'ncdata = '/glade/u/home/pel/src/cam-mars/scripts/mars_cam_vcoords_L49_c221221.cdf5.nc'" >> user_nl_cam
 #
 # spun-up Held-Suarez initial condition
 #
-echo "ncdata = 'ncdata = 'FHS94_ne16_ne16_mg17.cam.i.0001-03-01-00000.nc'" >> user_nl_cam
+echo "ncdata = '/glade/u/home/pel/src/cam-mars/scripts/FHS94_ne16_ne16_mg17.cam.i.0001-03-01-00000.nc'" >> user_nl_cam
 echo "analytic_ic_type='us_standard_atmosphere'" >> user_nl_cam
 echo "mfilt = 144" >> user_nl_cam
 echo "avgflag_pertape(1) = 'I'" >> user_nl_cam
