@@ -40,7 +40,14 @@ echo "fincl1 = 'PS','U','V','T','OMEGA'" >> user_nl_cam
 # time-steps have not been optimized for Mars at this point
 #
 echo "se_nsplit = 6" >> user_nl_cam
-
+#
+# set physical constants
+#
+echo "gravit = 3.72"      >> user_nl_cam
+echo "sday   = 88642.0"   >> user_nl_cam
+echo "mwdry  = 43.34"     >> user_nl_cam #0.04334 - original value
+echo "cpair  = 735.0"     >> user_nl_cam
+echo "rearth = 3.38992e6" >> user_nl_cam
 qcmd -- ./case.build
 ./case.submit
 
