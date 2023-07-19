@@ -283,10 +283,16 @@ contains
     call TimeLevel_Qdp( tl, qsplit, n0_qdp)
 
     call tot_energy_dyn(elem,fvm,nets,nete,tl%n0,n0_qdp,'dAF')
-    call ApplyCAMForcing(elem,fvm,tl%n0,n0_qdp,dt_remap,dt_phys,nets,nete,nsubstep)
+    if (nsplit/=1) then
+      call ApplyCAMForcing(elem,fvm,tl%n0,n0_qdp,dt_remap,dt_phys,nets,nete,nsubstep)
     call tot_energy_dyn(elem,fvm,nets,nete,tl%n0,n0_qdp,'dBD')    
     do r=1,rsplit
       if (r.ne.1) call TimeLevel_update(tl,"leapfrog")
+      !
+      ! if nsplit==1 and physics time-step is long then there will be noise in the
+      ! pressure field; hence "dripple" in tendencies
+      !
+      if (nsplit==1) call ApplyCAMForcing(elem,fvm,tl%n0,n0_qdp,dt,dt_phys,nets,nete,r)
       call prim_step(elem, fvm, hybrid,nets,nete, dt, tl, hvcoord,r)
     enddo
 

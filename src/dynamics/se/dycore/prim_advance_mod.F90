@@ -78,7 +78,7 @@ contains
     real (kind=r8) :: qwater(np,np,nlev,thermodynamic_active_species_num,nets:nete)
     integer        :: qidx(thermodynamic_active_species_num)
     real (kind=r8) :: kappa(np,np,nlev,nets:nete)
-    call t_startf('prim_advance_exp')
+
     nm1   = tl%nm1
     n0    = tl%n0
     np1   = tl%np1
@@ -257,7 +257,6 @@ contains
 
     call omp_set_nested(.false.)
 
-    call t_stopf('prim_advance_exp')
   end subroutine prim_advance_exp
 
 
@@ -281,7 +280,7 @@ contains
     real (kind=r8) :: pdel(np,np,nlev)
     real (kind=r8), allocatable :: ftmp_fvm(:,:,:,:,:) !diagnostics
 
-
+    call t_startf('applyCAMforcing')
     if (use_cslam) allocate(ftmp_fvm(nc,nc,nlev,ntrac,nets:nete))
 
     if (ftype==0) then
@@ -423,6 +422,7 @@ contains
     end if
     if (ftype==1.and.nsubstep==1) call tot_energy_dyn(elem,fvm,nets,nete,np1,np1_qdp,'p2d')
     if (use_cslam) deallocate(ftmp_fvm)
+    call t_stopf('applyCAMforcing')
   end subroutine applyCAMforcing
 
 
