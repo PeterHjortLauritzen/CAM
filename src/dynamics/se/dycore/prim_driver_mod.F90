@@ -285,6 +285,7 @@ contains
     call tot_energy_dyn(elem,fvm,nets,nete,tl%n0,n0_qdp,'dAF')
     if (nsplit/=1) then
       call ApplyCAMForcing(elem,fvm,tl%n0,n0_qdp,dt_remap,dt_phys,nets,nete,nsubstep)
+    end if
     call tot_energy_dyn(elem,fvm,nets,nete,tl%n0,n0_qdp,'dBD')    
     do r=1,rsplit
       if (r.ne.1) call TimeLevel_update(tl,"leapfrog")
