@@ -241,6 +241,7 @@ end subroutine biharmonic_wk_omega
 
 
 subroutine biharmonic_wk_scalar(elem,qtens,deriv,edgeq,hybrid,nets,nete)
+use dimensions_mod,         only: qsize_adv
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! compute weak biharmonic operator
 !    input:  qtens = Q
@@ -250,7 +251,7 @@ subroutine biharmonic_wk_scalar(elem,qtens,deriv,edgeq,hybrid,nets,nete)
 type (hybrid_t)      , intent(in) :: hybrid
 type (element_t)     , intent(inout), target :: elem(:)
 integer :: nets,nete
-real (kind=r8), dimension(np,np,nlev,qsize,nets:nete) :: qtens
+real (kind=r8), dimension(np,np,nlev,qsize_adv,nets:nete) :: qtens
 type (EdgeBuffer_t)  , intent(inout) :: edgeq
 type (derivative_t)  , intent(in) :: deriv
 
@@ -262,7 +263,7 @@ logical var_coef1
 integer :: kblk,qblk   ! The per thead size of the vertical and tracers
 
   call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
-
+  qend = qsize_adv
    !if tensor hyperviscosity with tensor V is used, then biharmonic operator is (\grad\cdot V\grad) (\grad \cdot \grad) 
    !so tensor is only used on second call to laplace_sphere_wk
    var_coef1 = .true.
@@ -627,12 +628,12 @@ end subroutine
 
 
 subroutine neighbor_minmax(hybrid,edgeMinMax,nets,nete,min_neigh,max_neigh)
- 
+   use dimensions_mod,         only: qsize_adv
    type (hybrid_t)      , intent(in) :: hybrid
    type (EdgeBuffer_t)  , intent(inout) :: edgeMinMax
    integer :: nets,nete
-   real (kind=r8) :: min_neigh(nlev,qsize,nets:nete)
-   real (kind=r8) :: max_neigh(nlev,qsize,nets:nete)
+   real (kind=r8) :: min_neigh(nlev,qsize_adv,nets:nete)
+   real (kind=r8) :: max_neigh(nlev,qsize_adv,nets:nete)
    integer :: kblk, qblk
    ! local 
    integer:: ie, q, k, kptr
@@ -642,12 +643,12 @@ subroutine neighbor_minmax(hybrid,edgeMinMax,nets,nete,min_neigh,max_neigh)
    
    kblk = kend - kbeg + 1   ! calculate size of the block of vertical levels
    qblk = qend - qbeg + 1   ! calculate size of the block of tracers
-   
+   qend = qsize_adv
    do ie=nets,nete
       do q = qbeg, qend
          kptr = nlev*(q - 1) + kbeg - 1
          call  edgeSpack(edgeMinMax,min_neigh(kbeg:kend,q,ie),kblk,kptr,ie)
-         kptr = qsize*nlev + nlev*(q - 1) + kbeg - 1
+         kptr = qsize_adv*nlev + nlev*(q - 1) + kbeg - 1
          call  edgeSpack(edgeMinMax,max_neigh(kbeg:kend,q,ie),kblk,kptr,ie)
       enddo
    enddo
@@ -658,7 +659,7 @@ subroutine neighbor_minmax(hybrid,edgeMinMax,nets,nete,min_neigh,max_neigh)
       do q=qbeg,qend
          kptr = nlev*(q - 1) + kbeg - 1
          call  edgeSunpackMIN(edgeMinMax,min_neigh(kbeg:kend,q,ie),kblk,kptr,ie)
-         kptr = qsize*nlev + nlev*(q - 1) + kbeg - 1
+         kptr = qsize_adv*nlev + nlev*(q - 1) + kbeg - 1
          call  edgeSunpackMAX(edgeMinMax,max_neigh(kbeg:kend,q,ie),kblk,kptr,ie)
          do k=kbeg,kend
             min_neigh(k,q,ie) = max(min_neigh(k,q,ie),0.0_r8)
@@ -670,12 +671,12 @@ end subroutine neighbor_minmax
   
 
 subroutine neighbor_minmax_start(hybrid,edgeMinMax,nets,nete,min_neigh,max_neigh)
-
+   use dimensions_mod,         only: qsize_adv
    type (hybrid_t)      , intent(in) :: hybrid
    type (EdgeBuffer_t)  , intent(inout) :: edgeMinMax
    integer :: nets,nete
-   real (kind=r8) :: min_neigh(nlev,qsize,nets:nete)
-   real (kind=r8) :: max_neigh(nlev,qsize,nets:nete)
+   real (kind=r8) :: min_neigh(nlev,qsize_adv,nets:nete)
+   real (kind=r8) :: max_neigh(nlev,qsize_adv,nets:nete)
    integer :: kblk, qblk
    integer :: kbeg, kend, qbeg, qend
 
@@ -683,7 +684,7 @@ subroutine neighbor_minmax_start(hybrid,edgeMinMax,nets,nete,min_neigh,max_neigh
    integer :: ie,q, k,kptr
 
    call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
-
+   qend = qsize_adv
    kblk = kend - kbeg + 1   ! calculate size of the block of vertical levels
    qblk = qend - qbeg + 1   ! calculate size of the block of tracers
 
@@ -691,7 +692,7 @@ subroutine neighbor_minmax_start(hybrid,edgeMinMax,nets,nete,min_neigh,max_neigh
       do q=qbeg, qend
          kptr = nlev*(q - 1) + kbeg - 1
          call  edgeSpack(edgeMinMax,min_neigh(kbeg:kend,q,ie),kblk,kptr,ie)
-         kptr = qsize*nlev + nlev*(q - 1) + kbeg - 1
+         kptr = qsize_adv*nlev + nlev*(q - 1) + kbeg - 1
          call  edgeSpack(edgeMinMax,max_neigh(kbeg:kend,q,ie),kblk,kptr,ie)
       enddo
    enddo
@@ -701,18 +702,18 @@ subroutine neighbor_minmax_start(hybrid,edgeMinMax,nets,nete,min_neigh,max_neigh
 end subroutine neighbor_minmax_start
 
 subroutine neighbor_minmax_finish(hybrid,edgeMinMax,nets,nete,min_neigh,max_neigh)
-
+   use dimensions_mod,         only: qsize_adv
    type (hybrid_t)      , intent(in) :: hybrid
    type (EdgeBuffer_t)  , intent(inout) :: edgeMinMax
    integer :: nets,nete
-   real (kind=r8) :: min_neigh(nlev,qsize,nets:nete)
-   real (kind=r8) :: max_neigh(nlev,qsize,nets:nete)
+   real (kind=r8) :: min_neigh(nlev,qsize_adv,nets:nete)
+   real (kind=r8) :: max_neigh(nlev,qsize_adv,nets:nete)
    integer :: kblk, qblk
    integer :: ie,q, k,kptr
    integer :: kbeg, kend, qbeg, qend
 
    call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
-
+   qend = qsize_adv
    kblk = kend - kbeg + 1   ! calculate size of the block of vertical levels
    qblk = qend - qbeg + 1   ! calculate size of the block of tracers
 
@@ -722,7 +723,7 @@ subroutine neighbor_minmax_finish(hybrid,edgeMinMax,nets,nete,min_neigh,max_neig
       do q=qbeg, qend
          kptr = nlev*(q - 1) + kbeg - 1
          call  edgeSunpackMIN(edgeMinMax,min_neigh(kbeg:kend,q,ie),kblk,kptr,ie)
-         kptr = qsize*nlev + nlev*(q - 1) + kbeg - 1
+         kptr = qsize_adv*nlev + nlev*(q - 1) + kbeg - 1
          call  edgeSunpackMAX(edgeMinMax,max_neigh(kbeg:kend,q,ie),kblk,kptr,ie)
          do k=kbeg,kend
             min_neigh(k,q,ie) = max(min_neigh(k,q,ie),0.0_r8)

@@ -37,7 +37,9 @@ module dimensions_mod
 
   integer         :: ntrac = 0           !ntrac is set in dyn_comp
   logical, public :: use_cslam = .false. !logical for CSLAM
-  integer         :: qsize = 0           !qsize is set in dyn_comp
+  integer         :: qsize     = 0   !qsize is set in dyn_comp
+  integer         :: qsize_adv = 1   !option to not advect all thermodynamically active species on GLL grid
+                                     !overwritten every physics time-step with CSLAM value
   !
   ! fvm dimensions:
   logical, public :: lprint!for debugging
@@ -97,7 +99,7 @@ module dimensions_mod
   integer, public  :: max_corner_elem               = 1 !max_elements_attached_to_node-3
   integer, public  :: max_neigh_edges               = 8 !4 + 4*max_corner_elem
 
-  public :: qsize,qsize_d,ntrac_d,ntrac
+  public :: qsize,qsize_d,ntrac_d,ntrac,qsize_adv
 
   integer, public :: ne
   integer, public :: nelem       ! total number of elements

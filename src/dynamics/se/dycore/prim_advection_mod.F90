@@ -17,7 +17,7 @@ module prim_advection_mod
 !
 !
   use shr_kind_mod,           only: r8=>shr_kind_r8
-  use dimensions_mod,         only: nlev, np, qsize, nc
+  use dimensions_mod,         only: nlev, np, qsize_adv, nc
   use physconst,              only: cpair
   use derivative_mod,         only: derivative_t
   use element_mod,            only: element_t
@@ -63,7 +63,7 @@ contains
 
 
   subroutine Prim_Advec_Init1(par, elem)
-    use dimensions_mod, only: nlev, qsize, nelemd,ntrac
+    use dimensions_mod, only: nlev, qsize_adv, nelemd,ntrac
     use parallel_mod,   only: parallel_t, boundaryCommMethod
     type(parallel_t)    :: par
     type (element_t)    :: elem(:)
@@ -85,18 +85,18 @@ contains
     else
        advec_remap_num_threads = tracer_num_threads
     endif
-    ! this might be called with qsize=0
+    ! this might be called with qsize_adv=0
     ! allocate largest one first
     ! Currently this is never freed. If it was, only this first one should
     ! be freed, as only it knows the true size of the buffer.
-    call initEdgeBuffer(par,edgeAdvp1,elem,qsize*nlev + nlev,bndry_type=boundaryCommMethod,&
+    call initEdgeBuffer(par,edgeAdvp1,elem,qsize_adv*nlev + nlev,bndry_type=boundaryCommMethod,&
                          nthreads=horz_num_threads*advec_remap_num_threads)
-    call initEdgeBuffer(par,edgeAdv,elem,qsize*nlev,bndry_type=boundaryCommMethod, &
+    call initEdgeBuffer(par,edgeAdv,elem,qsize_adv*nlev,bndry_type=boundaryCommMethod, &
                          nthreads=horz_num_threads*advec_remap_num_threads)
     ! This is a different type of buffer pointer allocation
     ! used for determine the minimum and maximum value from
     ! neighboring  elements
-    call initEdgeSBuffer(par,edgeAdvQminmax,elem,qsize*nlev*2,bndry_type=boundaryCommMethod, &
+    call initEdgeSBuffer(par,edgeAdvQminmax,elem,qsize_adv*nlev*2,bndry_type=boundaryCommMethod, &
                         nthreads=horz_num_threads*advec_remap_num_threads)
 
     call initEdgeBuffer(par,edgeAdv1,elem,nlev,bndry_type=boundaryCommMethod)
@@ -109,8 +109,8 @@ contains
 
 
     ! this static array is shared by all threads, so dimension for all threads (nelemd), not nets:nete:
-    allocate (qmin(nlev,qsize,nelemd))
-    allocate (qmax(nlev,qsize,nelemd))
+    allocate (qmin(nlev,qsize_adv,nelemd))
+    allocate (qmax(nlev,qsize_adv,nelemd))
 
   end subroutine Prim_Advec_Init1
 
@@ -175,7 +175,7 @@ contains
     integer              , intent(in   ) :: nete
 
 
-    !print *,'prim_Advec_Tracers_remap: qsize: ',qsize
+    !print *,'prim_Advec_Tracers_remap: qsize_adv: ',qsize_adv
     call Prim_Advec_Tracers_remap_rk2( elem , deriv , hvcoord , hybrid , dt , tl , nets , nete )
   end subroutine Prim_Advec_Tracers_remap
 
@@ -262,7 +262,7 @@ contains
     !       and a DSS'ed version stored in derived%div(:,:,:,2)
 
     call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
-
+    qend = qsize_adv
     do ie=nets,nete
       do k=kbeg,kend
         ! div( U dp Q),
@@ -321,7 +321,7 @@ contains
     real(kind=r8) :: rrkstage
 
     call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
-
+    qend = qsize_adv
     rrkstage=1.0_r8/real(rkstage,kind=r8)
     do ie=nets,nete
       do q=qbeg,qend
@@ -382,20 +382,19 @@ contains
   real(kind=r8), dimension(np,np,2,nlev                ) :: Vstar
   real(kind=r8), dimension(np,np  ,nlev                ) :: Qtens
   real(kind=r8), dimension(np,np  ,nlev                ) :: dp
-  real(kind=r8), dimension(np,np  ,nlev,qsize,nets:nete) :: Qtens_biharmonic
+  real(kind=r8), dimension(np,np  ,nlev,qsize_adv,nets:nete) :: Qtens_biharmonic
   real(kind=r8), dimension(np,np)                        :: div
   real(kind=r8), pointer, dimension(:,:,:)               :: DSSvar
   real(kind=r8) :: dp0(nlev)
   integer :: ie,q,i,j,k, kptr
   integer :: rhs_viss = 0
-  integer :: kblk,qblk   ! The per thead size of the vertical and tracers
+  integer :: kblk      ! The per thead size of the vertical and tracers
   integer :: kbeg, kend, qbeg, qend
 
   call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
 
   kblk = kend - kbeg + 1   ! calculate size of the block of vertical levels
-  qblk = qend - qbeg + 1   ! calculate size of the block of tracers
-
+  qend = qsize_adv
   do k = kbeg, kend
     dp0(k) = ( hvcoord%hyai(k+1) - hvcoord%hyai(k) )*hvcoord%ps0 + &
           ( hvcoord%hybi(k+1) - hvcoord%hybi(k) )*hvcoord%ps0
@@ -694,7 +693,7 @@ contains
           enddo
           enddo
         enddo
-        kptr = nlev*qsize + kbeg - 1
+        kptr = nlev*qsize_adv + kbeg - 1
         call edgeVpack( edgeAdvp1 , DSSvar(:,:,kbeg:kend), kblk, kptr, ie)
       endif
     end if
@@ -708,7 +707,7 @@ contains
       if(threadOwnsTracer(hybrid,1)) then
         if ( DSSopt == DSSomega       ) DSSvar => elem(ie)%derived%omega(:,:,:)
         if ( DSSopt == DSSdiv_vdp_ave ) DSSvar => elem(ie)%derived%divdp_proj(:,:,:)
-        kptr = qsize*nlev + kbeg -1
+        kptr = qsize_adv*nlev + kbeg -1
         call edgeVunpack( edgeAdvp1 , DSSvar(:,:,kbeg:kend) , kblk , kptr , ie )
         do k = kbeg, kend
            !OMP_COLLAPSE_SIMD
@@ -820,10 +819,10 @@ contains
   real (kind=r8), intent(in   )         :: dt2
 
   ! local
-  real (kind=r8), dimension(np,np,nlev,qsize,nets:nete) :: Qtens
+  real (kind=r8), dimension(np,np,nlev,qsize_adv,nets:nete) :: Qtens
   real (kind=r8), dimension(np,np,nlev                ) :: dp
-!  real (kind=r8), dimension(      nlev,qsize,nets:nete) :: min_neigh
-!  real (kind=r8), dimension(      nlev,qsize,nets:nete) :: max_neigh
+!  real (kind=r8), dimension(      nlev,qsize_adv,nets:nete) :: min_neigh
+!  real (kind=r8), dimension(      nlev,qsize_adv,nets:nete) :: max_neigh
   integer :: k,kptr,ie,ic,q,i,j
   integer :: kbeg,kend,qbeg,qend
 
@@ -832,15 +831,15 @@ contains
 !       removed for now.
 !  real (kind=r8), dimension(:,:), pointer :: spheremp,rspheremp
   real (kind=r8) :: dt,dp0
-  integer :: kblk,qblk   ! The per thead size of the vertical and tracers
+  integer :: kblk   ! The per thead size of the vertical and tracers
 
   call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
+  qend = qsize_adv
 
   if ( nu_q           == 0 ) return
   !if ( hypervis_order /= 2 ) return
 
   kblk = kend - kbeg + 1   ! calculate size of the block of vertical levels
-  qblk = qend - qbeg + 1   ! calculate size of the block of tracers
 
   call t_startf('advance_hypervis_scalar')
 
@@ -892,8 +891,8 @@ contains
               ! DIFF( Qdp) ~   dp0 DIFF (Q)  =  dp0 DIFF ( Qdp/dp )
               elem(ie)%state%Qdp(i,j,k,q,nt_qdp) = elem(ie)%state%Qdp(i,j,k,q,nt_qdp) * elem(ie)%spheremp(i,j) &
                                                                                  - dt * nu_q * Qtens(i,j,k,q,ie)
-        enddo
-        enddo
+            enddo
+          enddo
         enddo
 
         if (limiter_option .ne. 0 ) then
@@ -948,7 +947,7 @@ contains
     use vertremap_mod,          only: remap1
     use hybrid_mod,             only: hybrid_t, config_thread_region,get_loop_ranges, PrintHybrid
     use fvm_control_volume_mod, only: fvm_struct
-    use dimensions_mod,         only: ntrac
+    use dimensions_mod,         only: ntrac,qsize
     use dimensions_mod,         only: kord_tr,kord_tr_cslam
     use cam_logfile,            only: iulog
     use physconst,              only: pi
@@ -1034,7 +1033,7 @@ contains
         call endrun('negative moist layer thickness.  timestep or remap time too large')
       endif
 
-      call remap1(elem(ie)%state%Qdp(:,:,:,1:qsize,np1_qdp),np,1,qsize,qsize,dp_star_dry,dp_dry,ptop,0,.true.,kord_tr)
+      call remap1(elem(ie)%state%Qdp(:,:,:,1:qsize_adv,np1_qdp),np,1,qsize_adv,qsize_adv,dp_star_dry,dp_dry,ptop,0,.true.,kord_tr)
       !
       ! compute moist reference pressure level thickness
       !
