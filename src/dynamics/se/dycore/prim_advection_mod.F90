@@ -242,7 +242,7 @@ contains
     integer :: k,ie
     integer :: rkstage,rhs_multiplier
     integer :: n0_qdp, np1_qdp
-    integer :: kbeg,kend,qbeg,qend
+    integer :: kbeg,kend
 
 !    call t_barrierf('sync_prim_advec_tracers_remap_k2', hybrid%par%comm)
 !    call t_startf('prim_advec_tracers_remap_rk2')
@@ -261,8 +261,7 @@ contains
     ! Also: save a copy of div(U dp) in derived%div(:,:,:,1), which will be DSS'd
     !       and a DSS'ed version stored in derived%div(:,:,:,2)
 
-    call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
-    qend = qsize_adv
+    call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend)
     do ie=nets,nete
       do k=kbeg,kend
         ! div( U dp Q),
@@ -321,7 +320,6 @@ contains
     real(kind=r8) :: rrkstage
 
     call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
-    qend = qsize_adv
     rrkstage=1.0_r8/real(rkstage,kind=r8)
     do ie=nets,nete
       do q=qbeg,qend
@@ -355,7 +353,7 @@ contains
   ! DSSopt = DSSeta or DSSomega:   also DSS omega
   !
   ! ===================================
-  use dimensions_mod , only: np, nlev
+  use dimensions_mod , only: np, nlev, qsize
   use hybrid_mod     , only: hybrid_t!, PrintHybrid
   use hybrid_mod     , only: get_loop_ranges, threadOwnsTracer
   use element_mod    , only: element_t
@@ -394,7 +392,6 @@ contains
   call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
 
   kblk = kend - kbeg + 1   ! calculate size of the block of vertical levels
-  qend = qsize_adv
   do k = kbeg, kend
     dp0(k) = ( hvcoord%hyai(k+1) - hvcoord%hyai(k) )*hvcoord%ps0 + &
           ( hvcoord%hybi(k+1) - hvcoord%hybi(k) )*hvcoord%ps0
@@ -732,7 +729,13 @@ contains
           enddo
           enddo
         enddo
-    enddo
+      enddo
+      !
+      ! update non-advected tracers (CSLAM configuration only)
+      !
+      do q = qsize_adv+1,qsize
+        elem(ie)%state%Qdp(:,:,:,q,np1_qdp) = elem(ie)%state%Qdp(:,:,:,q,n0_qdp)
+      end do
   enddo
 !  call t_stopf('euler_step')
 
@@ -834,7 +837,6 @@ contains
   integer :: kblk   ! The per thead size of the vertical and tracers
 
   call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
-  qend = qsize_adv
 
   if ( nu_q           == 0 ) return
   !if ( hypervis_order /= 2 ) return
@@ -1092,19 +1094,8 @@ contains
             end do
           end do
         end do
-        if(ntrac>tracer_num_threads) then
-          call omp_set_nested(.true.)
-          !$OMP PARALLEL NUM_THREADS(tracer_num_threads), DEFAULT(SHARED), PRIVATE(hybridnew2,qbeg,qend)
-          hybridnew2 = config_thread_region(hybrid,'ctracer')
-          call get_loop_ranges(hybridnew2, qbeg=qbeg, qend=qend)
-          call remap1(fvm(ie)%c(1:nc,1:nc,:,1:ntrac),nc,qbeg,qend,ntrac,dpc_star, &
+        call remap1(fvm(ie)%c(1:nc,1:nc,:,1:ntrac),nc,1,ntrac,ntrac,dpc_star, &
                       fvm(ie)%dp_fvm(1:nc,1:nc,:),ptop,0,.false.,kord_tr_cslam)
-          !$OMP END PARALLEL
-          call omp_set_nested(.false.)
-        else
-          call remap1(fvm(ie)%c(1:nc,1:nc,:,1:ntrac),nc,1,ntrac,ntrac,dpc_star, &
-                      fvm(ie)%dp_fvm(1:nc,1:nc,:),ptop,0,.false.,kord_tr_cslam)
-        endif
       enddo
     end if
   end subroutine vertical_remap

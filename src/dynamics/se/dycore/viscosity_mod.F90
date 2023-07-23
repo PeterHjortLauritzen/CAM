@@ -263,7 +263,6 @@ logical var_coef1
 integer :: kblk,qblk   ! The per thead size of the vertical and tracers
 
   call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
-  qend = qsize_adv
    !if tensor hyperviscosity with tensor V is used, then biharmonic operator is (\grad\cdot V\grad) (\grad \cdot \grad) 
    !so tensor is only used on second call to laplace_sphere_wk
    var_coef1 = .true.
@@ -643,7 +642,6 @@ subroutine neighbor_minmax(hybrid,edgeMinMax,nets,nete,min_neigh,max_neigh)
    
    kblk = kend - kbeg + 1   ! calculate size of the block of vertical levels
    qblk = qend - qbeg + 1   ! calculate size of the block of tracers
-   qend = qsize_adv
    do ie=nets,nete
       do q = qbeg, qend
          kptr = nlev*(q - 1) + kbeg - 1
@@ -684,7 +682,6 @@ subroutine neighbor_minmax_start(hybrid,edgeMinMax,nets,nete,min_neigh,max_neigh
    integer :: ie,q, k,kptr
 
    call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
-   qend = qsize_adv
    kblk = kend - kbeg + 1   ! calculate size of the block of vertical levels
    qblk = qend - qbeg + 1   ! calculate size of the block of tracers
 
@@ -713,7 +710,6 @@ subroutine neighbor_minmax_finish(hybrid,edgeMinMax,nets,nete,min_neigh,max_neig
    integer :: kbeg, kend, qbeg, qend
 
    call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
-   qend = qsize_adv
    kblk = kend - kbeg + 1   ! calculate size of the block of vertical levels
    qblk = qend - qbeg + 1   ! calculate size of the block of tracers
 

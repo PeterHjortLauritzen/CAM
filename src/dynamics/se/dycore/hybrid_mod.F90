@@ -7,7 +7,7 @@ module hybrid_mod
 use parallel_mod  , only : parallel_t, copy_par
 use thread_mod    , only : omp_set_num_threads, omp_get_thread_num 
 use thread_mod    , only : horz_num_threads, vert_num_threads, tracer_num_threads
-use dimensions_mod, only : nlev, qsize, ntrac, use_cslam
+use dimensions_mod, only : nlev, ntrac, use_cslam, qsize_adv
 
 implicit none
 private
@@ -152,7 +152,7 @@ contains
          call set_thread_ranges_1D ( work_pool_horz, ibeg_range, iend_range, ithr )
          hybrid%ibeg = 1;          hybrid%iend = nelemd_save
          hybrid%kbeg = 1;          hybrid%kend = nlev
-         hybrid%qbeg = 1;          hybrid%qend = qsize
+         hybrid%qbeg = 1;          hybrid%qend = qsize_adv
       endif
 
       if ( TRIM(region_name) == 'horizontal') then
@@ -160,7 +160,7 @@ contains
          call set_thread_ranges_1D ( work_pool_horz, ibeg_range, iend_range, ithr )
          hybrid%ibeg = ibeg_range; hybrid%iend = iend_range
          hybrid%kbeg = 1;          hybrid%kend = nlev
-         hybrid%qbeg = 1;          hybrid%qend = qsize
+         hybrid%qbeg = 1;          hybrid%qend = qsize_adv
       endif
 
       if ( TRIM(region_name) == 'vertical') then
@@ -168,7 +168,7 @@ contains
          call set_thread_ranges_1D ( work_pool_vert, kbeg_range, kend_range, ithr )
          hybrid%ibeg = 1;          hybrid%iend = nelemd_save
          hybrid%kbeg = kbeg_range; hybrid%kend = kend_range
-         hybrid%qbeg = 1;          hybrid%qend = qsize
+         hybrid%qbeg = 1;          hybrid%qend = qsize_adv
       endif
   
       if ( TRIM(region_name) == 'tracer' ) then
@@ -232,11 +232,11 @@ contains
           work_pool_vert(ith+1,2) = end_index
         end do
 
-        if(qsize<tracer_num_threads) &
+        if(qsize_adv<tracer_num_threads) &
           print *,'WARNING: insufficient tracer parallelism to support ',tracer_num_threads,' tracer threads'
         if ( .NOT. allocated(work_pool_trac) ) allocate(work_pool_trac(tracer_num_threads,2))
         do ith=0,tracer_num_threads-1
-          call create_work_pool( 1, qsize, tracer_num_threads, ith, beg_index, end_index )
+          call create_work_pool( 1, qsize_adv, tracer_num_threads, ith, beg_index, end_index )
           work_pool_trac(ith+1,1) = beg_index
           work_pool_trac(ith+1,2) = end_index
         end do
@@ -307,14 +307,14 @@ contains
     call set_thread_ranges_1D ( work_pool_horz, ibeg_range, iend_range, idthread )
     pybrid%ibeg = ibeg_range; pybrid%iend = iend_range
     pybrid%kbeg = 1;          pybrid%kend = nlev
-    pybrid%qbeg = 1;          pybrid%qend = qsize
+    pybrid%qbeg = 1;          pybrid%qend = qsize_adv
   endif
 
   if ( TRIM(region_name) == 'vertical' ) then
     call set_thread_ranges_1D ( work_pool_vert, kbeg_range, kend_range, idthread )
     !FIXME: need to set ibeg, iend as well
     pybrid%kbeg = kbeg_range; pybrid%kend = kend_range
-    pybrid%qbeg = 1;          pybrid%qend = qsize
+    pybrid%qbeg = 1;          pybrid%qend = qsize_adv
   endif
 
   if ( TRIM(region_name) == 'tracer' ) then
@@ -407,12 +407,12 @@ contains
   endif
 
   if ( TRIM(region_name) == 'tracer' ) then
-    pybrid%qbeg = 1; pybrid%qend = qsize
+    pybrid%qbeg = 1; pybrid%qend = qsize_adv
   endif
 
   if ( TRIM(region_name) == 'vertical_and_tracer' ) then
     pybrid%kbeg = 1; pybrid%kend = nlev
-    pybrid%qbeg = 1; pybrid%qend = qsize
+    pybrid%qbeg = 1; pybrid%qend = qsize_adv
   endif
 
   end subroutine reset_loop_ranges 
