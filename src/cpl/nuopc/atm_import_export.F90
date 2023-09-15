@@ -163,6 +163,9 @@ contains
     call fldlist_add(fldsFrAtm_num, fldsFrAtm, 'Faxa_rainl'    )
     call fldlist_add(fldsFrAtm_num, fldsFrAtm, 'Faxa_snowc'    )
     call fldlist_add(fldsFrAtm_num, fldsFrAtm, 'Faxa_snowl'    )
+    call fldlist_add(fldsFrAtm_num, fldsFrAtm, 'Faxa_hrain'    )
+    call fldlist_add(fldsFrAtm_num, fldsFrAtm, 'Faxa_hsnow'    )
+    call fldlist_add(fldsFrAtm_num, fldsFrAtm, 'Faxa_hevap'    )
     call fldlist_add(fldsFrAtm_num, fldsFrAtm, 'Faxa_lwdn'     )
     call fldlist_add(fldsFrAtm_num, fldsFrAtm, 'Faxa_swndr'    )
     call fldlist_add(fldsFrAtm_num, fldsFrAtm, 'Faxa_swvdr'    )
@@ -917,6 +920,7 @@ contains
     real(r8), pointer :: fldptr_solld(:)   , fldptr_solsd(:)
     real(r8), pointer :: fldptr_snowc(:)   , fldptr_snowl(:)
     real(r8), pointer :: fldptr_rainc(:)   , fldptr_rainl(:)
+    real(r8), pointer :: fldptr_hsnow(:)   , fldptr_hrain(:), fldptr_hevap(:) !material enthalpy fluxes
     real(r8), pointer :: fldptr_lwdn(:)    , fldptr_swnet(:)
     real(r8), pointer :: fldptr_topo(:)    , fldptr_zbot(:)
     real(r8), pointer :: fldptr_ubot(:)    , fldptr_vbot(:)
@@ -986,6 +990,12 @@ contains
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
     call state_getfldptr(exportState, 'Faxa_snowl', fldptr=fldptr_snowl, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call state_getfldptr(exportState, 'Faxa_hrain', fldptr=fldptr_hrain, rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call state_getfldptr(exportState, 'Faxa_hsnow', fldptr=fldptr_hsnow, rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call state_getfldptr(exportState, 'Faxa_hevap', fldptr=fldptr_hevap, rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
     call state_getfldptr(exportState, 'Faxa_swndr', fldptr=fldptr_soll, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
     call state_getfldptr(exportState, 'Faxa_swvdr', fldptr=fldptr_sols, rc=rc)
@@ -1003,6 +1013,9 @@ contains
           fldptr_snowl(g) = cam_out(c)%precsl(i)*1000._r8 * mod2med_areacor(g)
           fldptr_rainc(g) = (cam_out(c)%precc(i) - cam_out(c)%precsc(i))*1000._r8 * mod2med_areacor(g)
           fldptr_rainl(g) = (cam_out(c)%precl(i) - cam_out(c)%precsl(i))*1000._r8 * mod2med_areacor(g)
+          fldptr_hrain(g) = cam_out(c)%hrain (i) * mod2med_areacor(g)
+          fldptr_hsnow(g) = cam_out(c)%hsnow (i) * mod2med_areacor(g)
+          fldptr_hevap(g) = cam_out(c)%hevap (i) * mod2med_areacor(g)
           fldptr_soll(g)  = cam_out(c)%soll(i)  * mod2med_areacor(g)
           fldptr_sols(g)  = cam_out(c)%sols(i)  * mod2med_areacor(g)
           fldptr_solld(g) = cam_out(c)%solld(i) * mod2med_areacor(g)

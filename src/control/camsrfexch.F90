@@ -53,6 +53,9 @@ module camsrfexch
      real(r8) :: precsl(pcols)       !
      real(r8) :: precc(pcols)        !
      real(r8) :: precl(pcols)        !
+     real(r8) :: hrain(pcols)        !material enth. flx for rain (currently only used by ocn, MOM)
+     real(r8) :: hsnow(pcols)        !material enth. flx for snow (currently only used by ocn, MOM)
+     real(r8) :: hevap(pcols)        !material enth. flx for evaporation (currently only used by ocn, MOM)
      real(r8) :: soll(pcols)         !
      real(r8) :: sols(pcols)         !
      real(r8) :: solld(pcols)        !
@@ -295,6 +298,9 @@ CONTAINS
        cam_out(c)%precsl(:)   = 0._r8
        cam_out(c)%precc(:)    = 0._r8
        cam_out(c)%precl(:)    = 0._r8
+       cam_out(c)%hrain(:)    = 0._r8
+       cam_out(c)%hsnow(:)    = 0._r8
+       cam_out(c)%hevap(:)    = 0._r8
        cam_out(c)%soll(:)     = 0._r8
        cam_out(c)%sols(:)     = 0._r8
        cam_out(c)%solld(:)    = 0._r8
@@ -394,7 +400,7 @@ CONTAINS
 
 !======================================================================
 
-subroutine cam_export(state,cam_out,pbuf)
+subroutine cam_export(state,cam_out,pbuf,cam_in)
 
    ! Transfer atmospheric fields into necessary surface data structures
 
@@ -403,7 +409,7 @@ subroutine cam_export(state,cam_out,pbuf)
    use cam_history,      only: outfld
    use chem_surfvals,    only: chem_surfvals_get
    use co2_cycle,        only: co2_transport, c_i
-   use physconst,        only: rair, mwdry, mwco2, gravit, mwo3
+   use physconst,        only: rair, mwdry, mwco2, gravit, mwo3, cpwv, cpliq, cpice
    use constituents,     only: pcnst
    use physics_buffer,   only: pbuf_get_index, pbuf_get_field, physics_buffer_desc
    use rad_constituents, only: rad_cnst_get_gas
@@ -412,9 +418,10 @@ subroutine cam_export(state,cam_out,pbuf)
    implicit none
 
    ! Input arguments
-   type(physics_state),  intent(in) :: state
-   type (cam_out_t),     intent(inout) :: cam_out
-   type(physics_buffer_desc), pointer  :: pbuf(:)
+   type(physics_state),  intent(in)           :: state
+   type (cam_out_t),     intent(inout)        :: cam_out
+   type(physics_buffer_desc), pointer         :: pbuf(:)
+   type (cam_in_t ),     intent(in)           :: cam_in
 
    ! Local variables
 
@@ -563,7 +570,16 @@ subroutine cam_export(state,cam_out,pbuf)
       if (cam_out%precsl(i).lt.0._r8) cam_out%precsl(i)=0._r8
       if (cam_out%precsc(i).gt.cam_out%precc(i)) cam_out%precsc(i)=cam_out%precc(i)
       if (cam_out%precsl(i).gt.cam_out%precl(i)) cam_out%precsl(i)=cam_out%precl(i)
-
+      !
+      ! material enthalpy to surface (ocean) -- just bottom temperature for now (Thomas Toniazzo)
+      !
+      ! At this point this enthalpy flux will not be consistent with FV and MPAS 
+      ! (need to switch to variable cp)
+      !
+      cam_out%hsnow(i) = (cam_out%precsc(i)+cam_out%precsl(i))*cam_out%tbot(i)*cpice
+      cam_out%hrain(i) = (cam_out%precc (i)-cam_out%precsc(i) &
+                         +cam_out%precl (i)-cam_out%precsl(i))*cam_out%tbot(i)*cpliq 
+      cam_out%hevap(i) = cam_in%cflx(i,1)*cam_in%ts(i)*cpwv
    end do
 
 end subroutine cam_export

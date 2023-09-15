@@ -2899,7 +2899,7 @@ contains
 
     ! Save atmospheric fields to force surface models
     call t_startf('cam_export')
-    call cam_export (state,cam_out,pbuf)
+    call cam_export (state,cam_out,pbuf,cam_in)
     call t_stopf('cam_export')
 
     ! Write export state to history file
