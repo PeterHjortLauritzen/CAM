@@ -523,6 +523,13 @@ contains
     call addfld ('ALDIF',    horiz_only, 'A', '1','albedo: longwave, diffuse')
     call addfld ('SST',      horiz_only, 'A', 'K','sea surface temperature')
 
+    call addfld ('HRAIN',    horiz_only, 'A', 'W/m2','enthalpy flux from rain (ice ref state)')
+    call addfld ('HSNOW',    horiz_only, 'A', 'W/m2','enthalpy flux from snow (ice ref state)')
+    call addfld ('HEVAP',    horiz_only, 'A', 'W/m2','enthalpy flux from evap (ice ref state)')
+    call addfld ('HTOT' ,    horiz_only, 'A', 'W/m2','enthalpy flux + latent heat terms (ice ref state)')!xxx just debugging
+    call addfld ('HTOT_ATM_OCN' ,horiz_only, 'A', 'W/m2','enthalpy flux + latent heat terms (ice ref state) over ocean only')!xxx just debugging
+    call addfld ('HTOT_OCN_OCN' ,horiz_only, 'A', 'W/m2','enthalpy flux + latent heat terms (liq ref state) over ocean only')!xxx just debugging
+    call addfld ('HREF_OCN_OCN' ,horiz_only, 'A', 'W/m2','liq ref state term')!xxx just debugging
 
     ! outfld calls in diag_phys_tend_writeout
 

@@ -410,11 +410,12 @@ subroutine cam_export(state,cam_out,pbuf,cam_in)
    use chem_surfvals,    only: chem_surfvals_get
    use co2_cycle,        only: co2_transport, c_i
    use physconst,        only: rair, mwdry, mwco2, gravit, mwo3, cpwv, cpliq, cpice
+   use physconst,        only: latvap, latice, tmelt!xxx
    use constituents,     only: pcnst
    use physics_buffer,   only: pbuf_get_index, pbuf_get_field, physics_buffer_desc
    use rad_constituents, only: rad_cnst_get_gas
    use cam_control_mod,  only: simple_phys
-
+   use cam_history,      only: outfld
    implicit none
 
    ! Input arguments
@@ -581,7 +582,29 @@ subroutine cam_export(state,cam_out,pbuf,cam_in)
                          +cam_out%precl (i)-cam_out%precsl(i))*cam_out%tbot(i)*cpliq 
       cam_out%hevap(i) = cam_in%cflx(i,1)*cam_in%ts(i)*cpwv
    end do
-
+   !
+   ! enthalpy flux terms
+   !
+   call outfld('HRAIN',     cam_out%hrain,   pcols, lchnk)
+   call outfld('HSNOW',     cam_out%hsnow,   pcols, lchnk)
+   call outfld('HEVAP',     cam_out%hevap,   pcols, lchnk)
+   call outfld('HTOT' ,     cam_out%hevap+cam_out%hsnow+cam_out%hrain,   pcols, lchnk)!xxx just debugging
+   call outfld('HTOT_ATM_OCN' , (cam_out%hevap+cam_out%hsnow+cam_out%hrain+&
+        (latvap + latice)*cam_in%cflx(:,1)+latice*(cam_out%precc (:)-cam_out%precsc(:) &
+                         +cam_out%precl (:)-cam_out%precsl(:)))*&
+                                cam_in%ocnfrac(:)&
+        ,   pcols, lchnk)!xxx just debugging
+   call outfld('HTOT_OCN_OCN' , (cam_out%hevap-tmelt*cpwv *cam_in%cflx(:,1)+&
+                                 cam_out%hsnow-tmelt*cpice*(cam_out%precsc(:)+cam_out%precsl(:))+&
+                                 cam_out%hrain-tmelt*cpliq*(cam_out%precc (:)-cam_out%precsc(:) &
+                                +cam_out%precl (:)-cam_out%precsl(:))+&
+                                latvap*cam_in%cflx(:,1)-latice*(cam_out%precsc(:)+cam_out%precsl(:)))*&
+                                cam_in%ocnfrac(:)&
+                                ,   pcols, lchnk)!xxx just debugging
+    call outfld('HREF_OCN_OCN' ,(tmelt*cpwv *cam_in%cflx(:,1)+tmelt*cpice*(cam_out%precsc(:)+cam_out%precsl(:))+&
+                                tmelt*cpliq*(cam_out%precc (:)-cam_out%precsc(:) &
+                                +cam_out%precl (:)-cam_out%precsl(:)))*cam_in%ocnfrac(:)&
+                                ,   pcols, lchnk)!xxx just debugging
 end subroutine cam_export
 
 end module camsrfexch
