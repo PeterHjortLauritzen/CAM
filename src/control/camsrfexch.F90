@@ -447,6 +447,7 @@ subroutine cam_export(state,cam_out,pbuf,cam_in)
    real(r8), pointer :: snow_pcw(:)                ! snow from Hack   convection
    real(r8), pointer :: o3_ptr(:,:), srf_o3_ptr(:)
    real(r8), pointer :: lightning_ptr(:)
+   real(r8), allocatable :: htmp(:)
    !-----------------------------------------------------------------------
 
    lchnk = state%lchnk
@@ -585,26 +586,29 @@ subroutine cam_export(state,cam_out,pbuf,cam_in)
    !
    ! enthalpy flux terms
    !
+   allocate(htmp(ncol))
    call outfld('HRAIN',     cam_out%hrain,   pcols, lchnk)
    call outfld('HSNOW',     cam_out%hsnow,   pcols, lchnk)
    call outfld('HEVAP',     cam_out%hevap,   pcols, lchnk)
-   call outfld('HTOT' ,     cam_out%hevap+cam_out%hsnow+cam_out%hrain,   pcols, lchnk)!xxx just debugging
-   call outfld('HTOT_ATM_OCN' , (cam_out%hevap+cam_out%hsnow+cam_out%hrain+&
-        (latvap + latice)*cam_in%cflx(:,1)+latice*(cam_out%precc (:)-cam_out%precsc(:) &
-                         +cam_out%precl (:)-cam_out%precsl(:)))*&
-                                cam_in%ocnfrac(:)&
-        ,   pcols, lchnk)!xxx just debugging
-   call outfld('HTOT_OCN_OCN' , (cam_out%hevap-tmelt*cpwv *cam_in%cflx(:,1)+&
-                                 cam_out%hsnow-tmelt*cpice*(cam_out%precsc(:)+cam_out%precsl(:))+&
-                                 cam_out%hrain-tmelt*cpliq*(cam_out%precc (:)-cam_out%precsc(:) &
-                                +cam_out%precl (:)-cam_out%precsl(:))+&
-                                latvap*cam_in%cflx(:,1)-latice*(cam_out%precsc(:)+cam_out%precsl(:)))*&
-                                cam_in%ocnfrac(:)&
-                                ,   pcols, lchnk)!xxx just debugging
-    call outfld('HREF_OCN_OCN' ,(tmelt*cpwv *cam_in%cflx(:,1)+tmelt*cpice*(cam_out%precsc(:)+cam_out%precsl(:))+&
-                                tmelt*cpliq*(cam_out%precc (:)-cam_out%precsc(:) &
-                                +cam_out%precl (:)-cam_out%precsl(:)))*cam_in%ocnfrac(:)&
-                                ,   pcols, lchnk)!xxx just debugging
+   htmp =   cam_out%hevap(1:ncol)+cam_out%hsnow(1:ncol)+cam_out%hrain(1:ncol)
+   call outfld('HTOT' ,     htmp,   ncol, lchnk)!xxx just debugging
+   htmp =  (cam_out%hevap(1:ncol)+cam_out%hsnow(1:ncol)+cam_out%hrain(1:ncol)+&
+        (latvap + latice)*cam_in%cflx(1:ncol,1)+latice*(cam_out%precc(1:ncol)-cam_out%precsc(1:ncol) &
+        +cam_out%precl (1:ncol)-cam_out%precsl(1:ncol)))*&
+        cam_in%ocnfrac(1:ncol)
+   call outfld('HTOT_ATM_OCN' , htmp, ncol, lchnk)
+   htmp = (cam_out%hevap(1:ncol)-tmelt*cpwv *cam_in%cflx(1:ncol,1)+&
+        cam_out%hsnow(1:ncol)-tmelt*cpice*(cam_out%precsc(1:ncol)+cam_out%precsl(1:ncol))+&
+        cam_out%hrain(1:ncol)-tmelt*cpliq*(cam_out%precc (1:ncol)-cam_out%precsc(1:ncol)+ &
+        cam_out%precl (1:ncol)-cam_out%precsl(1:ncol))+&
+        latvap*cam_in%cflx(1:ncol,1)-latice*(cam_out%precsc(1:ncol)+cam_out%precsl(1:ncol)))*&
+        cam_in%ocnfrac(1:ncol)
+   call outfld('HTOT_OCN_OCN' , htmp, ncol, lchnk)
+   htmp = (tmelt*cpwv *cam_in%cflx(1:ncol,1)+tmelt*cpice*(cam_out%precsc(1:ncol)+cam_out%precsl(1:ncol))+&
+        tmelt*cpliq*(cam_out%precc (1:ncol)-cam_out%precsc(1:ncol) &
+        +cam_out%precl (1:ncol)-cam_out%precsl(1:ncol)))*cam_in%ocnfrac(1:ncol)
+   call outfld('HREF_OCN_OCN' , htmp, ncol, lchnk)
+   deallocate(htmp)
 end subroutine cam_export
 
 end module camsrfexch
