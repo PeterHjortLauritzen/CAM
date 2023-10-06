@@ -523,9 +523,13 @@ contains
     call addfld ('ALDIF',    horiz_only, 'A', '1','albedo: longwave, diffuse')
     call addfld ('SST',      horiz_only, 'A', 'K','sea surface temperature')
 
-    call addfld ('HRAIN',    horiz_only, 'A', 'W/m2','enthalpy flux from rain (ice ref state)')
-    call addfld ('HSNOW',    horiz_only, 'A', 'W/m2','enthalpy flux from snow (ice ref state)')
-    call addfld ('HEVAP',    horiz_only, 'A', 'W/m2','enthalpy flux from evap (ice ref state)')
+    call addfld ('HRAIN',      horiz_only, 'A', 'W/m2','enthalpy flux from rain (ice ref state)')
+    call addfld ('HSNOW',      horiz_only, 'A', 'W/m2','enthalpy flux from snow (ice ref state)')
+    call addfld ('HEVAP',      horiz_only, 'A', 'W/m2','enthalpy flux from evap (ice ref state)')
+    call addfld ('HRAIN_OCN_LIQREF',  horiz_only, 'A', 'W/m2','enthalpy flux from rain (liq ref state)') !xxx just debugging
+    call addfld ('HSNOW_OCN_LIQREF',  horiz_only, 'A', 'W/m2','enthalpy flux from snow (liq ref state)') !xxx just debugging
+    call addfld ('HEVAP_OCN_LIQREF',  horiz_only, 'A', 'W/m2','enthalpy flux from evap (liq ref state)') !xxx just debugging
+
     call addfld ('HTOT' ,    horiz_only, 'A', 'W/m2','enthalpy flux + latent heat terms (ice ref state)')!xxx just debugging
     call addfld ('HTOT_ATM_OCN' ,horiz_only, 'A', 'W/m2','enthalpy flux + latent heat terms (ice ref state) over ocean only')!xxx just debugging
     call addfld ('HTOT_OCN_OCN' ,horiz_only, 'A', 'W/m2','enthalpy flux + latent heat terms (liq ref state) over ocean only')!xxx just debugging
