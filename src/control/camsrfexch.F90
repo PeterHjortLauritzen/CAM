@@ -585,24 +585,24 @@ subroutine cam_export(state,cam_out,pbuf,cam_in)
       ! At this point this enthalpy flux will not be consistent with FV and MPAS 
       ! (need to switch to variable cp)
       !
-      fsnow = cam_out%precsc(i)+cam_out%precsl(i)                                    !snow flux
-      frain = cam_out%precc (i)-cam_out%precsc(i)+cam_out%precl (i)-cam_out%precsl(i)!rain flux
-      fevap = cam_in%cflx(i,1)                                                       !water vapor flux
+      fsnow = 1000.0_r8*(cam_out%precsc(i)+cam_out%precsl(i))                                    !snow flux
+      frain = 1000.0_r8*(cam_out%precc (i)-cam_out%precsc(i)+cam_out%precl (i)-cam_out%precsl(i))!rain flux
+      fevap = cam_in%cflx(i,1)                                                                   !water vapor flux
 
-      cam_out%hsnow(i) = fsnow*cam_out%tbot(i)*cpice
-      cam_out%hrain(i) = frain*cam_out%tbot(i)*cpliq
-      cam_out%hevap(i) = fevap*cam_in%ts(i)   *cpwv
+      cam_out%hsnow(i) =  fsnow*cam_out%tbot(i)*cpice !sign must follow ocean model convention: +ve for flux into ocean
+      cam_out%hrain(i) =  frain*cam_out%tbot(i)*cpliq !sign must follow ocean model convention: +ve for flux into ocean
+      cam_out%hevap(i) = -fevap*cam_in%ts(i)   *cpwv  !sign must follow ocean model convention: -ve for flux out of ocean
       !
       ! Compute enthalpy fluxes for ocean using liquid reference state
       !
-      hsnow_ocn_liqref(i) = fsnow*(cam_out%tbot(i)-tmelt)*cpice
-      hsnow_ocn_liqref(i) = hsnow_ocn_liqref(i)*cam_in%ocnfrac(i)
+      hsnow_ocn_liqref(i) =  fsnow*(cam_out%tbot(i)-tmelt)*cpice
+      hsnow_ocn_liqref(i) =  hsnow_ocn_liqref(i)*cam_in%ocnfrac(i)
 
-      hrain_ocn_liqref(i) = frain*(cam_out%tbot(i)-tmelt)*cpliq
-      hrain_ocn_liqref(i) = hrain_ocn_liqref(i)*cam_in%ocnfrac(i)
+      hrain_ocn_liqref(i) =  frain*(cam_out%tbot(i)-tmelt)*cpliq
+      hrain_ocn_liqref(i) =  hrain_ocn_liqref(i)*cam_in%ocnfrac(i)
 
-      hevap_ocn_liqref(i) = fevap*(cam_in%ts(i)-tmelt)*cpwv
-      hevap_ocn_liqref(i) = hevap_ocn_liqref(i)*cam_in%ocnfrac(i)
+      hevap_ocn_liqref(i) = -fevap*(cam_in%ts(i)-tmelt)*cpwv
+      hevap_ocn_liqref(i) =  hevap_ocn_liqref(i)*cam_in%ocnfrac(i)
    end do
    !
    ! enthalpy flux terms
