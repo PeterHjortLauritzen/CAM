@@ -41,6 +41,7 @@ def buildcpp(case):
     nthrds_atm = case.get_value("NTHRDS_ATM")
     cam_config_opts = case.get_value("CAM_CONFIG_OPTS")
     comp_interface=case.get_value("COMP_INTERFACE")
+    cam_planet=case.get_value("CAM_PLANET")
 
     # level information for CAM is part of the atm grid name - and must be stripped out
     nlev = ''
@@ -125,6 +126,9 @@ def buildcpp(case):
 
     if cam_dycore == 'mpas':
         config_opts += ["-mpas_libdir", os.path.join(exeroot, "atm", "obj", "mpas")]
+
+    if cam_planet == 'mars':
+        config_opts += ["-mars"]
 
     camconf = os.path.join(caseroot, "Buildconf", "camconf")
     if not os.path.isdir(camconf):

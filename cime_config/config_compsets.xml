@@ -295,6 +295,37 @@
   <!-- CAM untested compsets -->
   <!-- ****************************** -->
 
+  <!-- ****************************** -->
+  <!-- CAM science supported compsets -->
+  <!-- ****************************** -->
+
+  <!-- cam mars untested compsets -->
+  <compset>
+    <alias>FMARS</alias>
+    <lname>2000_CAM%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>FMARSRTSOCR</alias>
+    <lname>2000_CAM%MARS%SOCR_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>FMARSADIAB</alias>
+    <lname>2000_CAM%MARS%ADIAB_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>FMARSDABIP04</alias>
+    <lname>2000_CAM%MARS%DABIP04_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>FMARSHS94</alias>
+    <lname>2000_CAM%MARS%HS94_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+  </compset>
+
+
   <!-- spcam untested compsets -->
 
   <compset>

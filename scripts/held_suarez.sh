@@ -3,6 +3,7 @@ set short="F"
 set analytic="F"
 #set res = ne30_ne30_mg17
 set res=ne16_ne16_mg17
+set exp=001
 #
 # source code (assumed to be in /glade/u/home/$USER/src)
 #
@@ -11,12 +12,12 @@ if ($short == "T") then
   set stopoption="ndays"
   set steps="1"
   set wall="00:05:00"
-  set caze=Mars_${res}_L49_short
+  set caze=Mars_${res}_L49_short_${exp}
 else
   set stopoption="nmonths"
   set steps="12"
   set wall="00:40:00"
-  set caze=Mars_${res}_L49
+  set caze=Mars_${res}_L49_${exp}
 endif
 set cset="FHS94"
 set pecount="225"
@@ -25,10 +26,13 @@ set PBS_ACCOUNT="P93300642"
 echo $PBS_ACCOUNT
 set scratch="/glade/scratch"
 
+set CESMROOT=/glade/p/cgd/amp/${USER}/collections/tag/cam6_3_087_mars_pel.100523/
+set CASEDIR=/scratch/${USER}/$caze
+#set CASEDIR=/glade/p/cgd/amp/${USER}/cases
 
-/glade/u/home/$USER/src/$src/cime/scripts/create_newcase --case $scratch/$USER/$caze --compset $cset --res $res  --q $queue --walltime $wall --pecount $pecount  --project $PBS_ACCOUNT --run-unsupported
+$CESMROOT/cime/scripts/create_newcase --case $CASEDIR/$caze --compset $cset --res $res  --q $queue --walltime $wall --pecount $pecount  --project $PBS_ACCOUNT --run-unsupported
 
-cd $scratch/$USER/$caze
+cd $CASEDIR/$caze
 ./xmlchange STOP_OPTION=$stopoption,STOP_N=$steps
 ./xmlchange DOUT_S=FALSE
 ./xmlchange DEBUG=FALSE
@@ -95,5 +99,5 @@ echo "mwdry  = 43.34"     >> user_nl_cam #0.04334 - original value
 echo "cpair  = 735.0"     >> user_nl_cam
 echo "rearth = 3.38992e6" >> user_nl_cam
 
-qcmd -- ./case.build
+qcmd -A $PBS_ACCOUNT -- ./case.build
 ./case.submit

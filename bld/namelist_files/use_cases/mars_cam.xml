@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+
+<namelist_defaults>
+<!-- mars mean orbital elements https://nssdc.gsfc.nasa.gov/planetary/factsheet/marsfact.html  -->
+<orb_eccen                >0.0935</orb_eccen>
+<orb_obliq                >25.19</orb_obliq>
+<orb_mvelp                >336.04084</orb_mvelp>
+<orb_mode>fixed_parameters</orb_mode>
+
+<scale_dry_air_mass>0.0</scale_dry_air_mass> 
+
+<!-- MARS ghg -->
+<!-- <co2vmr                   >950.0e-6</co2vmr> -->
+
+<!-- Solar insolation of 950W -->
+<!-- <solar_irrad_data_file          >atm/cam/solar/mars_solar_ave_tsi_590.nc</solar_irrad_data_file> -->
+
+<!-- Set mar planet id                       -->
+<mars_planet              >.true. </mars_planet>
+
+<!-- Revised physics constants for ape experiments -->
+<sday                     >88642.0</sday>
+<rearth                   >3.38992e6</rearth>
+<gravit                   >3.72</gravit>
+<mwdry                    >43.34</mwdry>
+<cpair                    >735.0</cpair>
+
+<use_topo_file            >.false.</use_topo_file>
+<analytic_ic_type         >'us_standard_atmosphere'</analytic_ic_type>
+<ext_frc_specifier        > ""    </ext_frc_specifier>
+<srf_emis_specifier       > ""    </srf_emis_specifier>
+<tracer_cnst_specifier    > ""    </tracer_cnst_specifier>
+
+</namelist_defaults>
+

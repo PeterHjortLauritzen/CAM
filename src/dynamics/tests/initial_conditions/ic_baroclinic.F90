@@ -11,13 +11,14 @@ module ic_baroclinic
   use cam_abortutils,      only: endrun
   use spmd_utils,          only: masterproc
 
-  use physconst, only : rair, gravit, rearth, pi, omega, epsilo, pstd
+#ifdef planet_mars
+  use physconst, only : pstd
+#endif
+  use physconst, only : rair, gravit, rearth, pi, omega, epsilo
   use hycoef,    only : hyai, hybi, hyam, hybm, ps0
 
   implicit none
   private
-
-  real(r8), parameter :: deg2rad = pi/180.0_r8
 
   !=======================================================================
   !    Baroclinic wave test case parameters

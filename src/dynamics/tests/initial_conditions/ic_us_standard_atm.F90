@@ -11,7 +11,11 @@ use shr_kind_mod,        only: r8 => shr_kind_r8
 use spmd_utils,          only: masterproc
 
 use hycoef,              only: ps0, hyam, hybm
+#ifdef planet_mars
 use physconst,           only: gravit, pi
+#else
+use physconst,           only: gravit
+#endif
 use constituents,        only: cnst_name
 use const_init,          only: cnst_init_default
 
@@ -64,7 +68,9 @@ subroutine us_std_atm_set_ic(latvals, lonvals, zint, U, V, T, PS, PHIS_IN, &
    integer                           :: ncnst
    character(len=*), parameter       :: subname = 'us_std_atm_set_ic'
    real(r8)                          :: psurf(1)
+#ifdef planet_mars
    real(r8)                          :: deg2rad = pi/180.0_r8
+#endif
    real(r8), allocatable             :: pmid(:), zmid(:), zmid2d(:,:)
    !----------------------------------------------------------------------------
 

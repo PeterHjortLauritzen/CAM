@@ -64,7 +64,9 @@ contains
     use cam_abortutils,     only: endrun
     use cam_history,        only: outfld
     use held_suarez_1994,   only: held_suarez_1994_run
+#ifdef planet_mars
     use std_atm_profile,    only: std_atm_height, std_atm_temp
+#endif
     !
     ! Input arguments
     !

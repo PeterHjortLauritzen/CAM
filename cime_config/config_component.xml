@@ -12,7 +12,7 @@
     <desc atm="CAM50[%CCTS1][%CLB][%PORT][%RCO2][%MAM7][%SCAM][%SDYN][%WCSC][%WCTS]"                                                               >CAM cam5 physics:</desc>
     <desc atm="CAM40[%PORT][%RCO2][%SCAM][%SDYN][%TMOZ][%WX][%WXIE][%WXIED][%WCCM][%WCMD]"                                                         >CAM cam4 physics:</desc>
     <desc atm="CAM30"                                                                                                                              >CAM cam3 physics:</desc>
-    <desc atm="CAM[%ADIAB][%DABIP04][%TJ16][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM]"                                     >CAM simplified and non-versioned physics :</desc>
+    <desc atm="CAM[%ADIAB][%DABIP04][%TJ16][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM][%MARS][%SOCR]"                                     >CAM simplified and non-versioned physics :</desc>
     <desc atm="CAM%DEV[%L58][%L93][%CCTS1][%MAM5]"                                                                                                 >CAM7 development physics:</desc>
 
   <!--
@@ -51,6 +51,13 @@
     <desc option="SPCAMCLBM"    >CAM super-parameterized CAM double moment m2005 SAM microphysics using CLUBB </desc>
     <desc option="TMOZ"         >CAM tropospheric chemistry with bulk aerosols:</desc>
 
+  <!--
+    ===============
+     CAM-Mars Options
+    ===============
+   -->
+    <desc option="MARS"         >CAM-MARS</desc>
+    <desc option="SOCR"         >use SOCRATES Radiation library:</desc>
   <!--
     ===============
      WACCM Options
@@ -100,6 +107,18 @@
     <desc>CAM cpp definitions (setup automatically - DO NOT EDIT)</desc>
   </entry>
 
+  <entry id="CAM_PLANET">
+    <type>char</type>
+    <valid_values>earth,mars</valid_values>
+    <default_value>earth</default_value>
+    <values match="last">
+      <value compset="%MARS">mars</value>
+    </values>
+    <group>build_component_cam</group>
+    <file>env_build.xml</file>
+    <desc>CAM dynamical core</desc>
+  </entry>
+  
   <entry id="CAM_DYCORE">
     <type>char</type>
     <valid_values>eul,fv,fv3,se,mpas</valid_values>
@@ -169,6 +188,11 @@
       <value compset="_CAM.*%L58">-nlev 58</value>
       <value compset="_CAM.*%L93">-nlev 93</value>
 
+      <!-- CAM MARS -->
+      <value compset="_CAM.*%MARS">-nlev 49</value>
+      <value compset="_CAM%MARS%HS94">-phys held_suarez</value>
+      <value compset="_CAM.*%SOCR">-rad socrates</value>
+
       <!-- Simple models -->
       <value compset="_CAM%ADIAB">-phys adiabatic</value>
       <value compset="_CAM%DABIP04">-phys adiabatic</value>
@@ -182,6 +206,7 @@
 
       <!-- PORT -->
       <value compset="%PORT">-offline_drv rad</value>
+
     </values>
     <group>build_component_cam</group>
     <file>env_build.xml</file>
@@ -285,6 +310,8 @@
       <value compset="CAM%TJ16"          >dctest_tj2016</value>
       <value compset="CAM%KESSLER"       >dctest_baro_kessler</value>
 
+      <value compset="_CAM"          >mars_cam</value>
+      
       <!-- SCAM defaults to ARM97, all other IOPs are in usermods_dirs -->
       <!--       <value compset="CAM[456]0%SCAM"    >scam_arm97</value> -->
     </values>
