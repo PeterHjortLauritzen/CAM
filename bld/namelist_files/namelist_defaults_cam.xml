@@ -2905,7 +2905,7 @@
 <se_refined_mesh hgrid="ne0np4.ARCTICGRIS.ne30x8" > .true. </se_refined_mesh>
 
 <se_nsplit>                   2 </se_nsplit>
-<se_nsplit mars="1"        >  8 </se_nsplit>
+<se_nsplit mars="1"        >  16 </se_nsplit>
 <se_nsplit hgrid="ne16np4" >  1 </se_nsplit>
 
 <se_nsplit hgrid="ne5np4"   waccm_phys="1"            >  3  </se_nsplit>
