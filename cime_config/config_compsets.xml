@@ -295,18 +295,14 @@
   <!-- CAM untested compsets -->
   <!-- ****************************** -->
 
-  <!-- ****************************** -->
-  <!-- CAM science supported compsets -->
-  <!-- ****************************** -->
-
   <!-- cam mars untested compsets -->
   <compset>
-    <alias>FMARS</alias>
+    <alias>FMARSRRTMG</alias>
     <lname>2000_CAM%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
 
   <compset>
-    <alias>FMARSRTSOCR</alias>
+    <alias>FMARS</alias>
     <lname>2000_CAM%MARS%SOCR_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
 
