@@ -544,7 +544,7 @@ contains
     ! special case in CAM: if CSLAM tracers are turned on , qsize=1 but this tracer should
     ! not be advected.  This will be cleaned up when the physgrid is merged into CAM trunk
     ! Currently advecting all species
-    if (qsize > 0) then
+    if (qsize > 0.and..not.use_cslam) then
 
       call t_startf('prim_advec_tracers_remap')
       if(use_cslam) then 

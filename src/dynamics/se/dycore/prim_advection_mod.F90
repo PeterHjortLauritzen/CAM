@@ -45,7 +45,7 @@ module prim_advection_mod
   public :: prim_advec_tracers_fvm
   public :: vertical_remap
 
-  type (EdgeBuffer_t)      :: edgeAdv, edgeAdvp1, edgeAdvQminmax, edgeAdv1,  edgeveloc
+  type (EdgeBuffer_t)      :: edgeAdv, edgeAdvp1, edgeAdvQminmax, edgeveloc
 
   integer,parameter :: DSSeta = 1
   integer,parameter :: DSSomega = 2
@@ -99,7 +99,6 @@ contains
     call initEdgeSBuffer(par,edgeAdvQminmax,elem,qsize*nlev*2,bndry_type=boundaryCommMethod, &
                         nthreads=horz_num_threads*advec_remap_num_threads)
 
-    call initEdgeBuffer(par,edgeAdv1,elem,nlev,bndry_type=boundaryCommMethod)
     call initEdgeBuffer(par,edgeveloc,elem,2*nlev,bndry_type=boundaryCommMethod)
 
 
