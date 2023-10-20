@@ -635,24 +635,28 @@ contains
     ! if user or namelist is not specifying sponge del4 settings here are best guesses (empirically determined)
     !
     if (top_000_032km) then
+      umax = 120._r8
       if (sponge_del4_lev       <0) sponge_del4_lev        = 1
       if (sponge_del4_nu_fac    <0) sponge_del4_nu_fac     = 1.0_r8
       if (sponge_del4_nu_div_fac<0) sponge_del4_nu_div_fac = 1.0_r8
     end if
 
    if (top_032_042km) then
+       umax = 120._r8
       if (sponge_del4_lev       <0) sponge_del4_lev        = 3
       if (sponge_del4_nu_fac    <0) sponge_del4_nu_fac     = 1.0_r8
       if (sponge_del4_nu_div_fac<0) sponge_del4_nu_div_fac = 4.5_r8
     end if
 
     if (top_042_090km) then
+      umax = 200._r8
       if (sponge_del4_lev       <0) sponge_del4_lev        = 3
       if (sponge_del4_nu_fac    <0) sponge_del4_nu_fac     = 5.0_r8
       if (sponge_del4_nu_div_fac<0) sponge_del4_nu_div_fac = 7.5_r8
     end if
 
     if (top_090_140km.or.top_140_600km) then
+      umax = 400._r8
       if (sponge_del4_lev       <0) sponge_del4_lev        = 10
       if (sponge_del4_nu_fac    <0) sponge_del4_nu_fac     = 5.0_r8
       if (sponge_del4_nu_div_fac<0) sponge_del4_nu_div_fac = 7.5_r8
@@ -732,14 +736,7 @@ contains
     S_laplacian = 2.0_r8 !using forward Euler for sponge diffusion
     S_hypervis  = 2.0_r8 !using forward Euler for hyperviscosity
     S_rk_tracer = 2.0_r8
-    !
-    ! estimate max winds
-    !
-    if (ptop>100.0_r8) then
-      umax = 120.0_r8
-    else
-      umax = 400.0_r8
-    end if
+
     ugw = 342.0_r8 !max gravity wave speed
 
     dt_max_adv             = S_rk/(umax*max_normDinv*lambda_max*ra)
