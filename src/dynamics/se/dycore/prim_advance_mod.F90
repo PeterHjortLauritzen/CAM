@@ -47,7 +47,7 @@ contains
   end subroutine prim_advance_init
 
   subroutine prim_advance_exp(elem, fvm, deriv, hvcoord, hybrid,dt, tl,  nets, nete)
-    use control_mod,       only: tstep_type, qsplit
+    use control_mod,       only: tstep_type, qsplit, dadadj_nlvdry, dadadj_niter
     use derivative_mod,    only: derivative_t
     use dimensions_mod,    only: np, nlev
     use element_mod,       only: element_t
@@ -59,6 +59,9 @@ contains
     use air_composition,   only: thermodynamic_active_species_num
     use air_composition,   only: thermodynamic_active_species_idx_dycore, get_cp
     use physconst,         only: cpair
+    use cam_thermo,        only: get_pmid_from_dp
+    use cam_history,       only: outfld, hist_fld_active
+    use air_composition,   only: dry_air_species_num
     implicit none
 
     type (element_t), intent(inout), target   :: elem(:)
@@ -73,11 +76,12 @@ contains
 
     ! Local
     real (kind=r8) :: dt_vis, eta_ave_w
-    integer        :: ie,nm1,n0,np1,k,qn0,m_cnst, nq
+    integer        :: ie,nm1,n0,np1,k,qn0,m_cnst, nq, i, j
     real (kind=r8) :: inv_cp_full(np,np,nlev,nets:nete)
     real (kind=r8) :: qwater(np,np,nlev,thermodynamic_active_species_num,nets:nete)
     integer        :: qidx(thermodynamic_active_species_num)
     real (kind=r8) :: kappa(np,np,nlev,nets:nete)
+    real (kind=r8) :: dp(np,nlev),pmid(np,nlev),pint(np,nlev+1), dT_dadadj(np,np,nlev)
 
     nm1   = tl%nm1
     n0    = tl%n0
@@ -134,7 +138,33 @@ contains
     do ie=nets,nete
       call get_kappa_dry(qwater(:,:,:,:,ie), qidx, kappa(:,:,:,ie))
     end do
-
+    !
+    ! dry convective adjustment for stability
+    !
+    if (dadadj_nlvdry>0) then
+      do ie=nets,nete
+        if (hist_fld_active('dT_dadadj')) then
+          dT_dadadj(:,:,:) = elem(ie)%state%T(:,:,:,n0)
+        end if
+        do j=1,np
+          dp(:,:) = elem(ie)%state%dp3d(:,j,:,n0)
+          do i=1,np
+            do k=1,nlev
+              do nq=dry_air_species_num+1,thermodynamic_active_species_num
+                dp(i,k) = dp(i,k)+qwater(i,j,k,nq,ie)*elem(ie)%state%dp3d(i,j,j,n0)
+              end do
+            enddo
+          end do
+          call get_pmid_from_dp(dp,hvcoord%hyai(1)*hvcoord%ps0, pmid,pint)
+          call dadadj_calc(np, dadadj_nlvdry, dadadj_niter, pmid, pint, dp, kappa(:,j,:,ie),&
+               elem(ie)%state%T(:,j,:,n0), qwater(:,j,:,dry_air_species_num+1,ie))
+        end do
+        if (hist_fld_active('dT_dadadj')) then
+          dT_dadadj(:,:,:) =  elem(ie)%state%T(:,:,:,n0) - dT_dadadj(:,:,:)
+          call outfld('dT_dadadj',RESHAPE(dT_dadadj(:,:,:), (/np*np,nlev/)), np*np, ie)
+        end if
+      end do
+    end if
 
     dt_vis = dt
 
@@ -1826,133 +1856,135 @@ contains
      end if
      !call FreeEdgeBuffer(edgeOmega)
    end subroutine compute_omega
-#ifdef dadadj
-subroutine dadadj_calc( &
-   ncol, pmid, pint, pdel, cappav, t, &
-   q, dadpdf, icol_err)
 
-   ! Arguments
+   subroutine dadadj_calc( &
+        ncol, nlvdry, niter, &
+        pmid, pint, pdel, cappav, t, q)
 
-   integer, intent(in) :: ncol                ! number of atmospheric columns
+     ! Arguments
 
-   real(r8), intent(in) :: pmid(:,:)   ! pressure at model levels
-   real(r8), intent(in) :: pint(:,:)   ! pressure at model interfaces
-   real(r8), intent(in) :: pdel(:,:)   ! vertical delta-p
-   real(r8), intent(in) :: cappav(:,:) ! variable Kappa
+     integer, intent(in) :: ncol          ! number of atmospheric columns
+     integer, intent(in) :: nlvdry        ! level index start for dadadj
+     integer, intent(in) :: niter         ! number of iterations
 
-   real(r8), intent(inout) :: t(:,:)   ! temperature (K)
-   real(r8), intent(inout) :: q(:,:)   ! specific humidity
-   
-   real(r8), intent(out) :: dadpdf(:,:)  ! PDF of where adjustments happened
+     real(r8), intent(in) :: pmid(:,:)   ! pressure at model levels
+     real(r8), intent(in) :: pint(:,:)   ! pressure at model interfaces
+     real(r8), intent(in) :: pdel(:,:)   ! vertical delta-p
+     real(r8), intent(in) :: cappav(:,:) ! variable Kappa
 
-   integer,  intent(out) :: icol_err ! index of column in which error occurred
+     real(r8), intent(inout) :: t(:,:)   ! temperature (K)
+     real(r8), intent(inout) :: q(:,:)   ! specific humidity
 
-   !---------------------------Local workspace-----------------------------
+     !xxx   real(r8), intent(out) :: dadpdf(:,:)  ! PDF of where adjustments happened
 
-   integer :: i,k             ! longitude, level indices
-   integer :: jiter           ! iteration index
+     !xxx   integer,  intent(out) :: icol_err ! index of column in which error occurred
 
-   real(r8), allocatable :: c1dad(:) ! intermediate constant
-   real(r8), allocatable :: c2dad(:) ! intermediate constant
-   real(r8), allocatable :: c3dad(:) ! intermediate constant
-   real(r8), allocatable :: c4dad(:) ! intermediate constant
-   real(r8) :: gammad    ! dry adiabatic lapse rate (deg/Pa)
-   real(r8) :: zeps      ! convergence criterion (deg/Pa)
-   real(r8) :: rdenom    ! reciprocal of denominator of expression
-   real(r8) :: dtdp      ! delta-t/delta-p
-   real(r8) :: zepsdp    ! zeps*delta-p
-   real(r8) :: zgamma    ! intermediate constant
-   real(r8) :: qave      ! mean q between levels
-   real(r8) :: cappa     ! Kappa at level intefaces
+     !---------------------------Local workspace-----------------------------
 
-   logical :: ilconv          ! .TRUE. ==> convergence was attained
-   logical :: dodad(ncol)     ! .TRUE. ==> do dry adjustment
+     integer :: i,k             ! longitude, level indices
+     integer :: jiter           ! iteration index
 
-   !-----------------------------------------------------------------------
+     real(r8), allocatable :: c1dad(:) ! intermediate constant
+     real(r8), allocatable :: c2dad(:) ! intermediate constant
+     real(r8), allocatable :: c3dad(:) ! intermediate constant
+     real(r8), allocatable :: c4dad(:) ! intermediate constant
+     real(r8) :: gammad    ! dry adiabatic lapse rate (deg/Pa)
+     real(r8) :: zeps      ! convergence criterion (deg/Pa)
+     real(r8) :: rdenom    ! reciprocal of denominator of expression
+     real(r8) :: dtdp      ! delta-t/delta-p
+     real(r8) :: zepsdp    ! zeps*delta-p
+     real(r8) :: zgamma    ! intermediate constant
+     real(r8) :: qave      ! mean q between levels
+     real(r8) :: cappa     ! Kappa at level intefaces
 
-   icol_err = 0
-   zeps = 2.0e-5_r8           ! set convergence criteria
+     logical :: ilconv          ! .TRUE. ==> convergence was attained
+     logical :: dodad(ncol)     ! .TRUE. ==> do dry adjustment
 
-   allocate(c1dad(nlvdry), c2dad(nlvdry), c3dad(nlvdry), c4dad(nlvdry))
+     !-----------------------------------------------------------------------
 
-   ! Find gridpoints with unstable stratification
+     !xxx   icol_err = 0
+     zeps = 2.0e-5_r8           ! set convergence criteria
 
-   do i = 1, ncol
-      cappa = 0.5_r8*(cappav(i,2) + cappav(i,1))
-      gammad = cappa*0.5_r8*(t(i,2) + t(i,1))/pint(i,2)
-      dtdp = (t(i,2) - t(i,1))/(pmid(i,2) - pmid(i,1))
-      dodad(i) = (dtdp + zeps) .gt. gammad
-   end do
-   
-   dadpdf(:ncol,:) = 0._r8
-   do k= 2, nlvdry
-      do i = 1, ncol
+     allocate(c1dad(nlvdry), c2dad(nlvdry), c3dad(nlvdry), c4dad(nlvdry))
+
+     ! Find gridpoints with unstable stratification
+
+     do i = 1, ncol
+       cappa = 0.5_r8*(cappav(i,2) + cappav(i,1))
+       gammad = cappa*0.5_r8*(t(i,2) + t(i,1))/pint(i,2)
+       dtdp = (t(i,2) - t(i,1))/(pmid(i,2) - pmid(i,1))
+       dodad(i) = (dtdp + zeps) .gt. gammad
+     end do
+
+     !xxx   dadpdf(:ncol,:) = 0._r8
+     do k= 2, nlvdry
+       do i = 1, ncol
          cappa = 0.5_r8*(cappav(i,k+1) + cappav(i,k))
          gammad = cappa*0.5_r8*(t(i,k+1) + t(i,k))/pint(i,k+1)
          dtdp = (t(i,k+1) - t(i,k))/(pmid(i,k+1) - pmid(i,k))
          dodad(i) = dodad(i) .or. (dtdp + zeps).gt.gammad
-         if ((dtdp + zeps).gt.gammad) then
-           dadpdf(i,k) = 1._r8
-         end if
-      end do
-   end do
+         !xxx         if ((dtdp + zeps).gt.gammad) then
+         !xxx           dadpdf(i,k) = 1._r8
+         !xxx         end if
+       end do
+     end do
 
-   ! Make a dry adiabatic adjustment
-   ! Note: nlvdry ****MUST**** be < pver
+     ! Make a dry adiabatic adjustment
+     ! Note: nlvdry ****MUST**** be < pver
 
-   COL: do i = 1, ncol
+     COL: do i = 1, ncol
 
-      if (dodad(i)) then
+       if (dodad(i)) then
 
          zeps = 2.0e-5_r8
 
          do k = 1, nlvdry
-            c1dad(k) = cappa*0.5_r8*(pmid(i,k+1)-pmid(i,k))/pint(i,k+1)
-            c2dad(k) = (1._r8 - c1dad(k))/(1._r8 + c1dad(k))
-            rdenom = 1._r8/(pdel(i,k)*c2dad(k) + pdel(i,k+1))
-            c3dad(k) = rdenom*pdel(i,k)
-            c4dad(k) = rdenom*pdel(i,k+1)
+           c1dad(k) = cappa*0.5_r8*(pmid(i,k+1)-pmid(i,k))/pint(i,k+1)
+           c2dad(k) = (1._r8 - c1dad(k))/(1._r8 + c1dad(k))
+           rdenom = 1._r8/(pdel(i,k)*c2dad(k) + pdel(i,k+1))
+           c3dad(k) = rdenom*pdel(i,k)
+           c4dad(k) = rdenom*pdel(i,k+1)
          end do
 
 50       continue
 
          do jiter = 1, niter
-            ilconv = .true.
+           ilconv = .true.
 
-            do k = 1, nlvdry
-               zepsdp = zeps*(pmid(i,k+1) - pmid(i,k))
-               zgamma = c1dad(k)*(t(i,k) + t(i,k+1))
+           do k = 1, nlvdry
+             zepsdp = zeps*(pmid(i,k+1) - pmid(i,k))
+             zgamma = c1dad(k)*(t(i,k) + t(i,k+1))
 
-               if ((t(i,k+1)-t(i,k)) >= (zgamma+zepsdp)) then
-                  ilconv = .false.
-                  t(i,k+1) = t(i,k)*c3dad(k) + t(i,k+1)*c4dad(k)
-                  t(i,k) = c2dad(k)*t(i,k+1)
-                  qave = (pdel(i,k+1)*q(i,k+1) + pdel(i,k)*q(i,k))/(pdel(i,k+1)+ pdel(i,k))
-                  q(i,k+1) = qave
-                  q(i,k) = qave
-               end if
+             if ((t(i,k+1)-t(i,k)) >= (zgamma+zepsdp)) then
+               ilconv = .false.
+               t(i,k+1) = t(i,k)*c3dad(k) + t(i,k+1)*c4dad(k)
+               t(i,k) = c2dad(k)*t(i,k+1)
+               qave = (pdel(i,k+1)*q(i,k+1) + pdel(i,k)*q(i,k))/(pdel(i,k+1)+ pdel(i,k))
+               q(i,k+1) = qave
+               q(i,k) = qave
+             end if
 
-            end do
+           end do
 
-            if (ilconv) cycle COL ! convergence => next longitude
+           if (ilconv) cycle COL ! convergence => next longitude
          end do
 
          ! Double convergence criterion if no convergence in niter iterations
 
          zeps = zeps + zeps
          if (zeps > 1.e-4_r8) then
-            icol_err = i
-            return                ! error return
+           !xxx           icol_err = i
+           write(*,*) "dadadj_calc: not converging ",zeps
+           return                ! error return
          else
-            go to 50
+           go to 50
          end if
 
-      end if
+       end if
 
-   end do COL
+     end do COL
 
-   deallocate(c1dad, c2dad, c3dad, c4dad)
+     deallocate(c1dad, c2dad, c3dad, c4dad)
 
-end subroutine dadadj_calc
-#endif
+   end subroutine dadadj_calc
 end module prim_advance_mod

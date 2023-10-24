@@ -26,6 +26,8 @@ module control_mod
   logical, public :: refined_mesh
 
   integer, public :: vert_remap_q_alg = 10
+  integer, public :: dadadj_nlvdry = 0
+  integer, public :: dadadj_niter  = 5
 
 
   integer, public :: cubed_sphere_map = -1  ! -1 = chosen at run time

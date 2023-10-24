@@ -8184,6 +8184,20 @@ Default: Set by build-namelist.
   Default: Set by build-namelist.
 </entry>
 
+<entry id="se_dadadj_nlvdry" type="integer"  category="se"
+       group="dyn_se_inparm" valid_values="" >
+Number of layers from the top of the model over which to do dry convective
+adjustment is applied. Must be less than plev (the number of vertical levels).
+Default: 0
+</entry>
+
+<entry id="se_dadadj_niter" type="integer"  category="se"
+       group="dyn_se_inparm" valid_values="" >
+The maximum number of iterations to achieve convergence in dry adiabatic adjustment.
+For WACCM-X it can be advantageous to use a number which is much higher than the CAM
+default.
+Default: 5
+</entry>
 
 <!-- MPAS dycore -->
 

@@ -3028,6 +3028,11 @@
 
 <se_pgf_formulation>           1</se_pgf_formulation>
 <se_pgf_formulation waccmx="1">2</se_pgf_formulation>
+
+<!-- Dry Convective Adjustment options in se dycore-->
+<se_dadadj_nlvdry>0</se_dadadj_nlvdry>
+<se_dadadj_niter>5</se_dadadj_niter>
+
 <se_ftype> 2 </se_ftype>
 
 <se_large_Courant_incr        > .true.  </se_large_Courant_incr>

@@ -107,7 +107,7 @@ subroutine dyn_readnl(NLFileName)
    use control_mod,    only: vert_remap_uvTq_alg, vert_remap_tracer_alg
    use control_mod,    only: tstep_type, rk_stage_user
    use control_mod,    only: ftype, limiter_option, partmethod
-   use control_mod,    only: topology, variable_nsplit
+   use control_mod,    only: topology, variable_nsplit, dadadj_nlvdry, dadadj_niter
    use control_mod,    only: fine_ne, hypervis_power, hypervis_scaling
    use control_mod,    only: max_hypervis_courant, statediag_numtrac,refined_mesh
    use control_mod,    only: molecular_diff, pgf_formulation
@@ -168,6 +168,8 @@ subroutine dyn_readnl(NLFileName)
    integer                      :: se_kmax_jet
    real(r8)                     :: se_molecular_diff
    integer                      :: se_pgf_formulation
+   integer                      :: se_dadadj_nlvdry
+   integer                      :: se_dadadj_niter
 
    namelist /dyn_se_inparm/        &
       se_fine_ne,                  & ! For refined meshes
@@ -213,7 +215,9 @@ subroutine dyn_readnl(NLFileName)
       se_kmin_jet,                 &
       se_kmax_jet,                 &
       se_molecular_diff,           &
-      se_pgf_formulation
+      se_pgf_formulation,          &
+      se_dadadj_nlvdry,            &
+      se_dadadj_niter
 
    !--------------------------------------------------------------------------
 
@@ -288,6 +292,8 @@ subroutine dyn_readnl(NLFileName)
    call MPI_bcast(se_kmax_jet, 1, mpi_integer, masterprocid, mpicom, ierr)
    call MPI_bcast(se_molecular_diff, 1, mpi_real8, masterprocid, mpicom, ierr)
    call MPI_bcast(se_pgf_formulation, 1, mpi_integer, masterprocid, mpicom, ierr)
+   call MPI_bcast(se_dadadj_nlvdry, 1, mpi_integer, masterprocid, mpicom, ierr)
+   call MPI_bcast(se_dadadj_niter, 1, mpi_integer, masterprocid, mpicom, ierr)
 
    if (se_npes <= 0) then
       call endrun('dyn_readnl: ERROR: se_npes must be > 0')
@@ -333,6 +339,8 @@ subroutine dyn_readnl(NLFileName)
    refined_mesh             = se_refined_mesh
    ne                       = se_ne
    nsplit                   = se_nsplit
+   dadadj_nlvdry            = se_dadadj_nlvdry
+   dadadj_niter             = se_dadadj_niter
    nu                       = se_nu
    nu_div                   = se_nu_div
    nu_p                     = se_nu_p
@@ -492,6 +500,9 @@ subroutine dyn_readnl(NLFileName)
                             se_write_restart_unstruct
 
       write(iulog, '(a,e9.2)') 'dyn_readnl: se_molecular_diff  = ', molecular_diff
+      write(iulog, '(a,i0)')   'dyn_readnl: se_pgf_formulation = ', pgf_formulation
+      write(iulog, '(a,i0)')   'dyn_readnl: se_dadadj_nlvdry   = ', dadadj_nlvdry
+      write(iulog, '(a,i0)')   'dyn_readnl: se_dadadj_niter    = ', dadadj_niter
    end if
 
    call native_mapping_readnl(NLFileName)
@@ -851,6 +862,7 @@ subroutine dyn_init(dyn_in, dyn_out)
    call addfld ('nu_kmvis',   (/ 'lev' /), 'A', '', 'Molecular viscosity Laplacian coefficient'            , gridname='GLL')
    call addfld ('nu_kmcnd',   (/ 'lev' /), 'A', '', 'Thermal conductivity Laplacian coefficient'           , gridname='GLL')
    call addfld ('nu_kmcnd_dp',(/ 'lev' /), 'A', '', 'Thermal conductivity like Laplacian coefficient on dp', gridname='GLL')
+   call addfld ('dT_dadadj'  ,(/ 'lev' /), 'A', '', 'dry convective adjustment T increment'                , gridname='GLL')
 
 
    ! Forcing from physics on the GLL grid
