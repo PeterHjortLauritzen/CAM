@@ -69,8 +69,62 @@ fincl7= 'AQSO4_H2O2','AQSO4_O3', 'bc_a1', 'bc_a4', 'dst_a1', 'dst_a2', 'dst_a3',
 'SFdst_a1','SFdst_a2', 'SFdst_a3', 'SFncl_a1', 'SFncl_a2', 'SFncl_a3',
 'num_a2_sfnnuc1', 'SFSO2', 'OCN_FLUX_DMS', 'SAD_SULFC', 'SAD_TROP', 'SAD_AERO'
 
+clubb_C1                           =   0.800000000000000
+clubb_C1b                          =   0.800000000000000
+clubb_C1c                          =   0.750000000000000
+clubb_C4                           =    1.00000000000000
+clubb_C_uu_shr                     =   0.100000000000000
+clubb_C_uu_buoy                    =   0.000000000000000
+clubb_C6rt                         =    1.00000000000000
+clubb_C6rtb                        =    1.00000000000000
+clubb_C6rtc                        =   0.500000000000000
+clubb_C6thl                        =    1.00000000000000
+clubb_C6thlb                       =    1.00000000000000
+clubb_C6thlc                       =   0.500000000000000
+clubb_C7b                          =   0.700000000000000
+clubb_C8                           =   0.800000000000000
+clubb_C11                          =   0.500000000000000
+clubb_C11b                         =   0.800000000000000
+clubb_C11c                         =   0.850000000000000
+clubb_C14                          =   0.800000000000000
+clubb_C_wp3_pr_turb                =    1.00000000000000
+clubb_wpxp_L_thresh                =    100.000000000000
+clubb_c_K1                         =    1.00000000000000
+clubb_nu1                          =    10.0000000000000
+clubb_c_K2                         =   0.100000000000000
+clubb_nu2                          =    1.00000000000000
+clubb_c_K8                         =    10.0000000000000
+clubb_gamma_coef                   =   0.300000000000000
+clubb_gamma_coefb                  =   0.300000000000000
+clubb_gamma_coefc                  =    1.20000000000000
+clubb_mu                           =   5.000000000000000E-004
+clubb_beta                         =    2.00000000000000
+clubb_lambda0_stability_coef       =   3.000000000000000E-002
+clubb_c_K10                        =   0.300000000000000
+clubb_c_K10h                       =   0.350000000000000
+clubb_C_invrs_tau_bkgnd            =    1.10000000000000
+clubb_C_invrs_tau_sfc              =   5.000000000000000E-002
+clubb_C_invrs_tau_shear            =   0.220000000000000
+clubb_C_invrs_tau_N2               =   0.300000000000000
+clubb_C_invrs_tau_N2_xp2           =   0.000000000000000E+000
+clubb_C_invrs_tau_N2_wpxp          =    2.00000000000000
+clubb_C_invrs_tau_N2_clear_wp3     =    2.00000000000000
+clubb_C_invrs_tau_wpxp_Ri          =    3.00000000000000
+clubb_C_invrs_tau_wpxp_N2_thresh   =   3.500000000000000E-004
+clubb_altitude_threshold           =    150.000000000000
+clubb_a3_coef_min                  =    1.60000000000000
 clubb_l_diag_Lscale_from_tau=.true.
-clubb_l_stability_correct_tau_zm = .false.
+clubb_l_stability_correct_tau_zm=.false.
+clubb_l_min_wp2_from_corr_wx=.false.
+clubb_l_min_xp2_from_corr_wx=.false.
+clubb_l_vert_avg_closure=.false.
+clubb_l_use_cloud_cover=.false.
+clubb_l_damp_wp2_using_em=.true.
+clubb_l_use_C7_Richardson=.true.
+clubb_l_rcm_supersat_adj=.true.
+clubb_l_damp_wp3_Skw_squared=.true.
+clubb_l_enable_relaxed_clipping=.true.
+
 EOF
 
 ## clm namelists
