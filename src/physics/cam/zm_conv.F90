@@ -76,9 +76,9 @@ module zm_conv
 
    logical :: lparcel_pbl     ! Switch to turn on mixing of parcel MSE air, and picking launch level to be the top of the PBL.
 
-
    real(r8) :: tiedke_add      ! namelist configurable
    real(r8) :: dmpdz_param     ! namelist configurable
+   real(r8) :: parcel_hscale 
 
 contains
 
@@ -86,7 +86,7 @@ contains
 subroutine zm_convi(limcnv_in, zmconv_c0_lnd, zmconv_c0_ocn, zmconv_ke, zmconv_ke_lnd, &
                     zmconv_momcu, zmconv_momcd, zmconv_num_cin, zmconv_org, &
                     zmconv_microp_in, no_deep_pbl_in, zmconv_tiedke_add, &
-                    zmconv_capelmt, zmconv_dmpdz, zmconv_parcel_pbl, zmconv_tau)
+                    zmconv_capelmt, zmconv_dmpdz, zmconv_parcel_pbl, zmconv_tau, zmconv_parcel_hscale)
 
    integer, intent(in)           :: limcnv_in       ! top interface level limit for convection
    integer, intent(in)           :: zmconv_num_cin  ! Number negative buoyancy regions that are allowed 
@@ -105,6 +105,7 @@ subroutine zm_convi(limcnv_in, zmconv_c0_lnd, zmconv_c0_ocn, zmconv_ke, zmconv_k
    real(r8),intent(in)           :: zmconv_dmpdz
    logical, intent(in)           :: zmconv_parcel_pbl ! Should the parcel properties include PBL mixing? 
    real(r8),intent(in)           :: zmconv_tau
+   real(r8),intent(in)           :: zmconv_parcel_hscale
 
    ! Initialization of ZM constants
    limcnv = limcnv_in
@@ -133,6 +134,7 @@ subroutine zm_convi(limcnv_in, zmconv_c0_lnd, zmconv_c0_ocn, zmconv_ke, zmconv_k
    dmpdz_param = zmconv_dmpdz
    no_deep_pbl = no_deep_pbl_in
    lparcel_pbl = zmconv_parcel_pbl
+   parcel_hscale = zmconv_parcel_hscale
 
    tau = zmconv_tau
 
@@ -146,6 +148,7 @@ subroutine zm_convi(limcnv_in, zmconv_c0_lnd, zmconv_c0_ocn, zmconv_ke, zmconv_k
       write(iulog,*) 'tuning parameters zm_convi: zm_dmpdz', dmpdz_param
       write(iulog,*) 'tuning parameters zm_convi: zm_tiedke_add', tiedke_add 
       write(iulog,*) 'tuning parameters zm_convi: zm_parcel_pbl', lparcel_pbl 
+      write(iulog,*) 'tuning parameters zm_convi: zm_parcel_hscale', parcel_hscale
    endif
 
    if (masterproc) write(iulog,*)'**** ZM: DILUTE Buoyancy Calculation ****'
@@ -4086,9 +4089,6 @@ subroutine buoyan_dilute(lchnk   ,ncol    , &
    
 ! Scaling of PBL height to give parcel mixing length for lparcel_pbl=True 
 
-   real(r8), parameter :: parcel_hscale  = 0.5_r8
-
-   
 !
 !-----------------------------------------------------------------------
 !
