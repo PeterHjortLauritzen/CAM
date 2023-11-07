@@ -3038,6 +3038,7 @@ if (($phys =~ /cam6/ or $phys =~ /cam_dev/) and $nl->get_value('deep_scheme') =~
 # cam_dev specific namelists
 if ($phys =~ /cam_dev/ and $nl->get_value('deep_scheme') =~ /ZM/) {
     add_default($nl, 'zmconv_parcel_pbl', 'val'=>'.true.');
+    add_default($nl, 'zmconv_parcel_hscale');
 } else {
     add_default($nl, 'zmconv_parcel_pbl', 'val'=>'.false.');
 }

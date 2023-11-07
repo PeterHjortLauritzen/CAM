@@ -79,7 +79,7 @@ module zm_conv_intr
    real(r8) :: zmconv_capelmt = unset_r8      ! Triggering thereshold for ZM convection
    logical  :: zmconv_parcel_pbl = .false.             ! switch for parcel pbl calculation
    real(r8) :: zmconv_tau = unset_r8          ! Timescale for convection
-
+   real(r8) :: zmconv_parcel_hscale = unset_r8
 
 !  indices for fields in the physics buffer
    integer  ::    cld_idx          = 0
@@ -189,7 +189,7 @@ subroutine zm_conv_readnl(nlfile)
                         zmconv_ke, zmconv_ke_lnd, zmconv_org, &
                         zmconv_momcu, zmconv_momcd, zmconv_microp, &
                         zmconv_dmpdz, zmconv_tiedke_add, zmconv_capelmt, &
-                        zmconv_parcel_pbl, zmconv_tau
+                        zmconv_parcel_pbl, zmconv_tau, zmconv_parcel_hscale
    !-----------------------------------------------------------------------------
 
    if (masterproc) then
@@ -236,6 +236,8 @@ subroutine zm_conv_readnl(nlfile)
    if (ierr /= 0) call endrun("zm_conv_readnl: FATAL: mpi_bcast: zmconv_parcel_pbl") 
    call mpi_bcast(zmconv_tau,               1, mpi_real8, masterprocid, mpicom, ierr)
    if (ierr /= 0) call endrun("zm_conv_readnl: FATAL: mpi_bcast: zmconv_tau")
+   call mpi_bcast(zmconv_parcel_hscale,     1, mpi_real8, masterprocid, mpicom, ierr)
+   if (ierr /= 0) call endrun("zm_conv_readnl: FATAL: mpi_bcast: zmconv_parcel_hscale")
 
 end subroutine zm_conv_readnl
 
@@ -374,7 +376,7 @@ subroutine zm_conv_init(pref_edge)
     call zm_convi(limcnv,zmconv_c0_lnd, zmconv_c0_ocn, zmconv_ke, zmconv_ke_lnd, &
                   zmconv_momcu, zmconv_momcd, zmconv_num_cin, zmconv_org, &
                   zmconv_microp, no_deep_pbl, zmconv_tiedke_add, &
-                  zmconv_capelmt, zmconv_dmpdz,zmconv_parcel_pbl, zmconv_tau)
+                  zmconv_capelmt, zmconv_dmpdz,zmconv_parcel_pbl, zmconv_tau, zmconv_parcel_hscale)
 
     cld_idx         = pbuf_get_index('CLD')
     fracis_idx      = pbuf_get_index('FRACIS')
