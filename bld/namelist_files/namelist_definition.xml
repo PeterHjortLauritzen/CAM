@@ -3630,6 +3630,13 @@ Logical switch to turn on the beljaars scheme
 Default: set by build-namelist
 </entry>
 
+<entry id="eff_blj" type="real" category="pbl"
+       group="blj_nl" valid_values="" >
+Knob to modulate the beljaars scheme
+Default: 1.0
+</entry>
+
+
 <entry id="do_tms" type="logical" category="pbl"
        group="tms_nl" valid_values="" >
 Logical switch to turn on turbulent mountain stress calculation in
