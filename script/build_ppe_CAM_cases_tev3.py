@@ -14,7 +14,7 @@ from itertools import islice
 # Edit below to set up your cases
 #cesmroot = '/glade/u/home/trude/src/cam6_3_026_ppe/'
 cesmroot = '/glade/work/katec/mg3work/peterLau_CAM_fork'
-basecasename = "PPE7_test_4"
+basecasename = "PPE7_test_5"
 baseroot = os.path.join("/glade/work/katec/mg3work","ppe_cases",basecasename)
 res = "ne30pg3_ne30pg3_mg17"
 compset = "FLTHIST"
@@ -113,6 +113,27 @@ fincl7= 'AQSO4_H2O2','AQSO4_O3', 'bc_a1', 'bc_a4', 'dst_a1', 'dst_a2', 'dst_a3',
 'so4_a1_sfgaex1', 'so4_a2_sfgaex1', 'so4_a3_sfgaex1', 'soa_a1_sfgaex1', 'soa_a2_sfgaex1',
 'SFdst_a1','SFdst_a2', 'SFdst_a3', 'SFncl_a1', 'SFncl_a2', 'SFncl_a3',
 'num_a2_sfnnuc1', 'SFSO2', 'OCN_FLUX_DMS', 'SAD_SULFC', 'SAD_TROP', 'SAD_AERO'
+
+srf_emis_cycle_yr    = 2000
+srf_emis_type             = 'CYCLICAL'
+ext_frc_cycle_yr       =  2000
+ext_frc_type             = 'CYCLICAL'
+flbc_cycle_yr            = 2000
+
+flbc_type = 'CYCLICAL'
+csw_cycle_yr = 2000
+csw_time_type = 'CYCLICAL'
+ubc_file_cycle_yr            = 2000
+ubc_file_input_type          = 'CYCLICAL'
+
+tracer_cnst_cycle_yr = 2000
+tracer_cnst_type = 'CYCLICAL'
+prescribed_ozone_cycle_yr =    2000
+prescribed_ozone_type = 'CYCLICAL'
+prescribed_strataero_cycle_yr =    2000
+prescribed_strataero_type = 'CYCLICAL'
+solar_data_type = 'FIXED'
+solar_data_ymd =     20000101
 
 clubb_C1                           =   0.800000000000000
 clubb_C1b                          =   0.800000000000000
