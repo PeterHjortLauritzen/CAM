@@ -3447,6 +3447,7 @@ if (!$simple_phys) {
 # Beljaars
 if (!$simple_phys) {
     add_default($nl, 'do_beljaars');
+    add_default($nl, 'eff_blj');
     my $do_beljaars = $nl->get_value('do_beljaars');
     if ($do_tms =~ /$TRUE/io and $do_beljaars =~ /$TRUE/io) {
         die "$ProgName - ERROR: by default, do_beljaars and do_tms cannot be set to  \n".

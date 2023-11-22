@@ -1977,7 +1977,7 @@
 <do_beljaars                                                > .false. </do_beljaars>
 <do_beljaars                                  phys="cam6"   > .true.  </do_beljaars>
 <do_beljaars                                  phys="cam_dev"> .true.  </do_beljaars>
-
+<eff_blj                                                    > 1.0D0   </eff_blj>
 <!-- Implicit Turbulent Surface Stress -->
 <do_iss                  > .false. </do_iss>
 <do_iss phys="cam5"      > .true.  </do_iss>

@@ -16,7 +16,8 @@ public :: beljaars_drag_init
 public :: beljaars_drag_tend
 
 ! Is this module on at all?
-logical, public, protected :: do_beljaars = .false.
+logical,  public, protected :: do_beljaars = .false.
+real(r8), public, protected :: eff_blj = 1._r8
 
 ! Tuning parameters for TMS.
 real(r8) :: blj_orocnst
@@ -44,7 +45,7 @@ subroutine beljaars_drag_readnl(nlfile)
 
   character(len=*), parameter :: subname = "beljaars_drag_readnl"
 
-  namelist /blj_nl/ do_beljaars
+  namelist /blj_nl/ do_beljaars , eff_blj
 
   ierr = 0
 
@@ -60,9 +61,11 @@ subroutine beljaars_drag_readnl(nlfile)
      end if
      close(unitn)
      call freeunit(unitn)
+     write(iulog,*)'eff_blj=',eff_blj
   end if
 
   call mpi_bcast(do_beljaars,      1, mpi_logical, masterprocid, mpicom, ierr)
+  call mpi_bcast(eff_blj,          1, mpi_real8, masterprocid, mpicom, ierr)
   if (ierr /= 0) call endrun(errMsg(__FILE__, __LINE__)//" mpi_bcast error")
 
 end subroutine beljaars_drag_readnl
@@ -143,7 +146,7 @@ subroutine beljaars_drag_tend(state, pbuf, cam_in)
   call compute_blj( pcols    , pver    , state%ncol , &
        state%u    , state%v  , state%t , state%pmid , & 
        state%pdel , state%zm , sgh30   , dragblj    , & 
-       taubljx    , taubljy  , cam_in%landfrac )
+       taubljx    , taubljy  , cam_in%landfrac , eff_blj )
 
   call outfld("TAUBLJX", taubljx, pcols, state%lchnk)
   call outfld("TAUBLJY", taubljy, pcols, state%lchnk)

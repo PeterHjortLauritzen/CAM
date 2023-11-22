@@ -54,7 +54,7 @@ contains
   subroutine compute_blj( pcols    , pver    , ncol    ,                     &
                           u        , v       , t       , pmid    , delp    , &
                           zm       , sgh     , drag    , taux    , tauy    , & 
-                          landfrac )
+                          landfrac , eff_blj )
 
     !------------------------------------------------------------------------------ !
     ! Beljaars Sub-Grid Orographic (SGO) Form drag parameterization                 !  
@@ -82,6 +82,8 @@ contains
     real(r8), intent(in)  :: zm(pcols,pver)        ! Layer mid-point height [ m ]
     real(r8), intent(in)  :: sgh(pcols)            ! Standard deviation of orography [ m ]
     real(r8), intent(in)  :: landfrac(pcols)       ! Land fraction [ fraction ]
+    real(r8), intent(in)  :: eff_blj               ! Beljaars 'efficiency factor', i.e., tuning knob.
+
     
     real(r8), intent(out) :: drag(pcols,pver)      ! SGO drag profile [ kg/s/m2 ]
     real(r8), intent(out) :: taux(pcols)           ! Surface zonal      wind stress [ N/m2 ]
@@ -99,7 +101,7 @@ contains
     real(r8) :: alpha,beta,Cmd,Ccorr,n1,n2,k1,kflt,k2,IH
     real(r8) :: a1(pcols),a2(pcols)
 
-    alpha =  12._r8
+    alpha =  12._r8 * eff_blj
     beta  =  1._r8
     n1    = -1.9_r8
     n2    = -2.8_r8
