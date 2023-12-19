@@ -448,9 +448,12 @@ subroutine cam_export(state,cam_out,pbuf,cam_in)
    real(r8), pointer :: o3_ptr(:,:), srf_o3_ptr(:)
    real(r8), pointer :: lightning_ptr(:)
    real(r8), allocatable :: htmp(:)                !for outfld
-   real(r8), allocatable :: hrain_ocn_liqref(:)    !hrain for ocean using liquid reference state
-   real(r8), allocatable :: hsnow_ocn_liqref(:)    !hsnow for ocean using liquid reference state
-   real(r8), allocatable :: hevap_ocn_liqref(:)    !hevap for ocean using liquid reference state
+   real(r8), allocatable :: hrain_iceref(:)        !hrain ice reference state (atmosphere)
+   real(r8), allocatable :: hsnow_iceref(:)        !hsnow ice reference state (atmosphere)
+   real(r8), allocatable :: hevap_iceref(:)        !hevap ice reference state (atmosphere)
+   real(r8), allocatable :: hrain_liqref(:)    !hrain for ocean using liquid reference state
+   real(r8), allocatable :: hsnow_liqref(:)    !hsnow for ocean using liquid reference state
+   real(r8), allocatable :: hevap_liqref(:)    !hevap for ocean using liquid reference state
    real(r8) :: frain, fsnow, fevap  !fluxes of rain, snow and water vapor/condensation
    !-----------------------------------------------------------------------
 
@@ -539,9 +542,12 @@ subroutine cam_export(state,cam_out,pbuf,cam_in)
    ! Precipation and snow rates from shallow convection, deep convection and stratiform processes.
    ! Compute total convective and stratiform precipitation and snow rates
    !
-   allocate(hrain_ocn_liqref(ncol))
-   allocate(hsnow_ocn_liqref(ncol))
-   allocate(hevap_ocn_liqref(ncol))
+   allocate(hrain_liqref(ncol))
+   allocate(hsnow_liqref(ncol))
+   allocate(hevap_liqref(ncol))
+   allocate(hrain_iceref(ncol))
+   allocate(hsnow_iceref(ncol))
+   allocate(hevap_iceref(ncol))
    do i=1,ncol
       cam_out%precc (i) = 0._r8
       cam_out%precl (i) = 0._r8
@@ -585,36 +591,39 @@ subroutine cam_export(state,cam_out,pbuf,cam_in)
       ! At this point this enthalpy flux will not be consistent with FV and MPAS 
       ! (need to switch to variable cp)
       !
+      ! Note that precipitation rates are converted from m/s to a flux in kg/m^2/s (factor 1000)
+      !
       fsnow = 1000.0_r8*(cam_out%precsc(i)+cam_out%precsl(i))                                    !snow flux
       frain = 1000.0_r8*(cam_out%precc (i)-cam_out%precsc(i)+cam_out%precl (i)-cam_out%precsl(i))!rain flux
       fevap = cam_in%cflx(i,1)                                                                   !water vapor flux
 
-      cam_out%hsnow(i) =  fsnow*cam_out%tbot(i)*cpice !sign must follow ocean model convention: +ve for flux into ocean
-      cam_out%hrain(i) =  frain*cam_out%tbot(i)*cpliq !sign must follow ocean model convention: +ve for flux into ocean
-      cam_out%hevap(i) = -fevap*cam_in%ts(i)   *cpwv  !sign must follow ocean model convention: -ve for flux out of ocean
+      hsnow_iceref(i) =  -fsnow*cam_out%tbot(i)*cpice !sign following atmosphere model convention: -ve for flux out of atmopshere
+      hrain_iceref(i) =  -frain*cam_out%tbot(i)*cpliq !sign following atmosphere model convention: -ve for flux out of atmosphere
+      hevap_iceref(i) =   fevap*cam_in%ts(i)   *cpwv  !sign following atmosphere model convention: +ve for flux into atmosphere
       !
       ! Compute enthalpy fluxes for ocean using liquid reference state
       !
-      hsnow_ocn_liqref(i) =  fsnow*(cam_out%tbot(i)-tmelt)*cpice
-      hsnow_ocn_liqref(i) =  hsnow_ocn_liqref(i)*cam_in%ocnfrac(i)
+      ! Flux will be multiplied by cam_in%ocnfrac(i) in coupler
+      !
+      hsnow_liqref(i) =  fsnow*(cam_out%tbot(i)-tmelt)*cpice !sign must follow ocean model convention: +ve for flux into ocean
+      hrain_liqref(i) =  frain*(cam_out%tbot(i)-tmelt)*cpliq !sign must follow ocean model convention: +ve for flux into ocean
+      hevap_liqref(i) = -fevap*(cam_in%ts(i)-tmelt)*cpwv     !sign must follow ocean model convention: -ve for flux out of ocean
 
-      hrain_ocn_liqref(i) =  frain*(cam_out%tbot(i)-tmelt)*cpliq
-      hrain_ocn_liqref(i) =  hrain_ocn_liqref(i)*cam_in%ocnfrac(i)
-
-      hevap_ocn_liqref(i) = -fevap*(cam_in%ts(i)-tmelt)*cpwv
-      hevap_ocn_liqref(i) =  hevap_ocn_liqref(i)*cam_in%ocnfrac(i)
+      cam_out%hsnow(i) = hsnow_liqref(i) 
+      cam_out%hrain(i) = hrain_liqref(i)
+      cam_out%hevap(i) = hevap_liqref(i)
    end do
    !
    ! enthalpy flux terms
    !
    allocate(htmp(ncol))
-   call outfld('HRAIN',     cam_out%hrain,   pcols, lchnk)
-   call outfld('HSNOW',     cam_out%hsnow,   pcols, lchnk)
-   call outfld('HEVAP',     cam_out%hevap,   pcols, lchnk)
+   call outfld('HRAIN', hrain_iceref,  pcols, lchnk)
+   call outfld('HSNOW', hsnow_iceref,  pcols, lchnk)
+   call outfld('HEVAP', hevap_iceref,  pcols, lchnk)
 
-   call outfld('HRAIN_OCN_LIQREF', hrain_ocn_liqref, ncol, lchnk)
-   call outfld('HSNOW_OCN_LIQREF', hsnow_ocn_liqref, ncol, lchnk)
-   call outfld('HEVAP_OCN_LIQREF', hevap_ocn_liqref, ncol, lchnk)
+   call outfld('HRAIN_OCN_LIQREF', hrain_liqref*cam_in%ocnfrac(:ncol), ncol, lchnk)
+   call outfld('HSNOW_OCN_LIQREF', hsnow_liqref*cam_in%ocnfrac(:ncol), ncol, lchnk)
+   call outfld('HEVAP_OCN_LIQREF', hevap_liqref*cam_in%ocnfrac(:ncol), ncol, lchnk)
 
    htmp =   cam_out%hevap(1:ncol)+cam_out%hsnow(1:ncol)+cam_out%hrain(1:ncol)
    call outfld('HTOT' ,     htmp,   ncol, lchnk)!xxx just debugging
@@ -635,9 +644,12 @@ subroutine cam_export(state,cam_out,pbuf,cam_in)
         +cam_out%precl (1:ncol)-cam_out%precsl(1:ncol)))*cam_in%ocnfrac(1:ncol)
    call outfld('HREF_OCN_OCN' , htmp, ncol, lchnk)
    deallocate(htmp)
-   deallocate(hrain_ocn_liqref)
-   deallocate(hsnow_ocn_liqref)
-   deallocate(hevap_ocn_liqref)
+   deallocate(hrain_liqref)
+   deallocate(hsnow_liqref)
+   deallocate(hevap_liqref)
+   deallocate(hrain_iceref)
+   deallocate(hsnow_iceref)
+   deallocate(hevap_iceref)
 end subroutine cam_export
 
 end module camsrfexch
