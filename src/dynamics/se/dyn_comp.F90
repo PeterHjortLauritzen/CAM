@@ -1,3 +1,4 @@
+#define pgf
 module dyn_comp
 
 ! CAM interfaces to the SE Dynamical Core
@@ -76,7 +77,10 @@ logical, public, protected :: write_restart_unstruct
 ! Frontogenesis indices
 integer, public    :: frontgf_idx      = -1
 integer, public    :: frontga_idx      = -1
-
+#ifdef pgf
+integer, public    :: pgf_u_idx      = -1
+integer, public    :: pgf_v_idx      = -1
+#endif
 interface read_dyn_var
   module procedure read_dyn_field_2d
   module procedure read_dyn_field_3d
@@ -569,6 +573,12 @@ subroutine dyn_register()
       call pbuf_add_field("FRONTGA", "global", dtype_r8, (/pcols,pver/),       &
          frontga_idx)
    end if
+#ifdef pgf
+   call pbuf_add_field("PGF_U", "global", dtype_r8, (/pcols,pver/),       &
+        pgf_u_idx)
+   call pbuf_add_field("PGF_V", "global", dtype_r8, (/pcols,pver/),       &
+        pgf_v_idx)
+#endif
 
 end subroutine dyn_register
 
@@ -586,7 +596,9 @@ subroutine dyn_init(dyn_in, dyn_out)
    use air_composition,    only: thermodynamic_active_species_liq_num, thermodynamic_active_species_ice_num
    use cam_history,        only: addfld, add_default, horiz_only, register_vector_field
    use gravity_waves_sources, only: gws_init
-
+#ifdef pgf
+   use gravity_waves_sources, only: pgf_init
+#endif
    use thread_mod,         only: horz_num_threads
    use hybrid_mod,         only: get_loop_ranges, config_thread_region
    use dimensions_mod,     only: nu_scale_top
@@ -844,7 +856,9 @@ subroutine dyn_init(dyn_in, dyn_out)
       call get_loop_ranges(hybrid, ibeg=nets, iend=nete)
       call prim_init2(elem, fvm, hybrid, nets, nete, TimeLevel, hvcoord)
       !$OMP END PARALLEL
-
+#ifdef pgf
+      call pgf_init(elem)
+#endif
       if (use_gw_front .or. use_gw_front_igw) call gws_init(elem)
    end if  ! iam < par%nprocs
 

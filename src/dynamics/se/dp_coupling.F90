@@ -1,3 +1,4 @@
+#define pgf
 module dp_coupling
 
 !-------------------------------------------------------------------------------
@@ -49,7 +50,11 @@ subroutine d_p_coupling(phys_state, phys_tend,  pbuf2d, dyn_out)
    ! Note that all pressures and tracer mixing ratios coming from the dycore are based on
    ! dry air mass.
 
-   use gravity_waves_sources,  only: gws_src_fnct
+  use gravity_waves_sources,  only: gws_src_fnct
+#ifdef pgf
+  use gravity_waves_sources,  only: pgf_src
+  use dyn_comp,               only: pgf_u_idx, pgf_v_idx
+#endif
    use dyn_comp,               only: frontgf_idx, frontga_idx
    use phys_control,           only: use_gw_front, use_gw_front_igw
    use hycoef,                 only: hyai, ps0
@@ -88,6 +93,16 @@ subroutine d_p_coupling(phys_state, phys_tend,  pbuf2d, dyn_out)
    real (kind=r8),  pointer     :: pbuf_frontgf(:,:)
    real (kind=r8),  pointer     :: pbuf_frontga(:,:)
 
+#ifdef pgf
+   real (kind=r8),  allocatable :: pgf_u(:,:,:)      ! temp arrays to hold frontogenesis
+   real (kind=r8),  allocatable :: pgf_v(:,:,:)      ! function (frontgf) and angle (frontga)
+   real (kind=r8),  allocatable :: pgf_u_phys(:,:,:)
+   real (kind=r8),  allocatable :: pgf_v_phys(:,:,:)
+                                                        ! Pointers to pbuf
+   real (kind=r8),  pointer     :: pbuf_pgf_u(:,:)
+   real (kind=r8),  pointer     :: pbuf_pgf_v(:,:)
+#endif
+
    integer                      :: ncols, ierr
    integer                      :: col_ind, blk_ind(1), m
    integer                      :: nphys
@@ -110,7 +125,10 @@ subroutine d_p_coupling(phys_state, phys_tend,  pbuf2d, dyn_out)
    nullify(pbuf_chnk)
    nullify(pbuf_frontgf)
    nullify(pbuf_frontga)
-
+#ifdef pgf
+   nullify(pbuf_pgf_u)
+   nullify(pbuf_pgf_v)
+#endif
    if (fv_nphys > 0) then
       nphys = fv_nphys
    else
@@ -137,11 +155,20 @@ subroutine d_p_coupling(phys_state, phys_tend,  pbuf2d, dyn_out)
       if (ierr /= 0) call endrun("dp_coupling: Allocate of frontga failed.")
    end if
 
+#ifdef pgf
+   allocate(pgf_u(nphys_pts,pver,nelemd), stat=ierr)
+   if (ierr /= 0) call endrun("dp_coupling: Allocate of pgf_u failed.")
+   allocate(pgf_v(nphys_pts,pver,nelemd), stat=ierr)
+   if (ierr /= 0) call endrun("dp_coupling: Allocate of pgf_v failed.")
+#endif
+   
    if (iam < par%nprocs) then
       if (use_gw_front .or. use_gw_front_igw) then
          call gws_src_fnct(elem, tl_f, tl_qdp_np0, frontgf, frontga, nphys)
       end if
-
+#ifdef pgf
+      call pgf_src(elem, tl_f, tl_qdp_np0, pgf_u, pgf_v, nphys)
+#endif
       if (fv_nphys > 0) then
          call test_mapping_overwrite_dyn_state(elem,dyn_out%fvm)
          !******************************************************************
@@ -205,7 +232,10 @@ subroutine d_p_coupling(phys_state, phys_tend,  pbuf2d, dyn_out)
          frontgf(:,:,:) = 0._r8
          frontga(:,:,:) = 0._r8
       end if
-
+#ifdef pgf
+      pgf_u(:,:,:) = 0._r8
+      pgf_v(:,:,:) = 0._r8
+#endif
    endif ! iam < par%nprocs
 
    if (fv_nphys < 1) then
@@ -223,6 +253,10 @@ subroutine d_p_coupling(phys_state, phys_tend,  pbuf2d, dyn_out)
       allocate(frontgf_phys(pcols, pver, begchunk:endchunk))
       allocate(frontga_phys(pcols, pver, begchunk:endchunk))
    end if
+#ifdef pgf
+   allocate(pgf_u_phys(pcols, pver, begchunk:endchunk))
+   allocate(pgf_v_phys(pcols, pver, begchunk:endchunk))
+#endif
    !$omp parallel do num_threads(max_num_threads) private (col_ind, lchnk, icol, ie, blk_ind, ilyr, m)
    do col_ind = 1, columns_on_task
       call get_dyn_col_p(col_ind, ie, blk_ind)
@@ -240,6 +274,10 @@ subroutine d_p_coupling(phys_state, phys_tend,  pbuf2d, dyn_out)
             frontgf_phys(icol, ilyr, lchnk) = frontgf(blk_ind(1), ilyr, ie)
             frontga_phys(icol, ilyr, lchnk) = frontga(blk_ind(1), ilyr, ie)
          end if
+#ifdef pgf
+         pgf_u_phys(icol, ilyr, lchnk) = pgf_u(blk_ind(1), ilyr, ie)
+         pgf_v_phys(icol, ilyr, lchnk) = pgf_v(blk_ind(1), ilyr, ie)
+#endif
       end do
 
       do m = 1, pcnst
@@ -264,6 +302,24 @@ subroutine d_p_coupling(phys_state, phys_tend,  pbuf2d, dyn_out)
       end do
       deallocate(frontgf_phys)
       deallocate(frontga_phys)
+
+#ifdef pgf
+      !$omp parallel do num_threads(max_num_threads) private (lchnk, ncols, icol, ilyr, pbuf_chnk, pbuf_frontgf, pbuf_frontga)
+      do lchnk = begchunk, endchunk
+         ncols = get_ncols_p(lchnk)
+         pbuf_chnk => pbuf_get_chunk(pbuf2d, lchnk)
+         call pbuf_get_field(pbuf_chnk, pgf_u_idx, pbuf_pgf_u)!xxx
+         call pbuf_get_field(pbuf_chnk, pgf_v_idx, pbuf_pgf_v)
+         do icol = 1, ncols
+            do ilyr = 1, pver
+               pbuf_pgf_u(icol, ilyr) = pgf_u_phys(icol, ilyr, lchnk)
+               pbuf_pgf_v(icol, ilyr) = pgf_v_phys(icol, ilyr, lchnk)
+            end do
+         end do
+      end do
+      deallocate(pgf_u_phys)
+      deallocate(pgf_v_phys)
+#endif
    end if
 
    call t_stopf('dpcopy')

@@ -1,3 +1,4 @@
+#define pgf
 module cam_diagnostics
 
 !---------------------------------------------------------------------------------
@@ -204,7 +205,10 @@ contains
     call addfld ('T',          (/ 'lev' /), 'A', 'K',        'Temperature')
     call addfld ('U',          (/ 'lev' /), 'A', 'm/s',      'Zonal wind')
     call addfld ('V',          (/ 'lev' /), 'A', 'm/s',      'Meridional wind')
-
+#ifdef pgf
+    call addfld ('PGF_U',          (/ 'lev' /), 'A', 'm/s',      'Zonal component of PGF')
+    call addfld ('PGF_V',          (/ 'lev' /), 'A', 'm/s',      'Meridional component of PGF')
+#endif
     call register_vector_field('U','V')
 
     ! State before physics
@@ -925,9 +929,24 @@ contains
     !
     !-----------------------------------------------------------------------
     !
+#ifdef pgf
+    real(r8), pointer :: pgf_u(:,:)
+    real(r8), pointer :: pgf_v(:,:) 
+    integer  :: pgf_u_idx=-1, pgf_v_idx=-1
+    pgf_u_idx = pbuf_get_index('PGF_U')
+    pgf_v_idx = pbuf_get_index('PGF_V')
+
+    call pbuf_get_field(pbuf, pgf_u_idx, pgf_u)
+    call pbuf_get_field(pbuf, pgf_v_idx, pgf_v)
+#endif 
+
+    
     lchnk = state%lchnk
     ncol  = state%ncol
-
+#ifdef pgf
+    call outfld('PGF_U',pgf_u , pcols   ,lchnk   )
+    call outfld('PGF_V',pgf_v , pcols   ,lchnk   )
+#endif
     ! Output NSTEP for debugging
     nstep = get_nstep()
     timestep(:ncol) = nstep
