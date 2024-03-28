@@ -1934,7 +1934,7 @@ contains
         tmp_trac(:ncol,:pver,:pcnst) = state%q(:ncol,:pver,:pcnst)
         tmp_pdel(:ncol,:pver)        = state%pdel(:ncol,:pver)
         tmp_ps(:ncol)                = state%ps(:ncol)
-        call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt)
+        call physics_dme_adjust(state, qini, totliqini, toticeini, ztodt)
         call tot_energy_phys(state, 'phAM')
         call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
         ! Restore pre-"physics_dme_adjust" tracers
