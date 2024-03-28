@@ -1190,7 +1190,7 @@ end subroutine physics_ptend_copy
   end subroutine physics_cnst_limit
 
 !===============================================================================
-  subroutine physics_dme_adjust(state, tend, qini, liqini, iceini, dt)
+  subroutine physics_dme_adjust(state, qini, liqini, iceini, dt)
     use air_composition, only: dry_air_species_num,thermodynamic_active_species_num
     use air_composition, only: thermodynamic_active_species_idx
     use dycore,          only: dycore_is
@@ -1223,7 +1223,6 @@ end subroutine physics_ptend_copy
     ! Arguments
     !
     type(physics_state), intent(inout) :: state
-    type(physics_tend ), intent(inout) :: tend
     real(r8),            intent(in   ) :: qini(pcols,pver)    ! initial specific humidity
     real(r8),            intent(in   ) :: liqini(pcols,pver)  ! initial total liquid
     real(r8),            intent(in   ) :: iceini(pcols,pver)  ! initial total ice
