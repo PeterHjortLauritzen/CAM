@@ -884,7 +884,11 @@ subroutine hydrostatic_pressure(nCells, nVertLevels, qsize, index_qv, zz, zgrid,
         pintdry(k,iCell) = pintdry(k+1,iCell)+dpdry(k)
         pmid(k,iCell)    = dp(k)   *rgas*tvk/(gravit*dz(k))
         pmiddry(k,iCell) = dpdry(k)*rgas*tk /(gravit*dz(k))
-      end do
+     end do
+     do k = nVertLevels, 1, -1!phl fix
+        pmid(k,iCell)    = 0.5_r8*(pint(k,iCell)   +pint(k+1,iCell))!phl fix
+        pmiddry(k,iCell) = 0.5_r8*(pintdry(k,iCell)+pintdry(k+1,iCell))!phl fix
+     end do!phl fix
     end do
 end subroutine hydrostatic_pressure
 

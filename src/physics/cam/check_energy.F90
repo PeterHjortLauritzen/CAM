@@ -51,7 +51,7 @@ module check_energy
   public :: check_tracers_chng      ! check changes in integrals against cumulative boundary fluxes
 
   public :: tot_energy_phys ! calculate and output total energy and axial angular momentum diagnostics
-
+  public :: pressure_enthalpy_adjustment
 ! Private module data
 
   logical  :: print_energy_errors = .false.
@@ -817,7 +817,7 @@ end subroutine check_energy_get_integrals
 
 !#######################################################################
 
-  subroutine tot_energy_phys(state, outfld_name_suffix,vc)
+  subroutine tot_energy_phys(state, outfld_name_suffix,vc,enthalpy_flux_incr)
     use physconst,       only: rga,rearth,omega
     use cam_thermo,      only: get_hydrostatic_energy,thermo_budget_num_vars,thermo_budget_vars, &
                                wvidx,wlidx,wiidx,seidx,poidx,keidx,moidx,mridx,ttidx,teidx
@@ -832,7 +832,7 @@ end subroutine check_energy_get_integrals
     type(physics_state), intent(inout) :: state
     character(len=*),    intent(in)    :: outfld_name_suffix ! suffix for "outfld"
     integer, optional,   intent(in)    :: vc                 ! vertical coordinate
-
+    real(r8), optional,  intent(in)    :: enthalpy_flux_incr(pcols)
 !---------------------------Local storage-------------------------------
     real(r8) :: se(pcols)                          ! Dry Static energy (J/m2)
     real(r8) :: po(pcols)                          ! surface potential or potential energy (J/m2)
@@ -898,6 +898,10 @@ end subroutine check_energy_get_integrals
          po = po(1:ncol), ke = ke(1:ncol), wv = wv(1:ncol), liq = liq(1:ncol),       &
          ice = ice(1:ncol))
 
+    if (present(enthalpy_flux_incr)) then
+       se(:ncol) = se(:ncol)-enthalpy_flux_incr(:ncol)
+    end if
+    
     call cnst_get_ind('TT_LW' , ixtt    , abort=.false.)
     tt    = 0._r8
     if (ixtt > 1) then
@@ -964,5 +968,195 @@ end subroutine check_energy_get_integrals
 
   end subroutine tot_energy_phys
 
+  subroutine pressure_enthalpy_adjustment(ncol, lchnk, state, cam_in, cam_out, pbuf, ztodt, itim_old,&
+       qini,totliqini,toticeini)
+    use cam_thermo,      only: compute_enthalpy_flux
+    use air_composition,only: thermodynamic_active_species_liq_num!xxx
+    use air_composition,only: thermodynamic_active_species_liq_idx!xxx
+    use air_composition,only: thermodynamic_active_species_ice_num!xxx
+    use air_composition,only: thermodynamic_active_species_ice_idx!xxx
+    use camsrfexch,      only: cam_out_t, cam_in_t, get_prec_vars, get_enthalpy_flux
+    use physics_types,   only: ifrain, ifsnow, ihrain, ihsnow
+    use physics_buffer,  only: physics_buffer_desc, pbuf_set_field
+    use dyn_tests_utils, only: vc_dycore, vc_height, vc_dry_pressure
+    use dycore,          only: dycore_is
+    use cam_thermo,      only: cam_thermo_water_update
+    use air_composition, only: cpairv, cp_or_cv_dycore
+    use physics_types,   only: physics_dme_adjust, set_dry_to_wet, dyn_te_idx
+    use cam_budget,      only: thermo_budget_history
+    use cam_abortutils,  only: endrun
+    use cam_history,      only: outfld!xxx
+    integer,             intent(in)    :: ncol, lchnk
+    type(physics_state), intent(inout) :: state
+    type(cam_in_t),      intent(inout) :: cam_in
+    type(cam_out_t),     intent(inout) :: cam_out
+    type(physics_buffer_desc), pointer :: pbuf(:)        
+    real(r8),            intent(in)    :: ztodt
+    integer,             intent(in)    :: itim_old
+    
+    real(r8), dimension(pcols,pver), intent(in) :: qini, totliqini, toticeini
+    
+    real(r8) :: enthalpy_flux_incr(pcols)
 
+    logical  :: moist_mixing_ratio_dycore
+    real(r8) :: frain(pcols), fsnow(pcols)
+    real(r8) :: te_start(pcols)
+    real(r8) :: tot_wv(pcols), tot_ice(pcols), tot_liq(pcols)!xxx
+    integer  :: k,i,m_cnst,m
+    tot_wv=0.0_r8!xxx
+    do k = 1, pver!xxx
+       do i = 1, ncol!xxx
+          tot_wv(i)   = tot_wv(i)+(state%q(i,k,1)-qini(i,k))*state%pdel(i,k)*rga!xxx
+       end do!xxx
+    end do!xxx
+    call outfld ('dtot_wv',tot_wv, pcols, lchnk)!xxx
+    
+    tot_liq=0.0_r8!xxx
+    do k = 1, pver!xxx
+       do i = 1, ncol!xxx
+          do m_cnst=1,thermodynamic_active_species_liq_num
+             m = thermodynamic_active_species_liq_idx(m_cnst)
+             tot_liq(i)   = tot_liq(i)+(state%q(i,k,m))*state%pdel(i,k)*rga!xxx
+          end do
+          tot_liq(i)   = tot_liq(i)-totliqini(i,k)*state%pdel(i,k)*rga!xxx
+       end do!xxx
+    end do!xxx
+    call outfld ('dtot_liq',tot_liq, pcols, lchnk)!xxx
+
+    tot_ice=0.0_r8!xxx
+    do k = 1, pver!xxx
+       do i = 1, ncol!xxx
+          do m_cnst=1,thermodynamic_active_species_ice_num
+             m = thermodynamic_active_species_ice_idx(m_cnst)
+             tot_ice(i)   = tot_ice(i)+state%q(i,k,m)*state%pdel(i,k)*rga!xxx
+          end do
+          tot_ice(i)   = tot_ice(i)-toticeini(i,k)*state%pdel(i,k)*rga!xxx
+       end do!xxx
+    end do!xxx
+    call outfld ('dtot_ice',tot_ice, pcols, lchnk)!xxx
+    
+    call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))!xxx remove
+    if (compute_enthalpy_flux) then
+       if (.not.dycore_is('SE')) then
+          call endrun('FATAL: enthalpy flux is only supported with SE dycore')
+       end if
+       if (state%psetcols .ne. pcols) then
+          call endrun('FATAL: enthalpy flux not supported for sub-columns')
+       end if
+       te_start(:ncol) = state%te_cur(:ncol,dyn_te_idx)!save total energy in each column
+
+       !
+       ! get tphysac enthalpy flux
+       !
+       call get_prec_vars(ncol,pbuf,state%hflx_ac(:,ifrain),state%hflx_ac(:,ifsnow))
+       call outfld ('FRAIN_tot',state%hflx_ac(:,ifrain), pcols, lchnk)
+       call outfld ('FSNOW_tot',state%hflx_ac(:,ifsnow), pcols, lchnk)
+       call outfld ('FEVAP_tot',cam_in%cflx(:,1), pcols, lchnk)
+       state%hflx_ac(:ncol,ifrain) = state%hflx_ac(:ncol,ifrain) - state%hflx_bc(:ncol,ifrain)
+       state%hflx_ac(:ncol,ifsnow) = state%hflx_ac(:ncol,ifsnow) - state%hflx_bc(:ncol,ifsnow)
+       call outfld ('FRAIN_AC',state%hflx_ac(:,ifrain), pcols, lchnk)
+       call outfld ('FSNOW_AC',state%hflx_ac(:,ifsnow), pcols, lchnk)
+       call outfld ('FEVAP_AC',cam_in%cflx(:,1), pcols, lchnk)
+       
+       call get_enthalpy_flux(ncol,state%hflx_ac(:,ifrain),state%hflx_ac(:,ifsnow),&
+            cam_in%cflx(:,1),state%T(:ncol,pver),state%T(:ncol,pver),&
+!            cam_in%cflx(:,1),cam_out%tbot,cam_out%tbot,&
+            cam_in%ts,state%hflx_ac(:,ihrain),state%hflx_ac(:,ihsnow),cam_out%hevap)
+
+       call outfld ('HRAIN_AC',state%hflx_ac(:,ihrain), pcols, lchnk)
+       call outfld ('HSNOW_AC',state%hflx_ac(:,ihsnow), pcols, lchnk)
+       call outfld ('HEVAP_AC',cam_out%hevap, pcols, lchnk)
+       
+       enthalpy_flux_incr(:ncol)=ztodt*(&
+!            cam_out%hevap(:ncol))
+!            state%hflx_bc(:ncol,ihrain)+state%hflx_bc(:ncol,ihsnow))
+                   state%hflx_ac(:ncol,ihrain)+state%hflx_ac(:ncol,ihsnow)+&
+            state%hflx_bc(:ncol,ihrain)+state%hflx_bc(:ncol,ihsnow)+cam_out%hevap(:ncol))
+       
+       call tot_energy_phys(state, 'phAC',enthalpy_flux_incr=enthalpy_flux_incr)
+       call tot_energy_phys(state, 'dyAC',enthalpy_flux_incr=enthalpy_flux_incr, vc=vc_dycore)
+    else
+       call tot_energy_phys(state, 'phAC')
+       call tot_energy_phys(state, 'dyAC', vc=vc_dycore)
+       call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
+    end if
+    !
+    ! update cp/cv for energy computation based in updated water variables
+    !
+    call cam_thermo_water_update(state%q(:ncol,:,:), lchnk, ncol, vc_dycore,&
+         to_dry_factor=state%pdel(:ncol,:)/state%pdeldry(:ncol,:))
+    call physics_dme_adjust(state, qini, totliqini, toticeini, ztodt)
+    
+    moist_mixing_ratio_dycore = dycore_is('LR').or. dycore_is('FV3')
+    if (moist_mixing_ratio_dycore) then
+       !
+       ! change dry mixing ratios for moist for moist mixing ratio dycores
+       !
+       ! Note: this operation will NOT be reverted with set_wet_to_dry after set_dry_to_wet call
+       !
+       call set_dry_to_wet(state)
+    endif
+    call tot_energy_phys(state, 'phAF',enthalpy_flux_incr=enthalpy_flux_incr)!xxx , ztodt)!xxx should be AF
+    call tot_energy_phys(state, 'dyAF', vc=vc_dycore,enthalpy_flux_incr=enthalpy_flux_incr)!xxx ztodt, vc=vc_dycore)!xxx should be AF
+    if (compute_enthalpy_flux) then
+       call column_fixer_using_variable_latent_heat_energy_formula(ncol, lchnk, state, te_start, enthalpy_flux_incr)
+
+!       call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
+    end if
+    call tot_energy_phys(state, 'phAM', enthalpy_flux_incr=enthalpy_flux_incr)
+    call tot_energy_phys(state, 'dyAM', vc=vc_dycore,enthalpy_flux_incr=enthalpy_flux_incr)
+  end subroutine pressure_enthalpy_adjustment
+
+  subroutine column_fixer_using_variable_latent_heat_energy_formula(ncol, lchnk, state, enthalpy_flux_incr,te_start)
+    use air_composition, only: cp_or_cv_dycore
+    use dyn_tests_utils, only: vc_dry_pressure
+    use cam_thermo,      only: get_hydrostatic_energy
+    use physics_types,   only: dyn_te_idx
+    use physconst,       only: rga
+    integer,             intent(in)    :: ncol, lchnk
+    type(physics_state), intent(inout) :: state
+    real(r8),            intent(in)    :: enthalpy_flux_incr(pcols)
+    real(r8),            intent(in)    :: te_start(pcols)
+
+    real(r8) :: temp(state%ncol,pver) ! temperature
+    real(r8) :: scaling(pcols,pver)   ! scaling for conversion of temperature increment
+    real(r8) :: te_discr(pcols)       ! total energy discrepancy in each column
+    real(r8) :: column_enthalpy(pcols)! column integrated enthalpy
+    real(r8) :: cpave(pcols)
+    real(r8) :: Tfix
+    integer  :: i,k
+    !
+    ! compute current dycore energy (updated by dme_adjust)
+    !
+    !
+    ! enthalpy scaling for energy consistency
+    !
+    scaling(:ncol,:) = cpairv(:ncol,:,lchnk)/cp_or_cv_dycore(:ncol,:,lchnk)
+    temp(1:ncol,:)   = state%temp_ini(1:ncol,:)+scaling(1:ncol,:)*(state%T(1:ncol,:)-state%temp_ini(1:ncol,:))
+    call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,               &
+         state%pdel(1:ncol,1:pver), cp_or_cv_dycore(1:ncol,1:pver,lchnk),            &
+         state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), temp(1:ncol,1:pver),        &
+         vc_dry_pressure, ptop=state%pintdry(1:ncol,1), phis = state%phis(1:ncol),   &
+         te = state%te_cur(1:ncol,dyn_te_idx), se = column_enthalpy(1:ncol),         &
+         H2O = state%tw_cur(1:ncol,dyn_te_idx))
+    !
+    ! total energy discrepancy
+    !
+    te_discr(:ncol) = state%te_cur(:ncol,dyn_te_idx)-te_start(:ncol)-enthalpy_flux_incr(:ncol)
+    !
+    ! compute temperature increment (fixer) so that te_discr(:ncol)=0
+    !
+    cpave = 0._r8
+    do k=1,pver
+       do i=1,ncol
+          cpave(i) = cpave(i) + cp_or_cv_dycore(i,k,lchnk) * state%pdel(i,k) * rga
+       end do
+    end do
+    do i=1,ncol
+       Tfix = te_discr(i)/cpave(i)
+       do k=1,pver
+          state%T(i,k) = (state%T(i,k)-Tfix)/scaling(i,k)
+       end do
+    end do
+  end subroutine column_fixer_using_variable_latent_heat_energy_formula
 end module check_energy

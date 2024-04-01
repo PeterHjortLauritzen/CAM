@@ -1363,7 +1363,7 @@ contains
     use aoa_tracers,        only: aoa_tracers_timestep_tend
     use physconst,          only: rhoh2o
     use aero_model,         only: aero_model_drydep
-    use check_energy,       only: check_energy_chng, tot_energy_phys
+    use check_energy,       only: check_energy_chng, tot_energy_phys, pressure_enthalpy_adjustment
     use check_energy,       only: check_tracers_data, check_tracers_init, check_tracers_chng
     use time_manager,       only: get_nstep
     use cam_abortutils,     only: endrun
@@ -2351,8 +2351,14 @@ contains
       end if
       call physics_update(state,ptend,ztodt,tend)
       call check_energy_chng(state, tend, "nudging", nstep, ztodt, zero, zero, zero, zero)
-    endif
-
+   endif
+#define new
+#ifdef new
+   call pressure_enthalpy_adjustment(ncol,lchnk,state,cam_in,cam_out,pbuf,ztodt,itim_old,&
+        qini,totliqini,toticeini)
+!   call tot_energy_phys(state, 'phAM')
+!   call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
+#else
     !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
     ! Save total energy for global fixer in next timestep
     !
@@ -2382,12 +2388,12 @@ contains
         tmp_pdel(:ncol,:pver)        = state%pdel(:ncol,:pver)
         tmp_ps(:ncol)                = state%ps(:ncol)
         call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt)
-        call tot_energy_phys(state, 'phAM')
-        call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
+        call tot_energy_phys(state, 'phAF')
+        call tot_energy_phys(state, 'dyAF', vc=vc_dycore)
         ! Restore pre-"physics_dme_adjust" tracers
-        state%q(:ncol,:pver,:pcnst) = tmp_trac(:ncol,:pver,:pcnst)
-        state%pdel(:ncol,:pver)     = tmp_pdel(:ncol,:pver)
-        state%ps(:ncol)             = tmp_ps(:ncol)
+!        state%q(:ncol,:pver,:pcnst) = tmp_trac(:ncol,:pver,:pcnst)
+!        state%pdel(:ncol,:pver)     = tmp_pdel(:ncol,:pver)
+!        state%ps(:ncol)             = tmp_ps(:ncol)
       end if
     else
       !
@@ -2410,7 +2416,7 @@ contains
       call tot_energy_phys(state, 'phAM')
       call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
     endif
-
+#endif
     if (vc_dycore == vc_height.or.vc_dycore == vc_dry_pressure) then
       !
       ! MPAS and SE specific scaling of temperature for enforcing energy consistency
@@ -2858,7 +2864,8 @@ contains
         prec_str_sc = 0._r8
         snow_str_sc = 0._r8
       end if
-
+      state%hflx_ac = 0.0_r8!xxx
+      
       !===================================================
       ! Run wet deposition routines to intialize aerosols
       !===================================================
@@ -2878,7 +2885,8 @@ contains
 
     ! Save atmospheric fields to force surface models
     call t_startf('cam_export')
-    call cam_export (state,cam_out,pbuf)
+!xxx    call cam_export (state,cam_out,pbuf,cam_in)
+    call cam_export (state,cam_out,pbuf,cam_in,qini, totliqini, toticeini,ztodt)!xxx
     call t_stopf('cam_export')
 
     ! Write export state to history file

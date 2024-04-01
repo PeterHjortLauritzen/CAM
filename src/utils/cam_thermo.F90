@@ -204,6 +204,7 @@ module cam_thermo
         "kg/m2        ","J/m2         "/)
    logical              ,public, dimension(thermo_budget_num_vars) :: thermo_budget_vars_massv = (/&
         .true.,.true.,.true.,.false.,.false.,.false.,.false.,.false.,.true.,.false./)
+   logical, public :: compute_enthalpy_flux=.true.!xxx should be namelist or cam_dev/se_dycore logical
 CONTAINS
 
    !===========================================================================
