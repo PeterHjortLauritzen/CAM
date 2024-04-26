@@ -36,18 +36,22 @@ contains
 !=======================================================================
 
   subroutine held_suarez_init()
-    use physics_buffer,     only: physics_buffer_desc
     use cam_history,        only: addfld, add_default
-    use ref_pres,           only: psurf_ref
+#ifdef planet_mars
+    use held_suarez_1994_mars,   only: held_suarez_1994_mars_init
+#else
     use held_suarez_1994,   only: held_suarez_1994_init
+#endif
 
-    ! Local variables
-    character(len=512) :: errmsg
-    integer            :: errflg
+    character(len=512)            :: errmsg
+    integer                       :: errflg
 
     ! Set model constant values
+#ifdef planet_mars
+    call held_suarez_1994_mars_init(psurf_ref, errmsg, errflg)
+#else
     call held_suarez_1994_init(psurf_ref, errmsg, errflg)
-
+#endif
     ! This field is added by radiation when full physics is used
     call addfld('QRS', (/ 'lev' /), 'A', 'K/s', &
          'Temperature tendency associated with the relaxation toward the equilibrium temperature profile')
@@ -62,9 +66,11 @@ contains
     use physics_types,      only: physics_ptend_init
     use cam_abortutils,     only: endrun
     use cam_history,        only: outfld
-    use held_suarez_1994,   only: held_suarez_1994_run
 #ifdef planet_mars
+    use held_suarez_1994_mars,   only: held_suarez_1994_mars_run
     use std_atm_profile,    only: std_atm_height, std_atm_temp
+#else
+    use held_suarez_1994,   only: held_suarez_1994_run
 #endif
     !
     ! Input arguments
@@ -89,9 +95,8 @@ contains
 #endif
     integer                            :: i, k             ! Longitude, level indices
 
-    character(len=64)                  :: scheme_name      ! CCPP-required variables (not used in CAM)
-    character(len=512)                 :: errmsg
-    integer                            :: errflg
+    character(len=512)            :: errmsg
+    integer                       :: errflg
 
     !
     !-----------------------------------------------------------------------
@@ -115,13 +120,12 @@ contains
 
     ! initialize individual parameterization tendencies
     call physics_ptend_init(ptend, state%psetcols, 'held_suarez', ls=.true., lu=.true., lv=.true.)
-
 #ifdef planet_mars
-    call held_suarez_1994_run(pver, ncol, pref_mid_norm, clat, cappav(1:ncol,:,lchnk), &
-                              cpairv(1:ncol,:,lchnk), state%pmid(1:ncol,:), tref(1:ncol,:), &
-                              state%u(1:ncol,:), state%v(1:ncol,:), state%t(1:ncol,:), &
-                              ptend%u(1:ncol,:), ptend%v(1:ncol,:), ptend%s(1:ncol,:), &
-                              scheme_name, errmsg, errflg)
+    call held_suarez_1994_mars_run(pver, ncol, pref_mid_norm, clat, &
+         cpairv(1:ncol,:,lchnk), state%pmid(1:ncol,:),tref(1:ncol,:), &
+         state%u(1:ncol,:), state%v(1:ncol,:), state%t(1:ncol,:), &
+         ptend%u(1:ncol,:), ptend%v(1:ncol,:), ptend%s(1:ncol,:), &
+         scheme_name, errmsg, errflg)
 #else
     call held_suarez_1994_run(pver, ncol, pref_mid_norm, clat, cappav(1:ncol,:,lchnk), &
                               cpairv(1:ncol,:,lchnk), state%pmid(1:ncol,:),            &
