@@ -37,6 +37,7 @@ contains
 
   subroutine held_suarez_init()
     use cam_history,        only: addfld, add_default
+    use ref_pres,           only: psurf_ref
 #ifdef planet_mars
     use held_suarez_1994_mars,   only: held_suarez_1994_mars_init
 #else
@@ -95,6 +96,7 @@ contains
 #endif
     integer                            :: i, k             ! Longitude, level indices
 
+    character(len=64)                  :: scheme_name      ! CCPP-required variables (not used in CAM)
     character(len=512)            :: errmsg
     integer                       :: errflg
 
