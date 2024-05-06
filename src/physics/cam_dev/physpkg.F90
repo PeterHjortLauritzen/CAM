@@ -1035,7 +1035,10 @@ contains
     dvcore_idx = pbuf_get_index('DVCORE')
     dtcore_idx = pbuf_get_index('DTCORE')
     dqcore_idx = pbuf_get_index('DQCORE')
-
+    do lchnk = begchunk, endchunk
+       phys_state(lchnk)%hflx_ac = 0.0_r8!xxx
+       phys_state(lchnk)%hflx_bc = 0.0_r8!xxx
+    end do
   end subroutine phys_init
 
   !
@@ -2217,7 +2220,7 @@ contains
     !===================================================
     ! Gravity wave drag
     !===================================================
-    call t_startf('gw_tend')
+    call t_startf('gw_tend')!
 
     if (trim(cam_take_snapshot_before) == "gw_tend") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
@@ -2324,6 +2327,7 @@ contains
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
     end if
+
     call tot_energy_phys(state, 'phAP')
     call tot_energy_phys(state, 'dyAP',vc=vc_dycore)
 
@@ -2355,7 +2359,7 @@ contains
 #define new
 #ifdef new
    call pressure_enthalpy_adjustment(ncol,lchnk,state,cam_in,cam_out,pbuf,ztodt,itim_old,&
-        qini,totliqini,toticeini)
+        qini,totliqini,toticeini,tend)
 !   call tot_energy_phys(state, 'phAM')
 !   call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
 #else
@@ -2387,7 +2391,7 @@ contains
         tmp_trac(:ncol,:pver,:pcnst) = state%q(:ncol,:pver,:pcnst)
         tmp_pdel(:ncol,:pver)        = state%pdel(:ncol,:pver)
         tmp_ps(:ncol)                = state%ps(:ncol)
-        call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt)
+        call physics_dme_adjust(state, qini, totliqini, toticeini, ztodt)
         call tot_energy_phys(state, 'phAF')
         call tot_energy_phys(state, 'dyAF', vc=vc_dycore)
         ! Restore pre-"physics_dme_adjust" tracers
@@ -2407,7 +2411,7 @@ contains
          call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
       end if
-      call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt)
+      call physics_dme_adjust(state, qini, totliqini, toticeini, ztodt)
       if (trim(cam_take_snapshot_after) == "physics_dme_adjust") then
         call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
              fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)

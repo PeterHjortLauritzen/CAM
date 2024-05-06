@@ -108,6 +108,7 @@ module air_composition
    ! cp_or_cv_dycore:  enthalpy or internal energy scaling factor for 
    !                   energy consistency
    real(r8), public, protected, allocatable :: cp_or_cv_dycore(:,:,:)
+   real(r8), public, protected, allocatable :: cp_or_cv_dycore_init(:,:,:)
    !
    ! Interfaces for public routines
    interface get_cp_dry
@@ -337,6 +338,10 @@ CONTAINS
       allocate(cp_or_cv_dycore(pcols,pver,begchunk:endchunk), stat=ierr)
       if (ierr /= 0) then
          call endrun(errstr//"cp_or_cv_dycore")
+      end if
+      allocate(cp_or_cv_dycore_init(pcols,pver,begchunk:endchunk), stat=ierr)
+      if (ierr /= 0) then
+         call endrun(errstr//"cp_or_cv_dycore_init")
       end if
 
       thermodynamic_active_species_idx        = -HUGE(1)
@@ -655,7 +660,7 @@ CONTAINS
    !---------------------------------------------------------------------------
    !===========================================================================
 
-   subroutine water_composition_update(mmr, lchnk, ncol, vcoord, to_dry_factor)
+   subroutine water_composition_update(mmr, lchnk, ncol, vcoord, to_dry_factor, init)
       use cam_abortutils,  only: endrun
       use string_utils,    only: int2str
       use dyn_tests_utils, only: vc_height, vc_moist_pressure, vc_dry_pressure
@@ -664,12 +669,16 @@ CONTAINS
       integer,            intent(in) :: ncol       ! number of columns
       integer,            intent(in) :: vcoord
       real(r8), optional, intent(in) :: to_dry_factor(:,:)
-
+      logical,  optional, intent(in) :: init
+      
       character(len=*), parameter :: subname = 'water_composition_update'
 
       if (vcoord==vc_dry_pressure) then
         call get_cp(mmr(:ncol,:,:),.false.,cp_or_cv_dycore(:ncol,:,lchnk), factor=to_dry_factor,    &
              active_species_idx_dycore=thermodynamic_active_species_idx,cpdry=cpairv(:ncol,:,lchnk))
+        if (present(init)) then
+           if (init) cp_or_cv_dycore_init(:ncol,:,lchnk) = cp_or_cv_dycore(:ncol,:,lchnk)
+        end if
       else if (vcoord==vc_height) then
         call get_R(mmr(:ncol,:,:), thermodynamic_active_species_idx, &
              cp_or_cv_dycore(:ncol,:,lchnk), fact=to_dry_factor, Rdry=rairv(:ncol,:,lchnk))
@@ -679,6 +688,9 @@ CONTAINS
         !
         cp_or_cv_dycore(:ncol,:,lchnk)=cp_or_cv_dycore(:ncol,:,lchnk)*&
              (cpairv(:ncol,:,lchnk)-rairv(:ncol,:,lchnk)) /rairv(:ncol,:,lchnk)
+        if (present(init)) then
+           if (init) cp_or_cv_dycore_init(:ncol,:,lchnk) = cp_or_cv_dycore(:ncol,:,lchnk)
+        end if
       else if (vcoord==vc_moist_pressure) then
         ! no update needed for moist pressure vcoord
       else

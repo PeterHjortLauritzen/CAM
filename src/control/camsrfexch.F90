@@ -30,11 +30,12 @@ module camsrfexch
 
   public get_prec_vars
   public get_enthalpy_flux
-
+  public get_falling_precip_T
   ! Public data types
   public cam_out_t                  ! Data from atmosphere
   public cam_in_t                   ! Merged surface data
 
+ 
   !---------------------------------------------------------------------------
   ! This is the data that is sent from the atmosphere to the surface models
   !---------------------------------------------------------------------------
@@ -459,6 +460,7 @@ subroutine cam_export(state,cam_out,pbuf,cam_in,qini, totliqini, toticeini,ztodt
    real(r8), dimension(pcols) :: frain_ac, frain_bc !flux of liq precip after and before coupler, respectively
    real(r8), dimension(pcols) :: fsnow_ac, fsnow_bc !flux of frozen precip after and before coupler, respectively
    real(r8), dimension(pcols) :: frain, fsnow       !total flux of liq/frozen precip from thysac in previous time-step
+   real(r8), dimension(pcols) :: Tprec
     real(r8) :: tot_wv(pcols), tot_ice(pcols), tot_liq(pcols),rliqbc(pcols)!xxx
     integer  :: k,m_cnst!xxx
                                                     !tphysbc in current time-step
@@ -515,9 +517,11 @@ subroutine cam_export(state,cam_out,pbuf,cam_in,qini, totliqini, toticeini,ztodt
     tot_wv=0.0_r8!xxx
     do k = 1, pver!xxx
        do i = 1, ncol!xxx
-          tot_wv(i)   = tot_wv(i)+(state%q(i,k,1))*state%pdel(i,k)*rga!xxx
+          tot_wv(i)   = tot_wv(i)+(state%q(i,k,1)-qini(i,k))*state%pdel(i,k)*rga!xxx
        end do!xxx
-       tot_wv(i)   = tot_wv(i)-qini(i,k)*state%pdel(i,k)*rga!xxx
+       do i = 1, ncol!xxx
+
+       end do
     end do!xxx
     call outfld ('dtot_wv_coupler',tot_wv, pcols, lchnk)!xxx
     
@@ -570,8 +574,9 @@ subroutine cam_export(state,cam_out,pbuf,cam_in,qini, totliqini, toticeini,ztodt
    call outfld('FRAIN_BC', frain_bc,  pcols, lchnk)
    call outfld('FSNOW_BC', fsnow_bc,  pcols, lchnk)
 !   call outfld('FEVAP_BC', cam_in%cflx(:,1),pcols,lchnk)
-   
-   call get_enthalpy_flux(ncol,frain_bc,fsnow_bc,cam_in%cflx(:,1),cam_out%tbot,cam_out%tbot,&
+
+   Tprec = get_falling_precip_T(ncol,state%T,state%pdel)
+   call get_enthalpy_flux(ncol,frain_bc,fsnow_bc,cam_in%cflx(:,1),Tprec,Tprec,&
         cam_in%ts,state%hflx_bc(:,ihrain),state%hflx_bc(:,ihsnow),cam_out%hevap)
    !
    ! add enthalpy flux originating from atmosphere from tphybc and tphysac
@@ -580,7 +585,6 @@ subroutine cam_export(state,cam_out,pbuf,cam_in,qini, totliqini, toticeini,ztodt
    call outfld('HSNOW_BC', state%hflx_bc(:,ihsnow),  pcols, lchnk)
    call outfld('HEVAP_BC', cam_out%hevap,pcols,lchnk)
 
-   
    cam_out%hrain(:ncol) = state%hflx_bc(:ncol,ihrain)+state%hflx_ac(:ncol,ihrain)
    cam_out%hsnow(:ncol) = state%hflx_bc(:ncol,ihsnow)+state%hflx_ac(:ncol,ihsnow)
 
@@ -755,6 +759,27 @@ subroutine get_prec_vars(ncol,pbuf,frain,fsnow,&
      frain(:) = 1000.0_r8*(precc (:ncol)-precsc(:ncol)+precl(:ncol)-precsl(:ncol))!rain flux
    end subroutine get_prec_vars
 
+   function get_falling_precip_T(ncol,T,dp)
+     use ppgrid, only: pver
+     integer, intent(in) :: ncol
+     real(r8), dimension(pcols,pver), intent(in)  :: T, dp
+     real(r8), dimension(pcols)                   :: get_falling_precip_T
+
+     integer :: i,k
+     real(r8):: mean_dpT, mean_dp
+
+     do i=1,ncol
+        mean_dpT = 0.0_r8
+        mean_dp  = 0.0_r8
+        do k=pver-6,pver
+           mean_dpT  = mean_dpT  + dp(i,k)*T(i,k)
+           mean_dp = mean_dp + dp(i,k)
+        end do
+        get_falling_precip_T(i) = mean_dpT/mean_dp
+        get_falling_precip_T(i) = T(i,pver-6)
+     end do
+   end function get_falling_precip_T
+   
    subroutine get_enthalpy_flux(ncol,frain,fsnow,fevap,Train,Tsnow,Tevap,hrain_iceref,hsnow_iceref,hevap_iceref)
      use physconst,        only: cpwv, cpliq, cpice
      integer,                    intent(in) :: ncol

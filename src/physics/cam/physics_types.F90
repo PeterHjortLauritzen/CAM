@@ -140,6 +140,8 @@ module physics_types
      real(r8), dimension(:),  allocatable        :: flx_net
      real(r8), dimension(:),  allocatable        :: &
           te_tnd,  &! cumulative boundary flux of total energy
+          te_sen,  &! cumulative sensible heat flux
+          te_lat,  &! cumulative latent heat flux
           tw_tnd    ! cumulative boundary flux of total water
   end type physics_tend
 
@@ -634,9 +636,9 @@ contains
          varname="state%te_ini",    msg=msg)
     call shr_assert_in_domain(state%te_cur(:ncol,:),    lt=posinf_r8, gt=neginf_r8, &
          varname="state%te_cur",    msg=msg)
-    call shr_assert_in_domain(state%hflx_ac(:ncol,num_hflx),     lt=posinf_r8, gt=neginf_r8, &
+    call shr_assert_in_domain(state%hflx_ac(:ncol,:num_hflx),     lt=posinf_r8, gt=neginf_r8, &
          varname="state%hflx_ac",    msg=msg)
-    call shr_assert_in_domain(state%hflx_bc(:ncol,num_hflx),     lt=posinf_r8, gt=neginf_r8, &
+    call shr_assert_in_domain(state%hflx_bc(:ncol,:num_hflx),     lt=posinf_r8, gt=neginf_r8, &
          varname="state%hflx_bc",    msg=msg)
     call shr_assert_in_domain(state%tw_ini(:ncol,:),    lt=posinf_r8, gt=neginf_r8, &
          varname="state%tw_ini",    msg=msg)
@@ -1456,6 +1458,8 @@ end subroutine physics_ptend_copy
     tend%dvdt    = 0._r8
     tend%flx_net = 0._r8
     tend%te_tnd  = 0._r8
+    tend%te_sen  = 0._r8
+    tend%te_lat  = 0._r8
     tend%tw_tnd  = 0._r8
 
 end subroutine physics_tend_init
@@ -1885,6 +1889,12 @@ subroutine physics_tend_alloc(tend,psetcols)
   allocate(tend%te_tnd(psetcols), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%te_tnd')
 
+  allocate(tend%te_sen(psetcols), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%te_sen')
+
+  allocate(tend%te_lat(psetcols), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%te_lat')
+
   allocate(tend%tw_tnd(psetcols), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%tw_tnd')
 
@@ -1893,6 +1903,8 @@ subroutine physics_tend_alloc(tend,psetcols)
   tend%dvdt(:,:) = inf
   tend%flx_net(:) = inf
   tend%te_tnd(:) = inf
+  tend%te_sen(:) = inf
+  tend%te_lat(:) = inf
   tend%tw_tnd(:) = inf
 
 end subroutine physics_tend_alloc
@@ -1920,6 +1932,12 @@ subroutine physics_tend_dealloc(tend)
 
   deallocate(tend%te_tnd, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%te_tnd')
+
+  deallocate(tend%te_sen, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%te_sen')
+
+  deallocate(tend%te_lat, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%te_lat')
 
   deallocate(tend%tw_tnd, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%tw_tnd')
