@@ -1954,7 +1954,7 @@ contains
         call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
                     fh2o, surfric, obklen, flx_heat)
       end if
-      call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt)
+      call physics_dme_adjust(state, qini, totliqini, toticeini, ztodt)
       if (trim(cam_take_snapshot_after) == "physics_dme_adjust") then
         call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
              fh2o, surfric, obklen, flx_heat)
@@ -2906,7 +2906,8 @@ contains
 
     ! Save atmospheric fields to force surface models
     call t_startf('cam_export')
-    call cam_export (state,cam_out,pbuf,cam_in)
+!xxx    call cam_export (state,cam_out,pbuf,cam_in)
+    call cam_export (state,cam_out,pbuf,cam_in,qini, totliqini, toticeini,ztodt)!xxx
     call t_stopf('cam_export')
 
     ! Write export state to history file
