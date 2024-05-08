@@ -1,0 +1,29 @@
+! Users should add all user specific namelist changes below in the form of 
+! namelist_var = new_namelist_value 
+!bnd_topo = '/glade/campaign/cgd/amp/pel/topo/files/se/ne30pg3_gmted2010_modis_bedmachine_nc3000_Laplace0100_noleak_20240117.nc'
+ncdata ='/glade/campaign/cesm/cesmdata/inputdata/atm/cam/inic/se/FLT_L58_ne30pg3_IC_c220623.nc'
+!ncdata ='/glade/campaign/cesm/cesmdata/inputdata/atm/cam/inic/se/cam7_FMT_ne30pg3_mg17_L93_c221118.nc'
+interpolate_output  =  .true.,  .false., .true., .false., .false., .true.,  .true.
+interpolate_nlat    =     192,     192,    192,     192,     192,     192,   192
+interpolate_nlon    =     288,     288,    288,     288,     288,     288,   288
+
+!empty_htapes = .true.
+
+print_energy_errors = .true.
+se_statefreq = 1
+se_nsplit = 4
+avgflag_pertape(1) = 'I'
+fincl1 = 'U','V','T','Q','PRECT','OMEGA','OMEGA500','ABS_dPSdt','PSL','PS'!,'HRAIN','HSNOW','HEVAP'
+se_ftype=1
+thermo_budget_history = .true.
+thermo_budget_histfile_num = 2
+avgflag_pertape(2) = 'N'
+ndens(2) = 1
+nhtfrq =0, 1,1,1
+
+avgflag_pertape(3) = 'I'
+fincl3 = 'FRAIN_coupler','FSNOW_coupler','FEVAP_coupler','FRAIN_AC','FSNOW_AC','FEVAP_AC','FRAIN_BC','FSNOW_BC','FEVAP_BC','FRAIN_tot','FSNOW_tot','FEVAP_tot','dtot_wv','dtot_ice','dtot_liq','dtot_wv_coupler','dtot_ice_coupler','dtot_liq_coupler','rliqbc','HRAIN_AC','HSNOW_AC','HEVAP_AC','HRAIN_BC','HSNOW_BC','HEVAP_BC','HRAIN','HSNOW','HEVAP','SHFLX','FRHS_FLX','FRHS_FLXA','FRHS_FLXB','FRHS_FLXC','te_tnd','heating','radiation','te_sen','te_lat','T','TS','imbalance'
+
+ndens(4)=1
+avgflag_pertape(4) = 'I'
+fincl4 = 'FRAIN_coupler','FSNOW_coupler','FEVAP_coupler','FRAIN_AC','FSNOW_AC','FEVAP_AC','FRAIN_BC','FSNOW_BC','FEVAP_BC','FRAIN_tot','FSNOW_tot','FEVAP_tot','dtot_wv','dtot_ice','dtot_liq','dtot_wv_coupler','dtot_ice_coupler','dtot_liq_coupler','rliqbc','HRAIN_AC','HSNOW_AC','HEVAP_AC','HRAIN_BC','HSNOW_BC','HEVAP_BC','HRAIN','HSNOW','HEVAP','SHFLX','FRHS_FLX','FRHS_FLXA','FRHS_FLXB','FRHS_FLXC','te_tnd','heating','radiation','te_sen','te_lat','T','TS','imbalance'

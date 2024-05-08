@@ -1082,6 +1082,9 @@ end subroutine check_energy_get_integrals
           call endrun('FATAL: enthalpy flux not supported for sub-columns')
        end if
 
+       call physics_dme_adjust(state, qini, totliqini, toticeini, ztodt)
+       call tot_energy_phys(state, 'phAC')
+       call tot_energy_phys(state, 'dyAC', vc=vc_dycore)       
        !
        ! get tphysac enthalpy flux
        !
@@ -1107,6 +1110,9 @@ end subroutine check_energy_get_integrals
                             cam_out%hevap(:ncol)+state%hflx_bc(:ncol,ihsnow)+&
                             state%hflx_ac(:ncol,ihrain)+state%hflx_ac(:ncol,ihsnow)+&
                             state%hflx_bc(:ncol,ihrain)+state%hflx_bc(:ncol,ihsnow)
+
+       call cam_thermo_water_update(state%q(:ncol,:,:), lchnk, ncol, vc_dycore,&
+            to_dry_factor=state%pdel(:ncol,:)/state%pdeldry(:ncol,:))
        !
        ! add heating under variable latent heat assumption and compute temperature
        !
@@ -1119,12 +1125,11 @@ end subroutine check_energy_get_integrals
        !
        ! update pdel
        !
-       call cam_thermo_water_update(state%q(:ncol,:,:), lchnk, ncol, vc_dycore,&
-            to_dry_factor=state%pdel(:ncol,:)/state%pdeldry(:ncol,:))
+       
        !
        !
        !
-       call physics_dme_adjust(state, qini, totliqini, toticeini, ztodt)
+
 
        !
        ! compute column integrated energy
@@ -1168,8 +1173,7 @@ end subroutine check_energy_get_integrals
 
 
        
-       call tot_energy_phys(state, 'phAC')
-       call tot_energy_phys(state, 'dyAC', vc=vc_dycore)
+
 
        
 !       call tot_energy_phys(state, 'phAC',enthalpy_flux_incr=enthalpy_flux_incr)
