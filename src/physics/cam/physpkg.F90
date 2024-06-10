@@ -253,7 +253,7 @@ contains
          call pbuf_register_subcol('PREC_SED', 'phys_register', prec_sed_idx)
          call pbuf_register_subcol('SNOW_SED', 'phys_register', snow_sed_idx)
        end if
-
+       
     ! Who should add FRACIS?
     ! -- It does not seem that aero_intr should add it since FRACIS is used in convection
     !     even if there are no prognostic aerosols ... so do it here for now
@@ -2905,7 +2905,8 @@ contains
 
     ! Save atmospheric fields to force surface models
     call t_startf('cam_export')
-    call cam_export (state,cam_out,pbuf)
+    !xxx call cam_export (state,cam_out,pbuf)
+    call cam_export (state,cam_out,pbuf,cam_in,qini, totliqini, toticeini,ztodt)!xxx
     call t_stopf('cam_export')
 
     ! Write export state to history file

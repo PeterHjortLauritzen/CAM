@@ -47,17 +47,22 @@ public :: &
    diag_physvar_ic,          &
    nsurf
 
-integer, public, parameter                                 :: num_stages = 8
-character (len = max_fieldname_len), dimension(num_stages) :: stage = (/"phBF","phBP","phAP","phAM","dyBF","dyBP","dyAP","dyAM"/)
+integer, public, parameter                                 :: num_stages = 12
+character (len = max_fieldname_len), dimension(num_stages) :: &
+     stage = (/"phBF","phBP","phAP","phAC","phAF","phAM","dyBF","dyBP","dyAP","dyAC","dyAF","dyAM"/)
 character (len = 45),dimension(num_stages) :: stage_txt = (/&
-     " before energy fixer                     ",& !phBF - physics energy
-     " before parameterizations                ",& !phBF - physics energy
-     " after parameterizations                 ",& !phAP - physics energy
-     " after dry mass correction               ",& !phAM - physics energy
-     " before energy fixer (dycore)            ",& !dyBF - dynamics energy
-     " before parameterizations (dycore)       ",& !dyBF - dynamics energy
-     " after parameterizations (dycore)        ",& !dyAP - dynamics energy
-     " after dry mass correction (dycore)      " & !dyAM - dynamics energy
+     " before energy fixer                     ",& !phBF
+     " before parameterizations                ",& !phBP
+     " after parameterizations                 ",& !phAP
+     " after enthalpy flux                     ",& !phAC
+     " after dry mass adjustment               ",& !phAF
+     " afer residual fixer                     ",& !phAM
+     " before energy fixer (dycore)            ",& !dyBF
+     " before parameterizations (dycore)       ",& !dyBP
+     " after parameterizations (dycore)        ",& !dyAP
+     " after enthalpy flux (dycore)            ",& !dyAC
+     " after dry mass adjustment (dycore)      ",& !dyAF
+     " after residual fixer (dycore)           " & !dyAM
      /)
 
 ! Private data
@@ -408,12 +413,21 @@ contains
        call cam_budget_em_register('dEdt_param_efix_dynE' ,'dyAP','dyBF','phy','dif',longname='dE/dt CAM physics + energy fixer using dycore E formula (dyAP-dyBF)')
        call cam_budget_em_register('dEdt_param_physE'     ,'phAP','phBP','phy','dif',longname='dE/dt CAM physics using physics E formula (phAP-phBP)')
        call cam_budget_em_register('dEdt_param_dynE'      ,'dyAP','dyBP','phy','dif',longname='dE/dt CAM physics using dycore E (dyAP-dyBP)')
-       call cam_budget_em_register('dEdt_dme_adjust_physE','phAM','phAP','phy','dif',longname='dE/dt dry mass adjustment using physics E formula (phAM-phAP)')
-       call cam_budget_em_register('dEdt_dme_adjust_dynE' ,'dyAM','dyAP','phy','dif',longname='dE/dt dry mass adjustment using dycore E (dyAM-dyAP)')
        call cam_budget_em_register('dEdt_efix_physE'      ,'phBP','phBF','phy','dif',longname='dE/dt energy fixer using physics E formula (phBP-phBF)')
        call cam_budget_em_register('dEdt_efix_dynE'       ,'dyBP','dyBF','phy','dif',longname='dE/dt energy fixer using dycore E formula (dyBP-dyBF)')
        call cam_budget_em_register('dEdt_phys_tot_physE'  ,'phAM','phBF','phy','dif',longname='dE/dt physics total using physics E formula (phAM-phBF)')
        call cam_budget_em_register('dEdt_phys_tot_dynE'   ,'dyAM','dyBF','phy','dif',longname='dE/dt physics total using dycore E (dyAM-dyBF)')
+       call cam_budget_em_register('dEdt_Enthalpy_flux_dynE'   ,'dyAC','dyAP','phy','dif',longname='Enthalpy flux using dycore E (dyAC-dyAP)')
+       call cam_budget_em_register('dEdt_Enthalpy_flux_physE'  ,'phAC','phAP','phy','dif',longname='Enthalpy flux using physics E (phAC-phAP)')
+       call cam_budget_em_register('dEdt_dme_adjust_physE','phAC','phAP','phy','dif',longname='dE/dt dry mass adjustment using physics E formula (phAF-phAC)')
+       call cam_budget_em_register('dEdt_dme_adjust_dynE' ,'dyAC','dyAP','phy','dif',longname='dE/dt dry mass adjustment using dycore E (dyAF-dyAC)')
+       call cam_budget_em_register('dEdt_residual_fix_dynE'   ,'dyAM','dyAF','phy','dif',longname='Residual fixer dycore E (dyAM-dyAP)')
+       call cam_budget_em_register('dEdt_residual_fix_physE'  ,'phAM','phAF','phy','dif',longname='Residual fixer physics E (phAM-phAP)')
+
+       call cam_budget_em_register('dEdt_cpupdate_physE'  ,'phAF','phAC','phy','dif',longname='thermo update physics E (phAF-phAC)')
+       call cam_budget_em_register('dEdt_cpupdate_dynE'  ,'dyAF','dyAC','phy','dif',longname='thermo update dyn E (phAF-phAC)')
+       call cam_budget_em_register('dEdt_Q_LT_physE'  ,'phAM','phAF','phy','dif',longname='Q under L(T) physics E (phAM-phAF)')
+       call cam_budget_em_register('dEdt_Q_LT_dynE'  ,'dyAM','dyAF','phy','dif',longname='Q under L(T) dyn E (phAM-phAF)')
     endif
   end subroutine diag_init_dry
 
@@ -525,6 +539,60 @@ contains
     call addfld ('ALDIF',    horiz_only, 'A', '1','albedo: longwave, diffuse')
     call addfld ('SST',      horiz_only, 'A', 'K','sea surface temperature')
 
+
+    call addfld ('rliqbc',      horiz_only, 'I', 'W/m2','')
+    call addfld ('prect_diagnosed',      horiz_only, 'I', 'W/m2','')
+    call addfld ('FRAIN_coupler',      horiz_only, 'I', 'W/m2','')
+    call addfld ('FSNOW_coupler',      horiz_only, 'I', 'W/m2','')
+    call addfld ('FEVAP_coupler',      horiz_only, 'I', 'W/m2','')
+    call addfld ('HRAIN_AC',      horiz_only, 'I', 'W/m2','')
+    call addfld ('HSNOW_AC',      horiz_only, 'I', 'W/m2','')
+    call addfld ('HEVAP_AC',      horiz_only, 'I', 'W/m2','')
+    call addfld ('HRAIN_BC',      horiz_only, 'I', 'W/m2','')
+    call addfld ('HSNOW_BC',      horiz_only, 'I', 'W/m2','')
+    call addfld ('HEVAP_BC',      horiz_only, 'I', 'W/m2','')
+    call addfld ('FRAIN_AC',      horiz_only, 'I', 'W/m2','')
+    call addfld ('FSNOW_AC',      horiz_only, 'I', 'W/m2','')
+    call addfld ('FEVAP_AC',      horiz_only, 'I', 'W/m2','')
+    call addfld ('FRAIN_BC',      horiz_only, 'I', 'W/m2','')
+    call addfld ('FSNOW_BC',      horiz_only, 'I', 'W/m2','')
+    call addfld ('FEVAP_BC',      horiz_only, 'I', 'W/m2','')
+    call addfld ('FRAIN_tot',      horiz_only, 'I', 'W/m2','')
+    call addfld ('FSNOW_tot',      horiz_only, 'I', 'W/m2','')
+    call addfld ('FEVAP_tot',      horiz_only, 'I', 'W/m2','')
+    call addfld ('DTOTH2O',      (/ 'lev' /), 'I', 'W/m2','')!xxx
+    call addfld ('DCLDLIQ',      (/ 'lev' /), 'I', 'W/m2','')!xxx
+    call addfld ('DCLDICE',      (/ 'lev' /),'I', 'W/m2','')!xxx
+    call addfld ('zmQ',      (/ 'lev' /),'I', 'W/m2','')
+    call addfld ('dtot_wv',      horiz_only, 'I', 'W/m2','')
+    call addfld ('dtot_ice',      horiz_only, 'I', 'W/m2','')
+    call addfld ('dtot_liq',      horiz_only, 'I', 'W/m2','')
+    call addfld ('dtot_wv_coupler',      horiz_only, 'I', 'W/m2','')
+    call addfld ('dtot_ice_coupler',      horiz_only, 'I', 'W/m2','')
+    call addfld ('dtot_liq_coupler',      horiz_only, 'I', 'W/m2','')
+    call addfld ('heating',      horiz_only, 'I', 'W/m2','')
+    call addfld ('imbalance',      horiz_only, 'I', 'W/m2','')
+    call addfld ('radiation',      horiz_only, 'I', 'W/m2','')
+    call addfld ('te_sen',      horiz_only, 'I', 'W/m2','')
+    call addfld ('te_lat',      horiz_only, 'I', 'W/m2','')
+    
+    call addfld ('HRAIN',      horiz_only, 'A', 'W/m2','enthalpy flux from rain (ice ref state)')
+    call addfld ('HSNOW',      horiz_only, 'A', 'W/m2','enthalpy flux from snow (ice ref state)')
+    call addfld ('HEVAP',      horiz_only, 'A', 'W/m2','enthalpy flux from evap (ice ref state)')
+    call addfld ('HRAIN_OCN_LIQREF',  horiz_only, 'A', 'W/m2','enthalpy flux from rain (liq ref state)') !xxx just debugging
+    call addfld ('HSNOW_OCN_LIQREF',  horiz_only, 'A', 'W/m2','enthalpy flux from snow (liq ref state)') !xxx just debugging
+    call addfld ('HEVAP_OCN_LIQREF',  horiz_only, 'A', 'W/m2','enthalpy flux from evap (liq ref state)') !xxx just debugging
+
+    call addfld ('HTOT' ,    horiz_only, 'A', 'W/m2','enthalpy flux + latent heat terms (ice ref state)')!xxx just debugging
+    call addfld ('HTOT_ATM_OCN' ,horiz_only, 'A', 'W/m2','enthalpy flux + latent heat terms (ice ref state) over ocean only')!xxx just debugging
+    call addfld ('HTOT_OCN_OCN' ,horiz_only, 'A', 'W/m2','enthalpy flux + latent heat terms (liq ref state) over ocean only')!xxx just debugging
+    call addfld ('HREF_OCN_OCN' ,horiz_only, 'A', 'W/m2','liq ref state term')!xxx just debugging
+    call addfld ('FRHS_FLX' ,horiz_only, 'A', 'W/m2','RHS flux terms')!xxx just debugging
+    call addfld ('FRHS_FLXA' ,horiz_only, 'A', 'W/m2','RHS flux terms')!xxx just debugging
+    call addfld ('FRHS_FLXB' ,horiz_only, 'A', 'W/m2','RHS flux terms')!xxx just debugging
+    call addfld ('FRHS_FLXC' ,horiz_only, 'A', 'W/m2','RHS flux terms')!xxx just debugging
+    call addfld ('te_tnd' ,horiz_only, 'A', 'W/m2','RHS flux terms')!xxx just debugging
+    call addfld ('enth_flx' ,horiz_only, 'A', 'W/m2','RHS flux terms')!xxx just debugging
 
     ! outfld calls in diag_phys_tend_writeout
 
@@ -1789,7 +1857,6 @@ contains
       call outfld('U10',      cam_in%u10,       pcols, lchnk)
       call outfld('UGUST',    cam_in%ugustOut,  pcols, lchnk)
       call outfld('U10WITHGUSTS',cam_in%u10withGusts, pcols, lchnk)
-
       !
       ! Calculate and output reference height RH (RHREFHT)
       call qsat(cam_in%tref(1:ncol), state%ps(1:ncol), tem2(1:ncol), ftem(1:ncol), ncol)

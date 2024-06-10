@@ -1,3 +1,4 @@
+
 module cam_budget
   !----------------------------------------------------------------------------
   !
@@ -39,7 +40,7 @@ module cam_budget
 
   ! Private
   real(r8)                             :: dstepsize
-  integer, parameter                   :: budget_array_max  = 500                 ! max number of budgets
+  integer, parameter                   :: budget_array_max  = 600                 ! max number of budgets
   character*3                          :: budget_optype(budget_array_max)  = ''   ! allows 'dif' or 'sum'
   character*3                          :: budget_pkgtype(budget_array_max) = ''   ! allows 'phy' or 'dyn'
 

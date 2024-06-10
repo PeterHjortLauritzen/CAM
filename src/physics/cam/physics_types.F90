@@ -54,7 +54,14 @@ module physics_types
   public physics_cnst_limit ! apply limiters to constituents (waccmx)
 !-------------------------------------------------------------------------------
   integer, parameter, public :: phys_te_idx = 1
-  integer ,parameter, public :: dyn_te_idx = 2
+  integer, parameter, public :: dyn_te_idx = 2
+
+  integer, parameter, public :: num_hflx = 4
+  
+  integer, parameter, public :: ihrain = 1  ! index for enthalpy flux associated with liquid precipitation
+  integer, parameter, public :: ihsnow = 2  ! index for enthalpy flux associated with frozen precipiation
+  integer, parameter, public :: ifrain = 3  ! index for flux of liquid precipitation
+  integer, parameter, public :: ifsnow = 4  ! index for flux of frozen precipitation
 
   type physics_state
      integer                                     :: &
@@ -101,9 +108,16 @@ module physics_types
                            ! Second dimension is (phys_te_idx) CAM physics total energy and
                            ! (dyn_te_idx) dycore total energy computed in physics
           te_ini,         &! vertically integrated total (kinetic + static) energy of initial state
-          te_cur,         &! vertically integrated total (kinetic + static) energy of current state
+          te_cur,         &! vertically integrated total (kinetic + static) energy of current state          
           tw_ini,         &! vertically integrated total water of initial state
           tw_cur           ! vertically integrated total water of new state
+     !
+     ! Array for enthalpy flux calculations
+     !
+     real(r8), dimension(:,:),allocatable          :: &
+          hflx_ac            ! enthalpy flux variables after coupler
+     real(r8), dimension(:,:),allocatable          :: &
+          hflx_bc            ! enthalpy flux variables before coupler
      real(r8), dimension(:,:),allocatable          :: &
           temp_ini,       &! Temperature of initial state (used for energy computations)
           z_ini            ! Height of initial state (used for energy computations)
@@ -126,6 +140,8 @@ module physics_types
      real(r8), dimension(:),  allocatable        :: flx_net
      real(r8), dimension(:),  allocatable        :: &
           te_tnd,  &! cumulative boundary flux of total energy
+          te_sen,  &! cumulative sensible heat flux
+          te_lat,  &! cumulative latent heat flux
           tw_tnd    ! cumulative boundary flux of total water
   end type physics_tend
 
@@ -537,6 +553,11 @@ contains
          varname="state%te_ini",    msg=msg)
     call shr_assert_in_domain(state%te_cur(:ncol,:),    is_nan=.false., &
          varname="state%te_cur",    msg=msg)
+    !xxx make allocation dependent on if energy budget history is turned on
+    call shr_assert_in_domain(state%hflx_ac(:ncol,num_hflx),   is_nan=.false., &
+         varname="state%hflx_ac",    msg=msg)
+    call shr_assert_in_domain(state%hflx_bc(:ncol,num_hflx),   is_nan=.false., &
+         varname="state%hflx_bc",    msg=msg)
     call shr_assert_in_domain(state%tw_ini(:ncol,:),    is_nan=.false., &
          varname="state%tw_ini",    msg=msg)
     call shr_assert_in_domain(state%tw_cur(:ncol,:),    is_nan=.false., &
@@ -615,6 +636,10 @@ contains
          varname="state%te_ini",    msg=msg)
     call shr_assert_in_domain(state%te_cur(:ncol,:),    lt=posinf_r8, gt=neginf_r8, &
          varname="state%te_cur",    msg=msg)
+    call shr_assert_in_domain(state%hflx_ac(:ncol,:num_hflx),     lt=posinf_r8, gt=neginf_r8, &
+         varname="state%hflx_ac",    msg=msg)
+    call shr_assert_in_domain(state%hflx_bc(:ncol,:num_hflx),     lt=posinf_r8, gt=neginf_r8, &
+         varname="state%hflx_bc",    msg=msg)
     call shr_assert_in_domain(state%tw_ini(:ncol,:),    lt=posinf_r8, gt=neginf_r8, &
          varname="state%tw_ini",    msg=msg)
     call shr_assert_in_domain(state%tw_cur(:ncol,:),    lt=posinf_r8, gt=neginf_r8, &
@@ -1190,7 +1215,7 @@ end subroutine physics_ptend_copy
   end subroutine physics_cnst_limit
 
 !===============================================================================
-  subroutine physics_dme_adjust(state, tend, qini, liqini, iceini, dt)
+  subroutine physics_dme_adjust(state, qini, liqini, iceini, dt)
     use air_composition, only: dry_air_species_num,thermodynamic_active_species_num
     use air_composition, only: thermodynamic_active_species_idx
     use dycore,          only: dycore_is
@@ -1223,7 +1248,6 @@ end subroutine physics_ptend_copy
     ! Arguments
     !
     type(physics_state), intent(inout) :: state
-    type(physics_tend ), intent(inout) :: tend
     real(r8),            intent(in   ) :: qini(pcols,pver)    ! initial specific humidity
     real(r8),            intent(in   ) :: liqini(pcols,pver)  ! initial total liquid
     real(r8),            intent(in   ) :: iceini(pcols,pver)  ! initial total ice
@@ -1349,10 +1373,12 @@ end subroutine physics_ptend_copy
        state_out%ps(i)       = state_in%ps(i)
        state_out%phis(i)     = state_in%phis(i)
      end do
-     state_out%te_ini(:ncol,:) = state_in%te_ini(:ncol,:)
-     state_out%te_cur(:ncol,:) = state_in%te_cur(:ncol,:)
-     state_out%tw_ini(:ncol,:) = state_in%tw_ini(:ncol,:)
-     state_out%tw_cur(:ncol,:) = state_in%tw_cur(:ncol,:)
+     state_out%te_ini(:ncol,:)   = state_in%te_ini(:ncol,:)
+     state_out%te_cur(:ncol,:)   = state_in%te_cur(:ncol,:)
+     state_out%hflx_ac(:ncol,:)  = state_in%hflx_ac(:ncol,:)
+     state_out%hflx_bc(:ncol,:)  = state_in%hflx_bc(:ncol,:)
+     state_out%tw_ini(:ncol,:)   = state_in%tw_ini(:ncol,:)
+     state_out%tw_cur(:ncol,:)   = state_in%tw_cur(:ncol,:)
 
     do k = 1, pver
        do i = 1, ncol
@@ -1432,6 +1458,8 @@ end subroutine physics_ptend_copy
     tend%dvdt    = 0._r8
     tend%flx_net = 0._r8
     tend%te_tnd  = 0._r8
+    tend%te_sen  = 0._r8
+    tend%te_lat  = 0._r8
     tend%tw_tnd  = 0._r8
 
 end subroutine physics_tend_init
@@ -1635,6 +1663,12 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
   allocate(state%te_cur(psetcols,2), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%te_cur')
 
+  allocate(state%hflx_ac(psetcols,num_hflx), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%hflx_ac')
+
+  allocate(state%hflx_bc(psetcols,num_hflx), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%hflx_bc')
+
   allocate(state%tw_ini(psetcols,2), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_alloc error: allocation error for state%tw_ini')
 
@@ -1688,6 +1722,8 @@ subroutine physics_state_alloc(state,lchnk,psetcols)
 
   state%te_ini(:,:) = inf
   state%te_cur(:,:) = inf
+  state%hflx_ac(:,:)  = inf
+  state%hflx_bc(:,:)  = inf
   state%tw_ini(:,:) = inf
   state%tw_cur(:,:) = inf
   state%temp_ini(:,:) = inf
@@ -1794,6 +1830,12 @@ subroutine physics_state_dealloc(state)
   deallocate(state%te_cur, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%te_cur')
 
+  deallocate(state%hflx_ac, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%hflx_ac')
+
+  deallocate(state%hflx_bc, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%hflx_bc')
+
   deallocate(state%tw_ini, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_state_dealloc error: deallocation error for state%tw_ini')
 
@@ -1847,6 +1889,12 @@ subroutine physics_tend_alloc(tend,psetcols)
   allocate(tend%te_tnd(psetcols), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%te_tnd')
 
+  allocate(tend%te_sen(psetcols), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%te_sen')
+
+  allocate(tend%te_lat(psetcols), stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%te_lat')
+
   allocate(tend%tw_tnd(psetcols), stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_tend_alloc error: allocation error for tend%tw_tnd')
 
@@ -1855,6 +1903,8 @@ subroutine physics_tend_alloc(tend,psetcols)
   tend%dvdt(:,:) = inf
   tend%flx_net(:) = inf
   tend%te_tnd(:) = inf
+  tend%te_sen(:) = inf
+  tend%te_lat(:) = inf
   tend%tw_tnd(:) = inf
 
 end subroutine physics_tend_alloc
@@ -1882,6 +1932,12 @@ subroutine physics_tend_dealloc(tend)
 
   deallocate(tend%te_tnd, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%te_tnd')
+
+  deallocate(tend%te_sen, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%te_sen')
+
+  deallocate(tend%te_lat, stat=ierr)
+  if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%te_lat')
 
   deallocate(tend%tw_tnd, stat=ierr)
   if ( ierr /= 0 ) call endrun('physics_tend_dealloc error: deallocation error for tend%tw_tnd')

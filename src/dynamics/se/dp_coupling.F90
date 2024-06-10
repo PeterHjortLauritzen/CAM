@@ -669,7 +669,7 @@ subroutine derived_phys_dry(phys_state, phys_tend, pbuf2d)
       ! update cp_dycore in module air_composition.
       ! (note: at this point q is dry)
       !
-      call cam_thermo_water_update(phys_state(lchnk)%q(1:ncol,:,:), lchnk, ncol, vc_dry_pressure)
+      call cam_thermo_water_update(phys_state(lchnk)%q(1:ncol,:,:), lchnk, ncol, vc_dry_pressure, init=.true.)
       do k = 1, nlev
          do i = 1, ncol
             phys_state(lchnk)%exner(i,k) = (phys_state(lchnk)%pint(i,pver+1) &

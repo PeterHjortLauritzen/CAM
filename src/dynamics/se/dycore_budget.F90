@@ -42,11 +42,18 @@ subroutine print_budget(hstwr)
   real(r8) :: dEdt_dme_adjust_physE(4) ! dE/dt dry mass adjustment using physics E formula (phAM-phAP)
   real(r8) :: dEdt_dme_adjust_dynE(4)  ! dE/dt dry mass adjustment using dycore E (dyAM-dyAP)
 
+  real(r8) :: dEdt_Enthalpy_flux_dynE   ! dE/dt Enthalpy flux using dycore E (dyAC-dyAP)
+  real(r8) :: dEdt_Enthalpy_flux_physE  ! dE/dt Enthalpy flux using physics E (phAC-phAP)
+
+  real(r8) :: dEdt_residual_fix_dynE   ! dE/dt Residual fixer dycore E (dyAC-dyAP)
+  real(r8) :: dEdt_residual_fix_physE  ! Residual fixer physics E (phAC-phAP)
+
   real(r8) :: dEdt_param_efix_physE(4) ! dE/dt CAM physics + energy fixer using physics E formula (phAP-phBF)
   real(r8) :: dEdt_param_efix_dynE(4)  ! dE/dt CAM physics + energy fixer using dycore E formula (dyAP-dyBF)
 
   real(r8) :: dEdt_phys_total_dynE(4)  ! dE/dt physics total using dycore E (dyAM-dyBF)
                                        ! physics total = parameterizations + efix + dry-mass adjustment
+
   !
   ! SE dycore specific energy tendencies
   !
@@ -107,13 +114,17 @@ subroutine print_budget(hstwr)
     str(2) = "(enthalpy     )"
     str(3) = "(kinetic      )"
     str(4) = "(srf potential)"
+    call cam_budget_get_global('dyAC-dyAP',idx(1),dEdt_Enthalpy_flux_dynE)
+    call cam_budget_get_global('phAC-phAP',idx(1),dEdt_Enthalpy_flux_physE)
+    call cam_budget_get_global('dyAM-dyAF',idx(1),dEdt_residual_fix_dynE)
+    call cam_budget_get_global('phAM-phAF',idx(1),dEdt_residual_fix_physE)
     do i=1,4
       !
       ! CAM physics energy tendencies
       !
       call cam_budget_get_global('phAP-phBP',idx(i),dEdt_param_physE(i))
       call cam_budget_get_global('phBP-phBF',idx(i),dEdt_efix_physE(i))
-      call cam_budget_get_global('phAM-phAP',idx(i),dEdt_dme_adjust_physE(i))
+      call cam_budget_get_global('phAC-phAP',idx(i),dEdt_dme_adjust_physE(i))
       call cam_budget_get_global('phAP-phBF',idx(i),dEdt_param_efix_physE(i))
       !
       ! CAM physics energy tendencies using dycore energy formula scaling
@@ -121,7 +132,7 @@ subroutine print_budget(hstwr)
       !
       call cam_budget_get_global('dyAP-dyBP',idx(i),dEdt_param_dynE(i))
       call cam_budget_get_global('dyBP-dyBF',idx(i),dEdt_efix_dynE(i))
-      call cam_budget_get_global('dyAM-dyAP',idx(i),dEdt_dme_adjust_dynE(i))
+      call cam_budget_get_global('dyAC-dyAP',idx(i),dEdt_dme_adjust_dynE(i))
       call cam_budget_get_global('dyAP-dyBF',idx(i),dEdt_param_efix_dynE(i))
       call cam_budget_get_global('dyAM-dyBF',idx(i),dEdt_phys_total_dynE(i))
       call cam_budget_get_global('dyBF'     ,idx(i),E_dyBF(i))!state beginning physics
@@ -237,6 +248,12 @@ subroutine print_budget(hstwr)
                       dEdt_dme_adjust_dynE(i)," ",diff
     end do
     write(iulog,*)" "
+    write(iulog,*)" Enthalpy flux (dyAC-dyAP) : ",dEdt_Enthalpy_flux_dynE
+    write(iulog,*)" Enthalpy flux (phAC-phAP) : ",dEdt_Enthalpy_flux_physE
+    write(iulog,*)" Dry-mass adj. (dyAF-dyAC) : ",dEdt_dme_adjust_dynE(1)
+    write(iulog,*)" Dry-mass adj. (phAF-phAC) : ",dEdt_dme_adjust_physE(1)
+    write(iulog,*)" residual      (dyAM-dyAF) : ",dEdt_residual_fix_dynE
+    write(iulog,*)" residual      (phAM-phAF) : ",dEdt_residual_fix_physE
     write(iulog,*)" "
     !
     ! these diagnostics only make sense time-step to time-step
@@ -426,7 +443,7 @@ subroutine print_budget(hstwr)
         write(iulog,*)thermo_budget_vars_descriptor(m_cnst)
         write(iulog,*)"------------------------------"
         call cam_budget_get_global('phBP-phBF',m_cnst,dMdt_efix)
-        call cam_budget_get_global('phAM-phAP',m_cnst,dMdt_dme_adjust)
+        call cam_budget_get_global('phAC-phAP',m_cnst,dMdt_dme_adjust)
         call cam_budget_get_global('phAP-phBP',m_cnst,dMdt_parameterizations)
         call cam_budget_get_global('phAM-phBF',m_cnst,dMdt_phys_total)
         !
@@ -449,9 +466,9 @@ subroutine print_budget(hstwr)
         ! all of the mass-tendency should come from parameterization - checking
         !
         if (abs(dMdt_parameterizations-dMdt_phys_total)>eps_mass) then
-          write(iulog,*) "Error: dMASS/dt parameterizations (pAP-pBP) .ne. dMASS/dt physics total (pAM-pBF)"
-          write(iulog,*) "dMASS/dt parameterizations   (pAP-pBP) ",dMdt_parameterizations," Pa/m^2/s"
-          write(iulog,*) "dMASS/dt physics total       (pAM-pBF) ",dMdt_phys_total," Pa/m^2/s"
+          write(iulog,*) "Error: dMASS/dt parameterizations (phAP-phBP) .ne. dMASS/dt physics total (pAM-pBF)"
+          write(iulog,*) "dMASS/dt parameterizations   (phAP-phBP) ",dMdt_parameterizations," Pa/m^2/s"
+          write(iulog,*) "dMASS/dt physics total       (phAM-phBF) ",dMdt_phys_total," Pa/m^2/s"
           call endrun(subname//"mass change not only due to parameterizations. See atm.log")
         end if
         write(iulog,*)"  "

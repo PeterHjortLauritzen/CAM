@@ -204,6 +204,7 @@ module cam_thermo
         "kg/m2        ","J/m2         "/)
    logical              ,public, dimension(thermo_budget_num_vars) :: thermo_budget_vars_massv = (/&
         .true.,.true.,.true.,.false.,.false.,.false.,.false.,.false.,.true.,.false./)
+   logical, public :: compute_enthalpy_flux=.true.!xxx should be namelist or cam_dev/se_dycore logical
 CONTAINS
 
    !===========================================================================
@@ -276,7 +277,7 @@ CONTAINS
     !
     !***************************************************************************
     !
-    subroutine cam_thermo_water_update(mmr, lchnk, ncol, vcoord, to_dry_factor)
+    subroutine cam_thermo_water_update(mmr, lchnk, ncol, vcoord, to_dry_factor, init)
       use air_composition, only: water_composition_update
       !-----------------------------------------------------------------------
       ! Update the physics "constants" that vary
@@ -289,10 +290,11 @@ CONTAINS
       integer,            intent(in) :: ncol       ! number of columns
       integer,            intent(in) :: vcoord
       real(r8), optional, intent(in) :: to_dry_factor(:,:)
+      logical,  optional, intent(in) :: init
       !
       logical :: lcp
 
-      call water_composition_update(mmr, lchnk, ncol, vcoord, to_dry_factor=to_dry_factor)
+      call water_composition_update(mmr, lchnk, ncol, vcoord, to_dry_factor=to_dry_factor, init=init)
     end subroutine cam_thermo_water_update
 
    !===========================================================================

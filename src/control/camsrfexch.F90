@@ -32,6 +32,7 @@ module camsrfexch
   public cam_out_t                  ! Data from atmosphere
   public cam_in_t                   ! Merged surface data
 
+ 
   !---------------------------------------------------------------------------
   ! This is the data that is sent from the atmosphere to the surface models
   !---------------------------------------------------------------------------
@@ -53,6 +54,9 @@ module camsrfexch
      real(r8) :: precsl(pcols)       !
      real(r8) :: precc(pcols)        !
      real(r8) :: precl(pcols)        !
+     real(r8) :: hrain(pcols)        !material enth. flx for rain (currently only used by ocn, MOM)
+     real(r8) :: hsnow(pcols)        !material enth. flx for snow (currently only used by ocn, MOM)
+     real(r8) :: hevap(pcols)        !material enth. flx for evaporation (currently only used by ocn, MOM)
      real(r8) :: soll(pcols)         !
      real(r8) :: sols(pcols)         !
      real(r8) :: solld(pcols)        !
@@ -299,6 +303,9 @@ CONTAINS
        cam_out(c)%precsl(:)   = 0._r8
        cam_out(c)%precc(:)    = 0._r8
        cam_out(c)%precl(:)    = 0._r8
+       cam_out(c)%hrain(:)    = 0._r8
+       cam_out(c)%hsnow(:)    = 0._r8
+       cam_out(c)%hevap(:)    = 0._r8
        cam_out(c)%soll(:)     = 0._r8
        cam_out(c)%sols(:)     = 0._r8
        cam_out(c)%solld(:)    = 0._r8
@@ -398,94 +405,76 @@ CONTAINS
 
 !======================================================================
 
-subroutine cam_export(state,cam_out,pbuf)
+subroutine cam_export(state,cam_out,pbuf,cam_in,qini, totliqini, toticeini,ztodt)
 
    ! Transfer atmospheric fields into necessary surface data structures
 
    use physics_types,    only: physics_state
    use ppgrid,           only: pver
-   use cam_history,      only: outfld
    use chem_surfvals,    only: chem_surfvals_get
    use co2_cycle,        only: co2_transport, c_i
    use physconst,        only: rair, mwdry, mwco2, gravit, mwo3
+   use physconst,        only: cpwv, cpliq, cpice, latvap, latice, tmelt
    use constituents,     only: pcnst
-   use physics_buffer,   only: pbuf_get_index, pbuf_get_field, physics_buffer_desc
+   use physics_buffer,   only: pbuf_get_index, pbuf_get_field, physics_buffer_desc, pbuf_set_field
    use rad_constituents, only: rad_cnst_get_gas
    use cam_control_mod,  only: simple_phys
-
+   use cam_history,      only: outfld
+   use physics_types,    only: ihrain, ihsnow, ifrain, ifsnow
+   use air_composition,only: thermodynamic_active_species_liq_num!xxx
+   use air_composition,only: thermodynamic_active_species_liq_idx!xxx
+   use air_composition,only: thermodynamic_active_species_ice_num!xxx
+   use air_composition,only: thermodynamic_active_species_ice_idx!xxx
+   use physconst,       only: rga!xxx
+   use enthalpy_flux_mod, only: get_prec_vars
    implicit none
 
    ! Input arguments
-   type(physics_state),  intent(in) :: state
-   type (cam_out_t),     intent(inout) :: cam_out
-   type(physics_buffer_desc), pointer  :: pbuf(:)
+   type(physics_state),  intent(inout)        :: state
+   type (cam_out_t),     intent(inout)        :: cam_out
+   type(physics_buffer_desc), pointer         :: pbuf(:)
+   type (cam_in_t ),     intent(in)           :: cam_in
 
+    real(r8), dimension(pcols,pver), intent(in) :: qini, totliqini, toticeini!xxx
+    real(r8), intent(in   ) :: ztodt               ! 2 delta t (model time increment)   
    ! Local variables
 
    integer :: i              ! Longitude index
    integer :: m              ! constituent index
    integer :: lchnk          ! Chunk index
    integer :: ncol
-   integer :: psl_idx
-   integer :: prec_dp_idx, snow_dp_idx, prec_sh_idx, snow_sh_idx
-   integer :: prec_sed_idx,snow_sed_idx,prec_pcw_idx,snow_pcw_idx
+   integer :: psl_idx, hevap_iceref_idx
    integer :: srf_ozone_idx, lightning_idx
 
    real(r8), pointer :: psl(:)
-
-   real(r8), pointer :: prec_dp(:)                 ! total precipitation   from ZM convection
-   real(r8), pointer :: snow_dp(:)                 ! snow from ZM   convection
-   real(r8), pointer :: prec_sh(:)                 ! total precipitation   from Hack convection
-   real(r8), pointer :: snow_sh(:)                 ! snow from   Hack   convection
-   real(r8), pointer :: prec_sed(:)                ! total precipitation   from ZM convection
-   real(r8), pointer :: snow_sed(:)                ! snow from ZM   convection
-   real(r8), pointer :: prec_pcw(:)                ! total precipitation   from Hack convection
-   real(r8), pointer :: snow_pcw(:)                ! snow from Hack   convection
+   
    real(r8), pointer :: o3_ptr(:,:), srf_o3_ptr(:)
    real(r8), pointer :: lightning_ptr(:)
+   real(r8), allocatable :: htmp(:)                !for outfld !xxx
+   real(r8), allocatable :: hrain_iceref(:)        !hrain ice reference state (atmosphere)
+   real(r8), allocatable :: hsnow_iceref(:)        !hsnow ice reference state (atmosphere)
+   real(r8), allocatable :: hevap_iceref(:)        !hevap ice reference state (atmosphere)
+   real(r8), allocatable :: hrain_liqref(:)    !hrain for ocean using liquid reference state
+   real(r8), allocatable :: hsnow_liqref(:)    !hsnow for ocean using liquid reference state
+   real(r8), allocatable :: hevap_liqref(:)    !hevap for ocean using liquid reference state
+   real(r8), dimension(pcols) :: frain_ac, frain_bc !flux of liq precip after and before coupler, respectively
+   real(r8), dimension(pcols) :: fsnow_ac, fsnow_bc !flux of frozen precip after and before coupler, respectively
+   real(r8), dimension(pcols) :: frain, fsnow       !total flux of liq/frozen precip from thysac in previous time-step
+   real(r8), dimension(pcols) :: Tprec
+    real(r8) :: tot_wv(pcols), tot_ice(pcols), tot_liq(pcols),rliqbc(pcols),zeros(pcols)!xxx
+    integer  :: k,m_cnst!xxx
+                                                    !tphysbc in current time-step
    !-----------------------------------------------------------------------
-
+    zeros(:) = 0.0_r8
+    
    lchnk = state%lchnk
    ncol  = state%ncol
 
    psl_idx = pbuf_get_index('PSL')
    call pbuf_get_field(pbuf, psl_idx, psl)
 
-   prec_dp_idx = pbuf_get_index('PREC_DP', errcode=i)
-   snow_dp_idx = pbuf_get_index('SNOW_DP', errcode=i)
-   prec_sh_idx = pbuf_get_index('PREC_SH', errcode=i)
-   snow_sh_idx = pbuf_get_index('SNOW_SH', errcode=i)
-   prec_sed_idx = pbuf_get_index('PREC_SED', errcode=i)
-   snow_sed_idx = pbuf_get_index('SNOW_SED', errcode=i)
-   prec_pcw_idx = pbuf_get_index('PREC_PCW', errcode=i)
-   snow_pcw_idx = pbuf_get_index('SNOW_PCW', errcode=i)
    srf_ozone_idx = pbuf_get_index('SRFOZONE', errcode=i)
    lightning_idx = pbuf_get_index('LGHT_FLASH_FREQ', errcode=i)
-
-   if (prec_dp_idx > 0) then
-     call pbuf_get_field(pbuf, prec_dp_idx, prec_dp)
-   end if
-   if (snow_dp_idx > 0) then
-     call pbuf_get_field(pbuf, snow_dp_idx, snow_dp)
-   end if
-   if (prec_sh_idx > 0) then
-     call pbuf_get_field(pbuf, prec_sh_idx, prec_sh)
-   end if
-   if (snow_sh_idx > 0) then
-     call pbuf_get_field(pbuf, snow_sh_idx, snow_sh)
-   end if
-   if (prec_sed_idx > 0) then
-     call pbuf_get_field(pbuf, prec_sed_idx, prec_sed)
-   end if
-   if (snow_sed_idx > 0) then
-     call pbuf_get_field(pbuf, snow_sed_idx, snow_sed)
-   end if
-   if (prec_pcw_idx > 0) then
-     call pbuf_get_field(pbuf, prec_pcw_idx, prec_pcw)
-   end if
-   if (snow_pcw_idx > 0) then
-     call pbuf_get_field(pbuf, snow_pcw_idx, snow_pcw)
-   end if
 
    do i=1,ncol
       cam_out%tbot(i)  = state%t(i,pver)
@@ -525,51 +514,129 @@ subroutine cam_export(state,cam_out,pbuf)
       call pbuf_get_field(pbuf, lightning_idx, lightning_ptr)
       cam_out%lightning_flash_freq(:ncol) = lightning_ptr(:ncol)
    end if
+   !xxxxxxxxxxxxxxxxxxxx
+    tot_wv=0.0_r8!xxx
+    do k = 1, pver!xxx
+       do i = 1, ncol!xxx
+          tot_wv(i)   = tot_wv(i)+(state%q(i,k,1)-qini(i,k))*state%pdel(i,k)*rga!xxx
+       end do!xxx
+       do i = 1, ncol!xxx
 
+       end do
+    end do!xxx
+    call outfld ('dtot_wv_coupler',tot_wv, pcols, lchnk)!xxx
+    
+    tot_liq=0.0_r8!xxx
+    do k = 1, pver!xxx
+       do i = 1, ncol!xxx
+          do m_cnst=1,thermodynamic_active_species_liq_num
+             m = thermodynamic_active_species_liq_idx(m_cnst)
+             tot_liq(i)   = tot_liq(i)+(state%q(i,k,m))*state%pdel(i,k)*rga!xxx
+          end do
+          tot_liq(i)   = tot_liq(i)-totliqini(i,k)*state%pdel(i,k)*rga!xxx
+       end do!xxx
+    end do!xxx
+    call outfld ('dtot_liq_coupler',tot_liq, pcols, lchnk)!xxx
+
+    tot_ice=0.0_r8!xxx
+    do k = 1, pver!xxx
+       do i = 1, ncol!xxx
+          do m_cnst=1,thermodynamic_active_species_ice_num
+             m = thermodynamic_active_species_ice_idx(m_cnst)
+             tot_ice(i)   = tot_ice(i)+state%q(i,k,m)*state%pdel(i,k)*rga!xxx
+          end do
+          tot_ice(i)   = tot_ice(i)-toticeini(i,k)*state%pdel(i,k)*rga!xxx
+       end do!xxx
+    end do!xxx
+    call outfld ('dtot_ice_coupler',tot_ice, pcols, lchnk)!xxx
+   
+   !xxxxxxxxxxxxxxxxxxxx
    !
    ! Precipation and snow rates from shallow convection, deep convection and stratiform processes.
    ! Compute total convective and stratiform precipitation and snow rates
    !
-   do i=1,ncol
-      cam_out%precc (i) = 0._r8
-      cam_out%precl (i) = 0._r8
-      cam_out%precsc(i) = 0._r8
-      cam_out%precsl(i) = 0._r8
-      if (prec_dp_idx > 0) then
-        cam_out%precc (i) = cam_out%precc (i) + prec_dp(i)
-      end if
-      if (prec_sh_idx > 0) then
-        cam_out%precc (i) = cam_out%precc (i) + prec_sh(i)
-      end if
-      if (prec_sed_idx > 0) then
-        cam_out%precl (i) = cam_out%precl (i) + prec_sed(i)
-      end if
-      if (prec_pcw_idx > 0) then
-        cam_out%precl (i) = cam_out%precl (i) + prec_pcw(i)
-      end if
-      if (snow_dp_idx > 0) then
-        cam_out%precsc(i) = cam_out%precsc(i) + snow_dp(i)
-      end if
-      if (snow_sh_idx > 0) then
-        cam_out%precsc(i) = cam_out%precsc(i) + snow_sh(i)
-      end if
-      if (snow_sed_idx > 0) then
-        cam_out%precsl(i) = cam_out%precsl(i) + snow_sed(i)
-      end if
-      if (snow_pcw_idx > 0) then
-        cam_out%precsl(i) = cam_out%precsl(i) + snow_pcw(i)
-      end if
+   call get_prec_vars(ncol,pbuf,frain,fsnow,&
+        precc_out=cam_out%precc,precl_out=cam_out%precl,&
+        precsc_out=cam_out%precsc,precsl_out=cam_out%precsl,&
+        rliqbc_out=rliqbc)
+   call outfld('rliqbc', rliqbc,  pcols, lchnk)
+   call outfld('FRAIN_coupler', frain,  pcols, lchnk)
+   call outfld('FSNOW_coupler', fsnow,  pcols, lchnk)
+   call outfld('FEVAP_coupler', cam_in%cflx(:,1),pcols,lchnk)
+   !
+   ! back out precipitation fluxes from beginning of physics to coupler call
+   ! (frain and fsnow have been accummulated from tphysac in previous
+   ! time-step and in tphycbc in current time-step)
+   !
+!   state%hflx_bc(:ncol,ifrain) = frain(:ncol) - state%hflx_ac(:ncol,ifrain)
+!   state%hflx_bc(:ncol,ifsnow) = fsnow(:ncol) - state%hflx_ac(:ncol,ifsnow)
+!   frain_bc(:ncol) = frain(:ncol) - state%hflx_ac(:ncol,ifrain)
+!   fsnow_bc(:ncol) = fsnow(:ncol) - state%hflx_ac(:ncol,ifsnow)
+!   call outfld('FRAIN_BC', frain_bc,  pcols, lchnk)
+!   call outfld('FSNOW_BC', fsnow_bc,  pcols, lchnk)
+!   call outfld('FEVAP_BC', cam_in%cflx(:,1),pcols,lchnk)
 
-      ! jrm These checks should not be necessary if they exist in the parameterizations
-      if (cam_out%precc(i) .lt.0._r8) cam_out%precc(i)=0._r8
-      if (cam_out%precl(i) .lt.0._r8) cam_out%precl(i)=0._r8
-      if (cam_out%precsc(i).lt.0._r8) cam_out%precsc(i)=0._r8
-      if (cam_out%precsl(i).lt.0._r8) cam_out%precsl(i)=0._r8
-      if (cam_out%precsc(i).gt.cam_out%precc(i)) cam_out%precsc(i)=cam_out%precc(i)
-      if (cam_out%precsl(i).gt.cam_out%precl(i)) cam_out%precsl(i)=cam_out%precl(i)
+   cam_out%hevap(:ncol) = cam_in%cflx(:,1)*cam_in%ts(:ncol)*cpwv!compute evaporation enthalpy flux
+   hevap_iceref_idx = pbuf_get_index('hevap_iceref')
+   if (hevap_iceref_idx>0) call pbuf_set_field(pbuf, hevap_iceref_idx, cam_out%hevap(:))
+   !
+   ! add enthalpy flux originating from atmosphere from tphybc and tphysac
+   !
+   call outfld('HEVAP_BC', zeros,pcols,lchnk)
 
-   end do
+   cam_out%hrain(:ncol) = state%hflx_bc(:ncol,ihrain)+state%hflx_ac(:ncol,ihrain)
+   cam_out%hsnow(:ncol) = state%hflx_bc(:ncol,ihsnow)+state%hflx_ac(:ncol,ihsnow)
 
+   
+   call outfld('HRAIN', cam_out%hrain,  pcols, lchnk)
+   call outfld('HSNOW', cam_out%hsnow,  pcols, lchnk)
+   call outfld('HEVAP', cam_out%hevap,  pcols, lchnk)
+   allocate(htmp(ncol))
+   htmp =   cam_out%hevap(1:ncol)+cam_out%hsnow(1:ncol)+cam_out%hrain(1:ncol)
+   call outfld('HTOT' ,     htmp,   ncol, lchnk)!xxx just debugging
+   !
+   ! Compute enthalpy fluxes for the coupler:
+   !
+   ! ->Change enthalpy flux to sign convention of ocean model and change to liquid reference state
+   !
+   cam_out%hrain(:ncol) = -cam_out%hrain(:ncol)-fsnow(:ncol)     *tmelt*cpliq
+   cam_out%hsnow(:ncol) = -cam_out%hsnow(:ncol)-frain(:ncol)     *tmelt*cpice
+   cam_out%hevap(:ncol) = -cam_out%hevap(:ncol)+cam_in%cflx(:ncol,1)*tmelt*cpwv
+
+   call outfld('HRAIN_OCN_LIQREF', cam_out%hrain(:ncol)*cam_in%ocnfrac(:ncol), ncol, lchnk)
+   call outfld('HSNOW_OCN_LIQREF', cam_out%hsnow(:ncol)*cam_in%ocnfrac(:ncol), ncol, lchnk)
+   call outfld('HEVAP_OCN_LIQREF', cam_out%hevap(:ncol)*cam_in%ocnfrac(:ncol), ncol, lchnk)
+   !
+   ! Flux will be multiplied by cam_in%ocnfrac(i) in coupler
+   !
+   ! hsnow_liqref    =  fsnow(i)*(Tsnow(i)-tmelt)*cpice !sign must follow ocean model convention: +ve for flux into ocean
+   ! hrain_liqref    =  frain(i)*(Train(i)-tmelt)*cpliq !sign must follow ocean model convention: +ve for flux into ocean
+   ! hevap_liqref    = -fevap(i)*(Tevap(i)-tmelt)*cpwv  !sign must follow ocean model convention: -ve for flux out of ocean
+
+   !
+   ! enthalpy flux terms
+   !
+
+!   htmp =  (cam_out%hevap(1:ncol)+cam_out%hsnow(1:ncol)+cam_out%hrain(1:ncol)+&
+!        (latvap + latice)*cam_in%cflx(1:ncol,1)+latice*(cam_out%precc(1:ncol)-cam_out%precsc(1:ncol) &
+!        +cam_out%precl (1:ncol)-cam_out%precsl(1:ncol)))*&
+!        cam_in%ocnfrac(1:ncol)
+!   call outfld('HTOT_ATM_OCN' , htmp, ncol, lchnk)
+!   htmp = (cam_out%hevap(1:ncol)-tmelt*cpwv *cam_in%cflx(1:ncol,1)+&
+!        cam_out%hsnow(1:ncol)-tmelt*cpice*(cam_out%precsc(1:ncol)+cam_out%precsl(1:ncol))+&
+!        cam_out%hrain(1:ncol)-tmelt*cpliq*(cam_out%precc (1:ncol)-cam_out%precsc(1:ncol)+ &
+!        cam_out%precl (1:ncol)-cam_out%precsl(1:ncol))+&
+!        latvap*cam_in%cflx(1:ncol,1)-latice*(cam_out%precsc(1:ncol)+cam_out%precsl(1:ncol)))*&
+!        cam_in%ocnfrac(1:ncol)
+!   call outfld('HTOT_OCN_OCN' , htmp, ncol, lchnk)
+!   htmp = (tmelt*cpwv *cam_in%cflx(1:ncol,1)+tmelt*cpice*(cam_out%precsc(1:ncol)+cam_out%precsl(1:ncol))+&
+!        tmelt*cpliq*(cam_out%precc (1:ncol)-cam_out%precsc(1:ncol) &
+!        +cam_out%precl (1:ncol)-cam_out%precsl(1:ncol)))*cam_in%ocnfrac(1:ncol)
+!   call outfld('HREF_OCN_OCN' , htmp, ncol, lchnk)
+   deallocate(htmp)
 end subroutine cam_export
+
+
+
 
 end module camsrfexch

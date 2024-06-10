@@ -30,6 +30,7 @@ module physpkg
   use perf_mod
   use cam_logfile,     only: iulog
   use camsrfexch,      only: cam_export
+  use cam_thermo,      only: compute_enthalpy_flux
 
   use modal_aero_calcsize,    only: modal_aero_calcsize_init, modal_aero_calcsize_diag, modal_aero_calcsize_reg
   use modal_aero_wateruptake, only: modal_aero_wateruptake_init, modal_aero_wateruptake_dr, modal_aero_wateruptake_reg
@@ -75,7 +76,7 @@ module physpkg
   integer ::  cldiceini_idx      = 0
   integer ::  totliqini_idx      = 0
   integer ::  toticeini_idx      = 0
-
+  integer ::  hevap_iceref_idx   = 0
   integer ::  prec_str_idx       = 0
   integer ::  snow_str_idx       = 0
   integer ::  prec_sed_idx       = 0
@@ -203,6 +204,8 @@ contains
     call pbuf_add_field('TOTLIQINI', 'physpkg', dtype_r8, (/pcols,pver/), totliqini_idx)
     call pbuf_add_field('TOTICEINI', 'physpkg', dtype_r8, (/pcols,pver/), toticeini_idx)
 
+    ! Enthalpy variables
+    call pbuf_add_field('hevap_iceref', 'physpkg', dtype_r8, (/pcols/), hevap_iceref_idx)
     ! check energy package
     call check_energy_register
 
@@ -1035,7 +1038,10 @@ contains
     dvcore_idx = pbuf_get_index('DVCORE')
     dtcore_idx = pbuf_get_index('DTCORE')
     dqcore_idx = pbuf_get_index('DQCORE')
-
+    do lchnk = begchunk, endchunk
+       phys_state(lchnk)%hflx_ac = 0.0_r8!xxx
+       phys_state(lchnk)%hflx_bc = 0.0_r8!xxx
+    end do
   end subroutine phys_init
 
   !
@@ -1363,7 +1369,7 @@ contains
     use aoa_tracers,        only: aoa_tracers_timestep_tend
     use physconst,          only: rhoh2o
     use aero_model,         only: aero_model_drydep
-    use check_energy,       only: check_energy_chng, tot_energy_phys
+    use check_energy,       only: check_energy_chng, tot_energy_phys, pressure_enthalpy_adjustment
     use check_energy,       only: check_tracers_data, check_tracers_init, check_tracers_chng
     use time_manager,       only: get_nstep
     use cam_abortutils,     only: endrun
@@ -1410,6 +1416,10 @@ contains
     use cam_budget,         only: thermo_budget_history
     use dyn_tests_utils,    only: vc_dycore, vc_height, vc_dry_pressure
     use air_composition,    only: cpairv, cp_or_cv_dycore
+    use enthalpy_flux_mod,  only: enthalpy_evap_tend, enthalpy_clubb_pumas_tend
+    use physics_types,      only: ifrain, ifsnow, ihrain, ihsnow!xxx
+    use physconst,          only: cpliq, cpice!xxx
+    use physconst,          only: gravit!xxx
     !
     ! Arguments
     !
@@ -1455,6 +1465,8 @@ contains
     real(r8) dlf(pcols,pver)                   ! Detraining cld H20 from shallow + deep convections
     real(r8) rtdt                              ! 1./ztodt
 
+    real(r8) tmp(pcols,pver) !xxx
+    
     real(r8) :: rliq(pcols)                    ! vertical integral of liquid not yet in q(ixcldliq)
     real(r8) :: det_s  (pcols)                 ! vertical integral of detrained static energy from ice
     real(r8) :: det_ice(pcols)                 ! vertical integral of detrained ice
@@ -1476,7 +1488,7 @@ contains
     real(r8),pointer :: snow_pcw(:)     ! snow from prognostic cloud scheme
     real(r8),pointer :: prec_sed(:)     ! total precip from cloud sedimentation
     real(r8),pointer :: snow_sed(:)     ! snow from cloud ice sedimentation
-
+    real(r8),pointer :: hevap_iceref(:) ! enthalpy flux due to evaporation
     ! Local copies for substepping
     real(r8) :: prec_pcw_macmic(pcols)
     real(r8) :: snow_pcw_macmic(pcols)
@@ -1486,7 +1498,9 @@ contains
     ! carma precipitation variables
     real(r8) :: prec_sed_carma(pcols)          ! total precip from cloud sedimentation (CARMA)
     real(r8) :: snow_sed_carma(pcols)          ! snow from cloud ice sedimentation (CARMA)
-
+    real(r8) :: evap_enthalpy_flux(pcols)      ! enthalpy flux of evaporation
+    real(r8) :: prect_enthalpy_flux(pcols)     ! enthalpy flux of total precipitation
+    
     logical :: labort                            ! abort flag
 
     real(r8) tvm(pcols,pver)           ! virtual temperature
@@ -1500,7 +1514,7 @@ contains
     real(r8) :: tmp_ps    (pcols)      ! tmp space
     real(r8) :: scaling(pcols,pver)
     logical  :: moist_mixing_ratio_dycore
-
+    
     ! physics buffer fields for total energy and mass adjustment
     integer itim_old, ifld
 
@@ -1644,6 +1658,14 @@ contains
 
     call t_stopf('clubb_emissions_tend')
 
+    if (compute_enthalpy_flux) then
+       call t_startf('enthalpy_evap_tend')
+       call enthalpy_evap_tend(pbuf,state,ptend,evap_enthalpy_flux)
+       call physics_update(state,ptend, ztodt, tend)
+       call check_energy_chng(state, tend, "enthalpy_evap_tend", nstep, ztodt, zero, zero, zero, flx_sen=evap_enthalpy_flux)
+       call t_stopf('enthalpy_evap_tend')
+    end if
+    
     !===================================================
     ! Calculate tendencies from CARMA bin microphysics.
     !===================================================
@@ -2352,7 +2374,31 @@ contains
       call physics_update(state,ptend,ztodt,tend)
       call check_energy_chng(state, tend, "nudging", nstep, ztodt, zero, zero, zero, zero)
     endif
+#define new
+#ifdef new
+    !xxx    cldiceini(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
+    tmp = 0.0_r8
+    tmp(:ncol,:pver) = cpliq*state%pdel(:ncol,:pver)*(state%q(:ncol,:pver,ixcldliq)-cldliqini(:ncol,:pver))/(gravit*ztodt)
+    call outfld ('DCLDLIQ',tmp, pcols, lchnk)
+    tmp(:ncol,:pver) = cpice*state%pdel(:ncol,:pver)*(state%q(:ncol,:pver,ixcldice)-cldiceini(:ncol,:pver))/(gravit*ztodt)
+    call outfld ('DCLDICE',tmp, pcols, lchnk)
+    if (compute_enthalpy_flux) then
+       call t_startf('enthalpy_clubb_pumas_tend')
+       call enthalpy_clubb_pumas_tend(pbuf,state,ptend,prect_enthalpy_flux)
+       call physics_update(state,ptend, ztodt, tend)
+       call check_energy_chng(state, tend, "enthalpy_clubb_pumas_tend", nstep, ztodt, zero, zero, zero, flx_sen=prect_enthalpy_flux)
+       call t_stopf('enthalpy_clubb_pumas_tend')
+    end if
 
+    call outfld ('enth_flx',cam_out%hevap(:ncol)+&
+         state%hflx_ac(:ncol,ihrain)+state%hflx_ac(:ncol,ihsnow)+&
+         state%hflx_bc(:ncol,ihrain)+state%hflx_bc(:ncol,ihsnow), pcols, lchnk)
+
+    call pressure_enthalpy_adjustment(ncol,lchnk,state,cam_in,cam_out,pbuf,ztodt,itim_old,&
+         qini,totliqini,toticeini,tend)
+ !   call tot_energy_phys(state, 'phAM')
+ !   call
+#else
     !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
     ! Save total energy for global fixer in next timestep
     !
@@ -2410,8 +2456,9 @@ contains
       call tot_energy_phys(state, 'phAM')
       call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
     endif
-
-    if (vc_dycore == vc_height.or.vc_dycore == vc_dry_pressure) then
+#endif
+!xxx    if (vc_dycore == vc_height.or.vc_dycore == vc_dry_pressure) then
+       if (vc_dycore == vc_height) then!xxx scaling done in pressure adjustment - not good coding!
       !
       ! MPAS and SE specific scaling of temperature for enforcing energy consistency
       ! (and to make sure that temperature dependent diagnostic tendencies
@@ -2513,7 +2560,7 @@ contains
     use cam_snapshot,    only: cam_snapshot_all_outfld_tphysbc
     use cam_snapshot_common, only: cam_snapshot_ptend_outfld
     use dyn_tests_utils, only: vc_dycore
-
+    use enthalpy_flux_mod, only: enthalpy_zm_tend
     ! Arguments
 
     real(r8), intent(in) :: ztodt                          ! 2 delta t (model time increment)
@@ -2601,6 +2648,8 @@ contains
     real(r8) :: zero_tracers(pcols,pcnst)
 
     logical   :: lq(pcnst)
+
+    real(r8) :: precl_enthalpy_flux(pcols)      ! enthalpy flux of zm
 
     !-----------------------------------------------------------------------
 
@@ -2857,7 +2906,7 @@ contains
         prec_str_sc = 0._r8
         snow_str_sc = 0._r8
       end if
-
+      state%hflx_ac = 0.0_r8!xxx
       !===================================================
       ! Run wet deposition routines to intialize aerosols
       !===================================================
@@ -2875,9 +2924,19 @@ contains
 
     end if
 
+    if (compute_enthalpy_flux) then
+       call t_startf('enthalpy_zm_tend')
+       call enthalpy_zm_tend(pbuf,state,ptend,precl_enthalpy_flux)
+       call physics_update(state,ptend, ztodt, tend)
+       call check_energy_chng(state, tend, "enthalpy_zm_tend", nstep, ztodt, zero, zero, zero, flx_sen=precl_enthalpy_flux)
+       call t_stopf('enthalpy_zm_tend')
+    end if
+
+    
     ! Save atmospheric fields to force surface models
     call t_startf('cam_export')
-    call cam_export (state,cam_out,pbuf)
+    !xxxcall cam_export (state,cam_out,pbuf)
+    call cam_export (state,cam_out,pbuf,cam_in,qini, totliqini, toticeini,ztodt)!xxx  
     call t_stopf('cam_export')
 
     ! Write export state to history file
