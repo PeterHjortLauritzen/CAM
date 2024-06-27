@@ -427,20 +427,10 @@ subroutine cam_export(state,cam_out,pbuf)
    integer :: lchnk          ! Chunk index
    integer :: ncol
    integer :: psl_idx
-   integer :: prec_dp_idx, snow_dp_idx, prec_sh_idx, snow_sh_idx
-   integer :: prec_sed_idx,snow_sed_idx,prec_pcw_idx,snow_pcw_idx
    integer :: srf_ozone_idx, lightning_idx
 
    real(r8), pointer :: psl(:)
 
-   real(r8), pointer :: prec_dp(:)                 ! total precipitation   from ZM convection
-   real(r8), pointer :: snow_dp(:)                 ! snow from ZM   convection
-   real(r8), pointer :: prec_sh(:)                 ! total precipitation   from Hack convection
-   real(r8), pointer :: snow_sh(:)                 ! snow from   Hack   convection
-   real(r8), pointer :: prec_sed(:)                ! total precipitation   from ZM convection
-   real(r8), pointer :: snow_sed(:)                ! snow from ZM   convection
-   real(r8), pointer :: prec_pcw(:)                ! total precipitation   from Hack convection
-   real(r8), pointer :: snow_pcw(:)                ! snow from Hack   convection
    real(r8), pointer :: o3_ptr(:,:), srf_o3_ptr(:)
    real(r8), pointer :: lightning_ptr(:)
    !-----------------------------------------------------------------------
@@ -451,41 +441,12 @@ subroutine cam_export(state,cam_out,pbuf)
    psl_idx = pbuf_get_index('PSL')
    call pbuf_get_field(pbuf, psl_idx, psl)
 
-   prec_dp_idx = pbuf_get_index('PREC_DP', errcode=i)
-   snow_dp_idx = pbuf_get_index('SNOW_DP', errcode=i)
-   prec_sh_idx = pbuf_get_index('PREC_SH', errcode=i)
-   snow_sh_idx = pbuf_get_index('SNOW_SH', errcode=i)
-   prec_sed_idx = pbuf_get_index('PREC_SED', errcode=i)
-   snow_sed_idx = pbuf_get_index('SNOW_SED', errcode=i)
-   prec_pcw_idx = pbuf_get_index('PREC_PCW', errcode=i)
-   snow_pcw_idx = pbuf_get_index('SNOW_PCW', errcode=i)
+   call get_prec_vars(ncol,pbuf,&
+        precc_out=cam_out%precc,precl_out=cam_out%precl,&
+        precsc_out=cam_out%precsc,precsl_out=cam_out%precsl)
+
    srf_ozone_idx = pbuf_get_index('SRFOZONE', errcode=i)
    lightning_idx = pbuf_get_index('LGHT_FLASH_FREQ', errcode=i)
-
-   if (prec_dp_idx > 0) then
-     call pbuf_get_field(pbuf, prec_dp_idx, prec_dp)
-   end if
-   if (snow_dp_idx > 0) then
-     call pbuf_get_field(pbuf, snow_dp_idx, snow_dp)
-   end if
-   if (prec_sh_idx > 0) then
-     call pbuf_get_field(pbuf, prec_sh_idx, prec_sh)
-   end if
-   if (snow_sh_idx > 0) then
-     call pbuf_get_field(pbuf, snow_sh_idx, snow_sh)
-   end if
-   if (prec_sed_idx > 0) then
-     call pbuf_get_field(pbuf, prec_sed_idx, prec_sed)
-   end if
-   if (snow_sed_idx > 0) then
-     call pbuf_get_field(pbuf, snow_sed_idx, snow_sed)
-   end if
-   if (prec_pcw_idx > 0) then
-     call pbuf_get_field(pbuf, prec_pcw_idx, prec_pcw)
-   end if
-   if (snow_pcw_idx > 0) then
-     call pbuf_get_field(pbuf, snow_pcw_idx, snow_pcw)
-   end if
 
    do i=1,ncol
       cam_out%tbot(i)  = state%t(i,pver)
@@ -525,51 +486,120 @@ subroutine cam_export(state,cam_out,pbuf)
       call pbuf_get_field(pbuf, lightning_idx, lightning_ptr)
       cam_out%lightning_flash_freq(:ncol) = lightning_ptr(:ncol)
    end if
-
-   !
-   ! Precipation and snow rates from shallow convection, deep convection and stratiform processes.
-   ! Compute total convective and stratiform precipitation and snow rates
-   !
-   do i=1,ncol
-      cam_out%precc (i) = 0._r8
-      cam_out%precl (i) = 0._r8
-      cam_out%precsc(i) = 0._r8
-      cam_out%precsl(i) = 0._r8
-      if (prec_dp_idx > 0) then
-        cam_out%precc (i) = cam_out%precc (i) + prec_dp(i)
-      end if
-      if (prec_sh_idx > 0) then
-        cam_out%precc (i) = cam_out%precc (i) + prec_sh(i)
-      end if
-      if (prec_sed_idx > 0) then
-        cam_out%precl (i) = cam_out%precl (i) + prec_sed(i)
-      end if
-      if (prec_pcw_idx > 0) then
-        cam_out%precl (i) = cam_out%precl (i) + prec_pcw(i)
-      end if
-      if (snow_dp_idx > 0) then
-        cam_out%precsc(i) = cam_out%precsc(i) + snow_dp(i)
-      end if
-      if (snow_sh_idx > 0) then
-        cam_out%precsc(i) = cam_out%precsc(i) + snow_sh(i)
-      end if
-      if (snow_sed_idx > 0) then
-        cam_out%precsl(i) = cam_out%precsl(i) + snow_sed(i)
-      end if
-      if (snow_pcw_idx > 0) then
-        cam_out%precsl(i) = cam_out%precsl(i) + snow_pcw(i)
-      end if
-
-      ! jrm These checks should not be necessary if they exist in the parameterizations
-      if (cam_out%precc(i) .lt.0._r8) cam_out%precc(i)=0._r8
-      if (cam_out%precl(i) .lt.0._r8) cam_out%precl(i)=0._r8
-      if (cam_out%precsc(i).lt.0._r8) cam_out%precsc(i)=0._r8
-      if (cam_out%precsl(i).lt.0._r8) cam_out%precsl(i)=0._r8
-      if (cam_out%precsc(i).gt.cam_out%precc(i)) cam_out%precsc(i)=cam_out%precc(i)
-      if (cam_out%precsl(i).gt.cam_out%precl(i)) cam_out%precsl(i)=cam_out%precl(i)
-
-   end do
-
 end subroutine cam_export
+!
+! Precipation and snow rates from shallow convection, deep convection and stratiform processes.
+! Compute total convective and stratiform precipitation and snow rates
+!
+subroutine get_prec_vars(ncol,pbuf,frain,fsnow, precc_out,precl_out,precsc_out,precsl_out)
+     use ppgrid, only: pcols
+     use physics_buffer,   only: pbuf_get_index, pbuf_get_field, physics_buffer_desc
+
+     integer, intent(in) :: ncol
+     type(physics_buffer_desc), pointer         :: pbuf(:)
+     real(r8), dimension(ncol) , optional, intent(out):: frain!rain flux in SI units
+     real(r8), dimension(ncol) , optional, intent(out):: fsnow!snow flux in SI units
+
+     real(r8), dimension(pcols), optional, intent(out):: precc_out !total precipitation from convection
+     real(r8), dimension(pcols), optional, intent(out):: precl_out !total large scale precipitation
+     real(r8), dimension(pcols), optional, intent(out):: precsc_out!frozen precipitation from convection
+     real(r8), dimension(pcols), optional, intent(out):: precsl_out!frozen large scale precipitation
+
+     integer :: i
+
+     real(r8), pointer :: prec_dp(:)                 !total precipitation from from deep convection
+     real(r8), pointer :: snow_dp(:)                 !frozen precipitation from deep convection
+     real(r8), pointer :: prec_sh(:)                 !total precipitation from shallow convection
+     real(r8), pointer :: snow_sh(:)                 !frozen precipitation from from shallow convection
+     real(r8), pointer :: prec_sed(:)                !total precipitation from cloud sedimentation
+     real(r8), pointer :: snow_sed(:)                !frozen precipitation from sedimentation
+     real(r8), pointer :: prec_pcw(:)                !total precipitation from from microphysics
+     real(r8), pointer :: snow_pcw(:)                !frozen precipitation from from microphysics
+
+     real(r8), dimension(pcols):: precc, precl, precsc, precsl
+     integer :: prec_dp_idx, snow_dp_idx, prec_sh_idx, snow_sh_idx
+     integer :: prec_sed_idx,snow_sed_idx,prec_pcw_idx,snow_pcw_idx
+     !
+     ! get fields from pbuf
+     !
+     prec_dp_idx = pbuf_get_index('PREC_DP', errcode=i)
+     snow_dp_idx = pbuf_get_index('SNOW_DP', errcode=i)
+     prec_sh_idx = pbuf_get_index('PREC_SH', errcode=i)
+     snow_sh_idx = pbuf_get_index('SNOW_SH', errcode=i)
+     prec_sed_idx = pbuf_get_index('PREC_SED', errcode=i)
+     snow_sed_idx = pbuf_get_index('SNOW_SED', errcode=i)
+     prec_pcw_idx = pbuf_get_index('PREC_PCW', errcode=i)
+     snow_pcw_idx = pbuf_get_index('SNOW_PCW', errcode=i)
+
+     if (prec_dp_idx > 0) then
+        call pbuf_get_field(pbuf, prec_dp_idx, prec_dp)
+     end if
+     if (snow_dp_idx > 0) then
+        call pbuf_get_field(pbuf, snow_dp_idx, snow_dp)
+     end if
+     if (prec_sh_idx > 0) then
+        call pbuf_get_field(pbuf, prec_sh_idx, prec_sh)
+     end if
+     if (snow_sh_idx > 0) then
+        call pbuf_get_field(pbuf, snow_sh_idx, snow_sh)
+     end if
+     if (prec_sed_idx > 0) then
+        call pbuf_get_field(pbuf, prec_sed_idx, prec_sed)
+     end if
+     if (snow_sed_idx > 0) then
+        call pbuf_get_field(pbuf, snow_sed_idx, snow_sed)
+     end if
+     if (prec_pcw_idx > 0) then
+        call pbuf_get_field(pbuf, prec_pcw_idx, prec_pcw)
+     end if
+     if (snow_pcw_idx > 0) then
+        call pbuf_get_field(pbuf, snow_pcw_idx, snow_pcw)
+     end if
+
+     precc  = 0._r8
+     precl  = 0._r8
+     precsc = 0._r8
+     precsl = 0._r8
+     if (prec_dp_idx > 0) then
+        precc(:ncol) = precc(:ncol) + prec_dp(:ncol)
+     end if
+     if (prec_sh_idx > 0) then
+        precc(:ncol)  = precc(:ncol)  + prec_sh(:ncol)
+     end if
+     if (prec_sed_idx > 0) then
+        precl(:ncol) = precl(1:ncol) + prec_sed(:ncol)
+     end if
+     if (prec_pcw_idx > 0) then
+        precl(:ncol)  = precl(1:ncol) + prec_pcw(:ncol)
+     end if
+     if (snow_dp_idx > 0) then
+        precsc(:ncol) = precsc(:ncol) + snow_dp(:ncol)
+     end if
+     if (snow_sh_idx > 0) then
+        precsc(:ncol) = precsc(:ncol) + snow_sh(:ncol)
+     end if
+     if (snow_sed_idx > 0) then
+        precsl(:ncol) = precsl(:ncol) + snow_sed(:ncol)
+     end if
+     if (snow_pcw_idx > 0) then
+        precsl(:ncol)= precsl(:ncol) + snow_pcw(:ncol)
+     end if
+
+     do i=1,ncol
+        precc(i)  = MAX(precc(i), 0.0_r8)
+        precl(i)  = MAX(precl(i), 0.0_r8)
+        precsc(i) = MAX(precsc(i),0.0_r8)
+        precsl(i) = MAX(precsl(i),0.0_r8)
+        if (precsc(i).gt.precc(i)) precsc(i)=precc(i)
+        if (precsl(i).gt.precl(i)) precsl(i)=precl(i)
+     end do
+     if (present(precc_out )) precc_out (:ncol) = precc (:ncol)
+     if (present(precl_out )) precl_out (:ncol) = precl (:ncol)
+     if (present(precsc_out)) precsc_out(:ncol) = precsc(:ncol)
+     if (present(precsl_out)) precsl_out(:ncol) = precsl(:ncol)
+
+     if (present(fsnow)) fsnow(:) = 1000.0_r8*(precsc(:ncol)+precsl(:ncol))                           !snow flux
+     if (present(frain)) frain(:) = 1000.0_r8*(precc (:ncol)-precsc(:ncol)+precl(:ncol)-precsl(:ncol))!rain flux
+   end subroutine get_prec_vars
 
 end module camsrfexch
