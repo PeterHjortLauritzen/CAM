@@ -7942,6 +7942,13 @@ mass and thermodynamic properties.
 Default: Set by build-namelist.
 </entry>
 
+<entry id="compute_enthalpy_flux" type="logical"  category="physconst"
+       group="air_composition_nl" valid_values="" >
+Enthalpy flux terms explicitly computed and added in atmosphere and
+passed to MOM6
+Default: FALSE
+</entry>
+
 <!-- SE dycore -->
 
 <entry id="se_fine_ne" type="integer" category="se"
