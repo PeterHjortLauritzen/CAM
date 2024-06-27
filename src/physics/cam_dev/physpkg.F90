@@ -1409,7 +1409,7 @@ contains
     use cam_thermo,         only: cam_thermo_water_update
     use cam_budget,         only: thermo_budget_history
     use dyn_tests_utils,    only: vc_dycore, vc_height, vc_dry_pressure
-    use air_composition,    only: cpairv, cp_or_cv_dycore
+    use air_composition,    only: cpairv, cp_or_cv_dycore, compute_enthalpy_flux
     !
     ! Arguments
     !
@@ -2353,79 +2353,85 @@ contains
       call check_energy_chng(state, tend, "nudging", nstep, ztodt, zero, zero, zero, zero)
     endif
 
-    !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-    ! Save total energy for global fixer in next timestep
-    !
-    ! This call must be after the last parameterization and call to physics_update
-    !
-    call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
-    !
-    ! FV: convert dry-type mixing ratios to moist here because physics_dme_adjust
-    !     assumes moist. This is done in p_d_coupling for other dynamics. Bundy, Feb 2004.
-    moist_mixing_ratio_dycore = dycore_is('LR').or. dycore_is('FV3')
-    !
-    ! update cp/cv for energy computation based in updated water variables
-    !
-    call cam_thermo_water_update(state%q(:ncol,:,:), lchnk, ncol, vc_dycore,&
-         to_dry_factor=state%pdel(:ncol,:)/state%pdeldry(:ncol,:))
-
-    ! for dry mixing ratio dycore, physics_dme_adjust is called for energy diagnostic purposes only.
-    ! So, save off tracers
-    if (.not.moist_mixing_ratio_dycore) then
-      !
-      ! for dry-mixing ratio based dycores dme_adjust takes place in the dynamical core
-      !
-      ! only compute dme_adjust for diagnostics purposes
-      !
-      if (thermo_budget_history) then
-        tmp_trac(:ncol,:pver,:pcnst) = state%q(:ncol,:pver,:pcnst)
-        tmp_pdel(:ncol,:pver)        = state%pdel(:ncol,:pver)
-        tmp_ps(:ncol)                = state%ps(:ncol)
-        call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt)
-        call tot_energy_phys(state, 'phAM')
-        call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
-        ! Restore pre-"physics_dme_adjust" tracers
-        state%q(:ncol,:pver,:pcnst) = tmp_trac(:ncol,:pver,:pcnst)
-        state%pdel(:ncol,:pver)     = tmp_pdel(:ncol,:pver)
-        state%ps(:ncol)             = tmp_ps(:ncol)
-      end if
+    if (compute_enthalpy_flux) then
+       if (.not.dycore_is('SE')) then
+          call endrun("Explicit enthalpy flux functionality only supported for SE dycore")
+       end if
+       !Thomas: we will add call here to subroutine that does the simple dme bflx etc.
     else
-      !
-      ! for moist-mixing ratio based dycores
-      !
-      ! Note: this operation will NOT be reverted with set_wet_to_dry after set_dry_to_wet call
-      !
-      call set_dry_to_wet(state)
+       !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+       ! Save total energy for global fixer in next timestep
+       !
+       ! This call must be after the last parameterization and call to physics_update
+       !
+       call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
+       !
+       ! FV: convert dry-type mixing ratios to moist here because physics_dme_adjust
+       !     assumes moist. This is done in p_d_coupling for other dynamics. Bundy, Feb 2004.
+       moist_mixing_ratio_dycore = dycore_is('LR').or. dycore_is('FV3')
+       !
+       ! update cp/cv for energy computation based in updated water variables
+       !
+       call cam_thermo_water_update(state%q(:ncol,:,:), lchnk, ncol, vc_dycore,&
+            to_dry_factor=state%pdel(:ncol,:)/state%pdeldry(:ncol,:))
 
-      if (trim(cam_take_snapshot_before) == "physics_dme_adjust") then
-         call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
-                    fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
-      end if
-      call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt)
-      if (trim(cam_take_snapshot_after) == "physics_dme_adjust") then
-        call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
-             fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
-      end if
+       ! for dry mixing ratio dycore, physics_dme_adjust is called for energy diagnostic purposes only.
+       ! So, save off tracers
+       if (.not.moist_mixing_ratio_dycore) then
+          !
+          ! for dry-mixing ratio based dycores dme_adjust takes place in the dynamical core
+          !
+          ! only compute dme_adjust for diagnostics purposes
+          !
+          if (thermo_budget_history) then
+             tmp_trac(:ncol,:pver,:pcnst) = state%q(:ncol,:pver,:pcnst)
+             tmp_pdel(:ncol,:pver)        = state%pdel(:ncol,:pver)
+             tmp_ps(:ncol)                = state%ps(:ncol)
+             call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt)
+             call tot_energy_phys(state, 'phAM')
+             call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
+             ! Restore pre-"physics_dme_adjust" tracers
+             state%q(:ncol,:pver,:pcnst) = tmp_trac(:ncol,:pver,:pcnst)
+             state%pdel(:ncol,:pver)     = tmp_pdel(:ncol,:pver)
+             state%ps(:ncol)             = tmp_ps(:ncol)
+          end if
+       else
+          !
+          ! for moist-mixing ratio based dycores
+          !
+          ! Note: this operation will NOT be reverted with set_wet_to_dry after set_dry_to_wet call
+          !
+          call set_dry_to_wet(state)
 
-      call tot_energy_phys(state, 'phAM')
-      call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
-    endif
+          if (trim(cam_take_snapshot_before) == "physics_dme_adjust") then
+             call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
+                  fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
+          end if
+          call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt)
+          if (trim(cam_take_snapshot_after) == "physics_dme_adjust") then
+             call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
+                  fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
+          end if
 
-    if (vc_dycore == vc_height.or.vc_dycore == vc_dry_pressure) then
-      !
-      ! MPAS and SE specific scaling of temperature for enforcing energy consistency
-      ! (and to make sure that temperature dependent diagnostic tendencies
-      !  are computed correctly; e.g. dtcore)
-      !
-      scaling(1:ncol,:)  = cpairv(:ncol,:,lchnk)/cp_or_cv_dycore(:ncol,:,lchnk)
-      state%T(1:ncol,:)  = state%temp_ini(1:ncol,:)+&
-           scaling(1:ncol,:)*(state%T(1:ncol,:)-state%temp_ini(1:ncol,:))
-      tend%dtdt(:ncol,:) = scaling(:ncol,:)*tend%dtdt(:ncol,:)
-      !
-      ! else: do nothing for dycores with energy consistent with CAM physics
-      !
+          call tot_energy_phys(state, 'phAM')
+          call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
+       endif
+
+       if (vc_dycore == vc_height.or.vc_dycore == vc_dry_pressure) then
+          !
+          ! MPAS and SE specific scaling of temperature for enforcing energy consistency
+          ! (and to make sure that temperature dependent diagnostic tendencies
+          !  are computed correctly; e.g. dtcore)
+          !
+          scaling(1:ncol,:)  = cpairv(:ncol,:,lchnk)/cp_or_cv_dycore(:ncol,:,lchnk)
+          state%T(1:ncol,:)  = state%temp_ini(1:ncol,:)+&
+               scaling(1:ncol,:)*(state%T(1:ncol,:)-state%temp_ini(1:ncol,:))
+          tend%dtdt(:ncol,:) = scaling(:ncol,:)*tend%dtdt(:ncol,:)
+          !
+          ! else: do nothing for dycores with energy consistent with CAM physics
+          !
+       end if
     end if
-
 
     ! store T, U, and V in buffer for use in computing dynamics T-tendency in next timestep
     do k = 1,pver
