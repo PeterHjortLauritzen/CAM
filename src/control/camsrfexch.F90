@@ -53,6 +53,9 @@ module camsrfexch
      real(r8) :: precsl(pcols)       !
      real(r8) :: precc(pcols)        !
      real(r8) :: precl(pcols)        !
+     real(r8) :: hrain(pcols)        ! material enth. flx for liquid precip
+     real(r8) :: hsnow(pcols)        ! material enth. flx for frozen precip
+     real(r8) :: hevap(pcols)        ! material enth. flx for evaporation
      real(r8) :: soll(pcols)         !
      real(r8) :: sols(pcols)         !
      real(r8) :: solld(pcols)        !
@@ -398,7 +401,7 @@ CONTAINS
 
 !======================================================================
 
-subroutine cam_export(state,cam_out,pbuf)
+subroutine cam_export(state,cam_in,cam_out,pbuf)
 
    ! Transfer atmospheric fields into necessary surface data structures
 
@@ -407,16 +410,17 @@ subroutine cam_export(state,cam_out,pbuf)
    use cam_history,      only: outfld
    use chem_surfvals,    only: chem_surfvals_get
    use co2_cycle,        only: co2_transport, c_i
-   use physconst,        only: rair, mwdry, mwco2, gravit, mwo3
+   use physconst,        only: rair, mwdry, mwco2, gravit, mwo3, cpliq, cpice, cpwv, tmelt
    use constituents,     only: pcnst
-   use physics_buffer,   only: pbuf_get_index, pbuf_get_field, physics_buffer_desc
+   use physics_buffer,   only: pbuf_get_index, pbuf_get_field, physics_buffer_desc, pbuf_set_field
    use rad_constituents, only: rad_cnst_get_gas
    use cam_control_mod,  only: simple_phys
-
+   use air_composition,  only: hliq_idx, hice_idx, fliq_idx, fice_idx, compute_enthalpy_flux
    implicit none
 
    ! Input arguments
    type(physics_state),  intent(in) :: state
+   type (cam_in_t ),     intent(in)    :: cam_in
    type (cam_out_t),     intent(inout) :: cam_out
    type(physics_buffer_desc), pointer  :: pbuf(:)
 
@@ -428,11 +432,17 @@ subroutine cam_export(state,cam_out,pbuf)
    integer :: ncol
    integer :: psl_idx
    integer :: srf_ozone_idx, lightning_idx
+   integer :: enthalpy_prec_bc_idx, enthalpy_prec_ac_idx, enthalpy_evap_idx
 
    real(r8), pointer :: psl(:)
 
    real(r8), pointer :: o3_ptr(:,:), srf_o3_ptr(:)
    real(r8), pointer :: lightning_ptr(:)
+
+   real(r8), dimension(:,:), pointer :: enthalpy_prec_bc, enthalpy_prec_ac
+   real(r8), dimension(pcols)        :: fliq_tot, fice_tot
+
+   character(len=*), parameter :: sub = 'cam_export'
    !-----------------------------------------------------------------------
 
    lchnk = state%lchnk
@@ -441,9 +451,59 @@ subroutine cam_export(state,cam_out,pbuf)
    psl_idx = pbuf_get_index('PSL')
    call pbuf_get_field(pbuf, psl_idx, psl)
 
-   call get_prec_vars(ncol,pbuf,&
-        precc_out=cam_out%precc,precl_out=cam_out%precl,&
-        precsc_out=cam_out%precsc,precsl_out=cam_out%precsl)
+   if (compute_enthalpy_flux) then
+      enthalpy_prec_bc_idx = pbuf_get_index('ENTHALPY_PREC_BC', errcode=i)
+      enthalpy_prec_ac_idx = pbuf_get_index('ENTHALPY_PREC_AC', errcode=i)
+      enthalpy_evap_idx    = pbuf_get_index('ENTHALPY_EVAP'   , errcode=i)
+      if (enthalpy_prec_bc_idx==0.or.enthalpy_prec_ac_idx==0.or.enthalpy_evap_idx==0) then
+         call endrun(sub//": pbufs for enthalpy flux not allocated")
+      end if
+      call pbuf_get_field(pbuf, enthalpy_prec_ac_idx, enthalpy_prec_ac)
+      !
+      !------------------------------------------------------------------
+      !
+      ! compute precipitation fluxes and set associated physics buffers
+      !
+      !------------------------------------------------------------------
+      !
+      call get_prec_vars(ncol,pbuf,fliq=fliq_tot,fice=fice_tot,&
+           precc_out=cam_out%precc,precl_out=cam_out%precl,&
+           precsc_out=cam_out%precsc,precsl_out=cam_out%precsl)
+      !
+      ! fliq_tot holds liquid precipitation from tphysbc and
+      ! tphysac from previous physics time-step: back out fliq_bc
+      !
+      ! Idem for ice
+      !
+      enthalpy_prec_bc(:ncol,fice_idx) = fice_tot(:ncol)-enthalpy_prec_ac(:ncol,fice_idx)
+      enthalpy_prec_bc(:ncol,fliq_idx) = fliq_tot(:ncol)-enthalpy_prec_ac(:ncol,fliq_idx)
+      !
+      ! compute precipitation enthalpy fluxes from tphysbc
+      !
+      enthalpy_prec_bc(:ncol,hice_idx) =  -enthalpy_prec_bc(:ncol,fice_idx)*cpice*state%T(:ncol,pver)
+      enthalpy_prec_bc(:ncol,hliq_idx) =  -enthalpy_prec_bc(:ncol,fliq_idx)*cpice*state%T(:ncol,pver)
+      call pbuf_set_field(pbuf, enthalpy_prec_bc_idx, enthalpy_prec_bc)
+      !
+      ! compute evaporation enthalpy flux
+      !
+      cam_out%hevap(:ncol) = cam_in%cflx(:ncol,1)*cam_in%ts(:ncol)*cpwv
+      call pbuf_set_field(pbuf, enthalpy_evap_idx, cam_out%hevap)
+      !
+      ! Compute enthalpy fluxes for the coupler:
+      !
+      cam_out%hsnow (:ncol) = enthalpy_prec_bc(:ncol,hice_idx)+enthalpy_prec_ac(:ncol,hice_idx)
+      cam_out%hrain (:ncol) = enthalpy_prec_bc(:ncol,hliq_idx)+enthalpy_prec_ac(:ncol,hliq_idx)
+      !
+      ! ->Change enthalpy flux to sign convention of ocean model and change to liquid reference state
+      !
+      cam_out%hsnow (:ncol) = -cam_out%hsnow(:ncol) -fice_tot(:ncol)*tmelt*cpice
+      cam_out%hrain (:ncol) = -cam_out%hrain(:ncol) -fliq_tot(:ncol)*tmelt*cpliq
+      cam_out%hevap(:ncol)  = -cam_out%hevap(:ncol)+cam_in%cflx(:ncol,1)*tmelt*cpwv
+   else
+      call get_prec_vars(ncol,pbuf,&
+           precc_out=cam_out%precc,precl_out=cam_out%precl,&
+           precsc_out=cam_out%precsc,precsl_out=cam_out%precsl)
+   end if
 
    srf_ozone_idx = pbuf_get_index('SRFOZONE', errcode=i)
    lightning_idx = pbuf_get_index('LGHT_FLASH_FREQ', errcode=i)
@@ -491,14 +551,14 @@ end subroutine cam_export
 ! Precipation and snow rates from shallow convection, deep convection and stratiform processes.
 ! Compute total convective and stratiform precipitation and snow rates
 !
-subroutine get_prec_vars(ncol,pbuf,frain,fsnow, precc_out,precl_out,precsc_out,precsl_out)
+subroutine get_prec_vars(ncol,pbuf,fliq,fice, precc_out,precl_out,precsc_out,precsl_out)
      use ppgrid, only: pcols
      use physics_buffer,   only: pbuf_get_index, pbuf_get_field, physics_buffer_desc
 
      integer, intent(in) :: ncol
      type(physics_buffer_desc), pointer         :: pbuf(:)
-     real(r8), dimension(ncol) , optional, intent(out):: frain!rain flux in SI units
-     real(r8), dimension(ncol) , optional, intent(out):: fsnow!snow flux in SI units
+     real(r8), dimension(pcols) , optional, intent(out):: fliq!rain flux in SI units
+     real(r8), dimension(pcols) , optional, intent(out):: fice!snow flux in SI units
 
      real(r8), dimension(pcols), optional, intent(out):: precc_out !total precipitation from convection
      real(r8), dimension(pcols), optional, intent(out):: precl_out !total large scale precipitation
@@ -598,8 +658,8 @@ subroutine get_prec_vars(ncol,pbuf,frain,fsnow, precc_out,precl_out,precsc_out,p
      if (present(precsc_out)) precsc_out(:ncol) = precsc(:ncol)
      if (present(precsl_out)) precsl_out(:ncol) = precsl(:ncol)
 
-     if (present(fsnow)) fsnow(:) = 1000.0_r8*(precsc(:ncol)+precsl(:ncol))                           !snow flux
-     if (present(frain)) frain(:) = 1000.0_r8*(precc (:ncol)-precsc(:ncol)+precl(:ncol)-precsl(:ncol))!rain flux
+     if (present(fice)) fice(:ncol) = 1000.0_r8*(precsc(:ncol)+precsl(:ncol))                           !snow flux
+     if (present(fliq)) fliq(:ncol) = 1000.0_r8*(precc (:ncol)-precsc(:ncol)+precl(:ncol)-precsl(:ncol))!rain flux
    end subroutine get_prec_vars
 
 end module camsrfexch

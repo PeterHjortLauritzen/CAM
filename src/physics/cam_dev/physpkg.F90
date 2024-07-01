@@ -76,6 +76,10 @@ module physpkg
   integer ::  totliqini_idx      = 0
   integer ::  toticeini_idx      = 0
 
+  integer ::  enthalpy_prec_bc_idx = 0
+  integer ::  enthalpy_prec_ac_idx = 0
+  integer ::  enthalpy_evap_idx    = 0
+
   integer ::  prec_str_idx       = 0
   integer ::  snow_str_idx       = 0
   integer ::  prec_sed_idx       = 0
@@ -151,7 +155,7 @@ contains
     use dyn_comp,           only: dyn_register
     use offline_driver,     only: offline_driver_reg
     use hemco_interface,    only: HCOI_Chunk_Init
-
+    use air_composition,    only: compute_enthalpy_flux, num_enthalpy_vars
     !---------------------------Local variables-----------------------------
     !
     integer  :: m        ! loop index
@@ -202,7 +206,12 @@ contains
     call pbuf_add_field('CLDICEINI', 'physpkg', dtype_r8, (/pcols,pver/), cldiceini_idx)
     call pbuf_add_field('TOTLIQINI', 'physpkg', dtype_r8, (/pcols,pver/), totliqini_idx)
     call pbuf_add_field('TOTICEINI', 'physpkg', dtype_r8, (/pcols,pver/), toticeini_idx)
-
+    if (compute_enthalpy_flux) then
+       call pbuf_add_field('ENTHALPY_PREC_BC','physpkg', dtype_r8, (/pcols,num_enthalpy_vars/), enthalpy_prec_bc_idx)
+       call pbuf_add_field('ENTHALPY_PREC_AC','physpkg', dtype_r8, (/pcols,num_enthalpy_vars/), enthalpy_prec_ac_idx)
+       call pbuf_add_field('ENTHALPY_EVAP'   ,'physpkg', dtype_r8, (/pcols/),                   enthalpy_evap_idx)
+    end if
+    
     ! check energy package
     call check_energy_register
 
@@ -2883,7 +2892,7 @@ contains
 
     ! Save atmospheric fields to force surface models
     call t_startf('cam_export')
-    call cam_export (state,cam_out,pbuf)
+    call cam_export (state,cam_in,cam_out,pbuf)
     call t_stopf('cam_export')
 
     ! Write export state to history file
