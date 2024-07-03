@@ -25,7 +25,7 @@ module air_composition
    ! get_mbarv: molecular weight of dry air
    public :: get_mbarv
 
-   logical, public :: compute_enthalpy_flux=.false.
+   logical, public :: compute_enthalpy_flux=.true.
    !
    ! for book keeping of enthalpy variables in physics buffer
    !

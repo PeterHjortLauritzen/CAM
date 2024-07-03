@@ -27,7 +27,7 @@ module camsrfexch
   public atm2hub_deallocate
   public hub2atm_deallocate
   public cam_export
-
+  public get_prec_vars
   ! Public data types
   public cam_out_t                  ! Data from atmosphere
   public cam_in_t                   ! Merged surface data
@@ -415,7 +415,8 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
    use physics_buffer,   only: pbuf_get_index, pbuf_get_field, physics_buffer_desc, pbuf_set_field
    use rad_constituents, only: rad_cnst_get_gas
    use cam_control_mod,  only: simple_phys
-   use air_composition,  only: hliq_idx, hice_idx, fliq_idx, fice_idx, compute_enthalpy_flux
+   use air_composition,  only: hliq_idx, hice_idx, fliq_idx, fice_idx
+   use air_composition,  only: compute_enthalpy_flux, num_enthalpy_vars
    implicit none
 
    ! Input arguments
@@ -438,9 +439,12 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
 
    real(r8), pointer :: o3_ptr(:,:), srf_o3_ptr(:)
    real(r8), pointer :: lightning_ptr(:)
-
-   real(r8), dimension(:,:), pointer :: enthalpy_prec_bc, enthalpy_prec_ac
-   real(r8), dimension(pcols)        :: fliq_tot, fice_tot
+   !
+   ! enthalpy variables (if applicable)
+   !
+   real(r8), dimension(:,:), pointer            :: enthalpy_prec_ac
+   real(r8), dimension(pcols)                   :: fliq_tot, fice_tot
+   real(r8), dimension(pcols,num_enthalpy_vars) :: enthalpy_prec_bc
 
    character(len=*), parameter :: sub = 'cam_export'
    !-----------------------------------------------------------------------
@@ -475,13 +479,13 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
       !
       ! Idem for ice
       !
-      enthalpy_prec_bc(:ncol,fice_idx) = fice_tot(:ncol)-enthalpy_prec_ac(:ncol,fice_idx)
-      enthalpy_prec_bc(:ncol,fliq_idx) = fliq_tot(:ncol)-enthalpy_prec_ac(:ncol,fliq_idx)
+      enthalpy_prec_bc(:ncol,fice_idx) = fice_tot(:ncol) -enthalpy_prec_ac(:ncol,fice_idx)
+      enthalpy_prec_bc(:ncol,fliq_idx) = fliq_tot(:ncol) -enthalpy_prec_ac(:ncol,fliq_idx)
       !
       ! compute precipitation enthalpy fluxes from tphysbc
       !
       enthalpy_prec_bc(:ncol,hice_idx) =  -enthalpy_prec_bc(:ncol,fice_idx)*cpice*state%T(:ncol,pver)
-      enthalpy_prec_bc(:ncol,hliq_idx) =  -enthalpy_prec_bc(:ncol,fliq_idx)*cpice*state%T(:ncol,pver)
+      enthalpy_prec_bc(:ncol,hliq_idx) =  -enthalpy_prec_bc(:ncol,fliq_idx)*cpliq*state%T(:ncol,pver)
       call pbuf_set_field(pbuf, enthalpy_prec_bc_idx, enthalpy_prec_bc)
       !
       ! compute evaporation enthalpy flux

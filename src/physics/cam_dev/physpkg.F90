@@ -1372,7 +1372,7 @@ contains
     use aoa_tracers,        only: aoa_tracers_timestep_tend
     use physconst,          only: rhoh2o
     use aero_model,         only: aero_model_drydep
-    use check_energy,       only: check_energy_chng, tot_energy_phys
+    use check_energy,       only: check_energy_chng, tot_energy_phys, enthalpy_adjustment
     use check_energy,       only: check_tracers_data, check_tracers_init, check_tracers_chng
     use time_manager,       only: get_nstep
     use cam_abortutils,     only: endrun
@@ -2367,6 +2367,8 @@ contains
           call endrun("Explicit enthalpy flux functionality only supported for SE dycore")
        end if
        !Thomas: we will add call here to subroutine that does the simple dme bflx etc.
+       call enthalpy_adjustment(ncol,lchnk,state,cam_in,cam_out,pbuf,ztodt,itim_old,&
+         qini,totliqini,toticeini,tend)
     else
        !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
        ! Save total energy for global fixer in next timestep
@@ -2511,6 +2513,8 @@ contains
     use constituents,    only: qmin
     use air_composition, only: thermodynamic_active_species_liq_num,thermodynamic_active_species_liq_idx
     use air_composition, only: thermodynamic_active_species_ice_num,thermodynamic_active_species_ice_idx
+    use air_composition, only: compute_enthalpy_flux, num_enthalpy_vars
+    use physics_buffer,  only: pbuf_set_field
     use convect_deep,    only: convect_deep_tend
     use time_manager,    only: is_first_step, get_nstep
     use convect_diagnostics,only: convect_diagnostics_calc
@@ -2603,6 +2607,8 @@ contains
     real(r8),pointer :: snow_pcw(:)     ! snow from prognostic cloud scheme
     real(r8),pointer :: prec_sed(:)     ! total precip from cloud sedimentation
     real(r8),pointer :: snow_sed(:)     ! snow from cloud ice sedimentation
+
+    real(r8) :: enthalpy_prec_ac(pcols,num_enthalpy_vars)
 
     ! energy checking variables
     real(r8) :: zero(pcols)                    ! array of zeros
@@ -2867,6 +2873,18 @@ contains
       snow_sed = 0._r8
       prec_str = 0._r8
       snow_str = 0._r8
+      !
+      ! In first time-step tphysac variables need to be zero'd out 
+      !
+      if (compute_enthalpy_flux) then
+        ifld = pbuf_get_index('ENTHALPY_PREC_AC', errcode=i)
+        enthalpy_prec_ac = 0._r8
+        if (ifld>0) then
+          call pbuf_set_field(pbuf, ifld, enthalpy_prec_ac)
+        else
+          call endrun('tphysbc: pbuf ENTHALPY_PREC_AC not allocated')
+        end if
+      end if
 
       if (is_subcol_on()) then
         prec_str_sc = 0._r8

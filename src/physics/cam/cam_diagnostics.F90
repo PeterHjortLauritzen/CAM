@@ -1,3 +1,4 @@
+#define debug_entalpy
 module cam_diagnostics
 
 !---------------------------------------------------------------------------------
@@ -393,6 +394,18 @@ contains
 
     call addfld( 'CPAIRV', (/ 'lev' /), 'I', 'J/K/kg', 'Variable specific heat cap air' )
     call addfld( 'RAIRV', (/ 'lev' /), 'I', 'J/K/kg', 'Variable dry air gas constant' )
+
+#ifdef debug_entalpy
+    call addfld('enth_prec_ac_hice', horiz_only, 'I', 'W/m2', '' )
+    call addfld('enth_prec_ac_hliq', horiz_only, 'I', 'W/m2', '' )
+    call addfld('enth_prec_bc_hice', horiz_only, 'I', 'W/m2', '' )
+    call addfld('enth_prec_bc_hliq', horiz_only, 'I', 'W/m2', '' )
+    call addfld('enth_prec_ac_fice', horiz_only, 'I', 'W/m2', '' )
+    call addfld('enth_prec_ac_fliq', horiz_only, 'I', 'W/m2', '' )
+    call addfld('enth_prec_bc_fice', horiz_only, 'I', 'W/m2', '' )
+    call addfld('enth_prec_bc_fliq', horiz_only, 'I', 'W/m2', '' )
+    call addfld('enth_evap_hevap', horiz_only, 'I', 'W/m2', '' )
+#endif
 
     if (thermo_budget_history) then
        !

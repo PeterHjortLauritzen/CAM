@@ -1,4 +1,4 @@
-
+#define debug_entalpy
 module check_energy
 
 !---------------------------------------------------------------------------------
@@ -52,6 +52,7 @@ module check_energy
 
   public :: tot_energy_phys ! calculate and output total energy and axial angular momentum diagnostics
 
+  public :: enthalpy_adjustment
 ! Private module data
 
   logical  :: print_energy_errors = .false.
@@ -964,5 +965,73 @@ end subroutine check_energy_get_integrals
 
   end subroutine tot_energy_phys
 
+  subroutine enthalpy_adjustment(ncol, lchnk, state, cam_in, cam_out, pbuf, ztodt, itim_old,&
+       qini,totliqini,toticeini,tend)
+    use camsrfexch,      only: cam_out_t, cam_in_t, get_prec_vars
+    use physics_buffer,  only: pbuf_get_index, physics_buffer_desc, pbuf_set_field, pbuf_get_field
+    use cam_abortutils,  only: endrun
+    use air_composition, only: hliq_idx, hice_idx, fliq_idx, fice_idx, num_enthalpy_vars
+    use physconst,       only: cpliq, cpice
+#ifdef debug_entalpy
+    use cam_history,     only: outfld
+#endif
+    integer,             intent(in)    :: ncol, lchnk
+    type(physics_state), intent(inout) :: state
+    type(cam_in_t),      intent(inout) :: cam_in
+    type(cam_out_t),     intent(inout) :: cam_out
+    type(physics_buffer_desc), pointer :: pbuf(:)
+    real(r8),            intent(in)    :: ztodt
+    integer,             intent(in)    :: itim_old
 
+    real(r8), dimension(pcols,pver), intent(in) :: qini, totliqini, toticeini
+    type(physics_tend )    , intent(inout) :: tend!xxx
+
+    integer:: enthalpy_prec_bc_idx, enthalpy_prec_ac_idx, enthalpy_evap_idx
+    real(r8), dimension(:,:), pointer            :: enthalpy_prec_bc
+    real(r8), dimension(pcols,num_enthalpy_vars) :: enthalpy_prec_ac
+    real(r8), dimension(:)  , pointer            :: enthalpy_evap
+    real(r8), dimension(pcols)                   :: fliq_tot, fice_tot
+
+    integer :: i
+
+    enthalpy_prec_bc_idx = pbuf_get_index('ENTHALPY_PREC_BC', errcode=i)
+    enthalpy_prec_ac_idx = pbuf_get_index('ENTHALPY_PREC_AC', errcode=i)
+    enthalpy_evap_idx    = pbuf_get_index('ENTHALPY_EVAP'   , errcode=i)
+    if (enthalpy_prec_bc_idx==0.or.enthalpy_prec_ac_idx==0.or.enthalpy_evap_idx==0) then
+      call endrun("pbufs for enthalpy flux not allocated")
+    end if
+    call pbuf_get_field(pbuf, enthalpy_prec_bc_idx, enthalpy_prec_bc)
+    call pbuf_get_field(pbuf, enthalpy_evap_idx   , enthalpy_evap   )
+    !
+    !------------------------------------------------------------------
+    !
+    ! compute precipitation fluxes and set associated physics buffers
+    !
+    !------------------------------------------------------------------
+    !
+    call get_prec_vars(ncol,pbuf,fliq=fliq_tot,fice=fice_tot)
+    !
+    ! fliq_tot holds liquid precipitation from tphysbc and tphysac; idem for ice
+    !
+    enthalpy_prec_ac(:ncol,fice_idx) = fice_tot(:ncol)-enthalpy_prec_bc(:ncol,fice_idx)
+    enthalpy_prec_ac(:ncol,fliq_idx) = fliq_tot(:ncol)-enthalpy_prec_bc(:ncol,fliq_idx)
+    !
+    ! compute precipitation enthalpy fluxes from tphysbc
+    !
+    enthalpy_prec_ac(:ncol,hice_idx) =  -enthalpy_prec_ac(:ncol,fice_idx)*cpice*state%T(:ncol,pver)
+    enthalpy_prec_ac(:ncol,hliq_idx) =  -enthalpy_prec_ac(:ncol,fliq_idx)*cpliq*state%T(:ncol,pver)
+
+#ifdef debug_entalpy
+    call outfld("enth_prec_ac_hice"  , enthalpy_prec_ac(:,hice_idx)     , pcols   ,lchnk   )
+    call outfld("enth_prec_ac_hliq"  , enthalpy_prec_ac(:,hliq_idx)     , pcols   ,lchnk   )
+    call outfld("enth_prec_bc_hice"  , enthalpy_prec_bc(:,hice_idx)     , pcols   ,lchnk   )
+    call outfld("enth_prec_bc_hliq"  , enthalpy_prec_bc(:,hliq_idx)     , pcols   ,lchnk   )
+    call outfld("enth_prec_ac_fice"  , enthalpy_prec_ac(:,fice_idx)     , pcols   ,lchnk   )
+    call outfld("enth_prec_ac_fliq"  , enthalpy_prec_ac(:,fliq_idx)     , pcols   ,lchnk   )
+    call outfld("enth_prec_bc_fice"  , enthalpy_prec_bc(:,fice_idx)     , pcols   ,lchnk   )
+    call outfld("enth_prec_bc_fliq"  , enthalpy_prec_bc(:,fliq_idx)     , pcols   ,lchnk   )
+    call outfld("enth_evap_hevap"    , enthalpy_evap   (:)              , pcols   ,lchnk   )    
+#endif
+    call pbuf_set_field(pbuf, enthalpy_prec_ac_idx, enthalpy_prec_ac)
+  end subroutine enthalpy_adjustment
 end module check_energy
