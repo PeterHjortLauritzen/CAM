@@ -13,7 +13,7 @@
     <desc atm="CAM50[%CCTS1][%CLB][%PORT][%RCO2][%MAM7][%SCAM][%SDYN][%WCSC][%WCTS][%GEOSCHEM]"                                                               >CAM cam5 physics:</desc>
     <desc atm="CAM40[%PORT][%RCO2][%SCAM][%SDYN][%TMOZ][%WX][%WXIE][%WXIED][%WCCM][%WCMD][%GEOSCHEM]"                                                         >CAM cam4 physics:</desc>
     <desc atm="CAM30"                                                                                                                              >CAM cam3 physics:</desc>
-    <desc atm="CAM[%ADIAB][%DABIP04][%TJ16][%GRAYRAD][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM][%MARS][%SOCR]"                                     >CAM simplified and non-versioned physics :</desc>
+    <desc atm="CAM[%ADIAB][%DABIP04][%TJ16][%GRAYRAD][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM][%MARS][%SOCR][%EXORT]"                                     >CAM simplified and non-versioned physics :</desc>
 
   <!--
     ===============
@@ -66,6 +66,7 @@
    -->
     <desc option="MARS"         >CAM-MARS</desc>
     <desc option="SOCR"         >use SOCRATES Radiation library:</desc>
+    <desc option="EXORT"        >use ExoRT Radiation library:</desc>
 
   <!--
     ===============
@@ -200,6 +201,7 @@
       <value compset="_CAM.*%MARS">-nlev 49</value>
       <value compset="_CAM%MARS%HS94">-phys held_suarez</value>
       <value compset="_CAM.*%SOCR">-rad socrates</value>
+      <value compset="_CAM.*%EXO">-rad exort</value>
 
       <!-- Simple models -->
       <value compset="_CAM%ADIAB">-phys adiabatic</value>

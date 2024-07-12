@@ -448,6 +448,20 @@
 <bam_SSLTA rad="socrates">atm/cam/physprops/ssam_camrt_c080918.nc</bam_SSLTA>
 <bam_SSLTC rad="socrates">atm/cam/physprops/sscm_camrt_c080918.nc</bam_SSLTC>
 
+<!-- single gas k-coefficients for ExoRT -->
+<k_h2o_file  rad="exort"> atm/cam/physprops/n68_8gpt_h2o_hitran16_Nnu1e4_c25_voigt_noplinth_q0_grrtm.nc</k_h2o_file>
+<k_co2_file  rad="exort"> atm/cam/physprops/n68_8gpt_co2_hitran16_Nnu1e4_c500_subL_q1_grrtm.nc</k_co2_file>
+<k_ch4_file  rad="exort"> atm/cam/physprops/n68_8gpt_ch4_hitran16_Nnu1e4_c25_voigt_q0_grrtm.nc</k_ch4_file>
+<k_c2h6_file rad="exort"> atm/cam/physprops/n68_8gpt_c2h6_hitran16_Nnu1e4_c25_voigt_q0_grrtm.nc</k_c2h6_file>
+<kh2o_mtckd_file rad="exort"> atm/cam/physprops/KH2O_MTCKD3.3_SELF.FRGN_n68_ngauss.nc</kh2o_mtckd_file>
+<kn2n2cia_file rad="exort"> atm/cam/physprops/N2-N2_cia_n68.nc</kn2n2cia_file>
+<kn2h2cia_file rad="exort"> atm/cam/physprops/N2-H2_cia_n68.nc</kn2h2cia_file>
+<kh2h2cia_file rad="exort"> atm/cam/physprops/H2-H2_cia_n68.nc</kh2h2cia_file>
+<kco2co2cia_sw_file rad="exort"> atm/cam/physprops/CO2-CO2_cia_sw_n68.nc</kco2co2cia_sw_file>
+<kco2co2cia_lw_file rad="exort"> atm/cam/physprops/CO2-CO2_cia_lw_n68.nc</kco2co2cia_lw_file>
+<kco2ch4cia_file rad="exort"> atm/cam/physprops/CO2-CH4_cia_n68.nc</kco2ch4cia_file>
+<kco2h2cia_file rad="exort"> atm/cam/physprops/CO2-H2_cia_n68.nc</kco2h2cia_file>
+
 <!-- CAM-Chem bulk aerosols (different names used in prescribed and prognostic modes) -->
 <!-- Optics for RRTMG -->
 <bam_sulf   rad="rrtmg">atm/cam/physprops/sulfate_rrtmg_c080918.nc</bam_sulf>
