@@ -91,9 +91,9 @@ on Mapes and Neale (2011): 0 => no, 1 => yes
 PBL package: uw (University of Washington), hb (Holtslag and Boville), hbr
  (Holtslag, Boville, and Rasch), clubb_sgs, spcam_sam1om, spcam_m2005, none.
 </entry>
-<entry id="rad" valid_values="rrtmgp,rrtmg,camrt,socrates,none" value="">
+<entry id="rad" valid_values="rrtmgp,rrtmg,camrt,socrates,exort,none" value="">
 Radiative transfer calculation:
-camrt (CAM3 and CAM4 RT package), rrtmg (RRTMG package from AER), rrtmgp (updated version), socrates (from met office).
+camrt (CAM3 and CAM4 RT package), rrtmg (RRTMG package from AER), rrtmgp (updated version), socrates (from met office), exort (from Eric Wolf CU).
 </entry>
 <entry id="carma" valid_values="none,bc_strat,cirrus,cirrus_dust,dust,meteor_impact,meteor_smoke,mixed_sulfate,pmc,pmc_sulfate,sea_salt,sulfate,tholin,test_detrain,test_growth,test_passive,test_radiative,test_swelling,test_tracers,test_tracers2" value="none">
 CARMA sectional microphysics:
