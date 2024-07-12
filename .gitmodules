@@ -197,3 +197,9 @@ fxtag = fi_240516
 fxrequired = ToplevelRequired
 fxDONOTUSEurl = https://github.com/ESCOMP/FMS_interface
 
+[submodule "exo-rt"]
+path = src/physics/exo-rt/ext
+url = https://github.com/storyofthewolf/ExoRT
+fxtag = main
+fxrequired = ToplevelRequired
+fxDONOTUSEurl = https://github.com/storyofthewolf/ExoRT
