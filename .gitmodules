@@ -201,5 +201,5 @@ fxDONOTUSEurl = https://github.com/ESCOMP/FMS_interface
 path = src/physics/exo-rt/ext
 url = https://github.com/storyofthewolf/ExoRT
 fxtag = main
-fxrequired = ToplevelRequired
+fxrequired = AlwaysRequired
 fxDONOTUSEurl = https://github.com/storyofthewolf/ExoRT
