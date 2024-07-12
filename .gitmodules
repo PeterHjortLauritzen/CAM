@@ -198,5 +198,8 @@ fxrequired = ToplevelRequired
 fxDONOTUSEurl = https://github.com/ESCOMP/FMS_interface
 
 [submodule "exo-rt"]
-	path = src/physics/exo-rt
-	url = https://github.com/storyofthewolf/ExoRT
+path = src/physics/exo-rt/ext
+url = https://github.com/storyofthewolf/ExoRT
+fxtag = cam-mars-dev_002
+fxrequired = ToplevelRequired
+fxDONOTUSEurl = https://github.com/storyofthewolf/ExoRT
