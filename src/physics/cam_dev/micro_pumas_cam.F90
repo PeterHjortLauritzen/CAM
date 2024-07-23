@@ -171,7 +171,9 @@ integer :: &
    ls_flxsnw_idx,      &
    relvar_idx,         &
    cmeliq_idx,         &
-   accre_enhan_idx
+   accre_enhan_idx,    &
+   mpdt_idx,           &
+   mpdice_idx
 
 ! Fields for UNICON
 integer :: &
@@ -627,6 +629,9 @@ subroutine micro_pumas_cam_register
          call cnst_add(cnst_names(10), mwh2o, cpair, 0._r8, ixnumgraupel, &
               longname='Grid box averaged graupel/hail number', is_convtran1=.true.)
    end if
+
+   call pbuf_add_field('MPDT',     'physpkg', dtype_r8, (/pcols,pver/), mpdt_idx)
+   call pbuf_add_field('MPDICE',   'physpkg', dtype_r8, (/pcols,pver/), mpdice_idx)
 
    ! Request physics buffer space for fields that persist across timesteps.
 
@@ -2429,7 +2434,8 @@ subroutine micro_pumas_cam_tend(state, ptend, dtime, pbuf)
 
       call physics_ptend_init(ptend_loc, psetcols, "micro_pumas", &
                               ls=.true., lq=lq)
-
+      call pbuf_set_field(pbuf, mpdt_idx, tlat)
+      call pbuf_set_field(pbuf, mpdice_idx, qiten)
       ! Set local tendency.
       ptend_loc%s(:ncol,top_lev:) = tlat(:ncol,top_lev:)
       ptend_loc%q(:ncol,top_lev:,ixq) = qvlat(:ncol,top_lev:)

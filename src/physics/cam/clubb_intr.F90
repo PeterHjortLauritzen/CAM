@@ -401,8 +401,8 @@ module clubb_intr
     ice_supersat_idx, & ! ice cloud fraction for SILHS
     rcm_idx, &          ! Cloud water mixing ratio for SILHS
     ztodt_idx,&         ! physics timestep for SILHS
-    clubbtop_idx        ! level index for CLUBB top
-
+    clubbtop_idx,     & ! level index for CLUBB top
+    rcmtend_clubb_idx
   ! Indices for microphysical covariance tendencies
   integer :: &
     rtp2_mc_zt_idx,   &
@@ -587,6 +587,7 @@ module clubb_intr
     call pbuf_add_field('pdf_zm_var_w_2', 'global', dtype_r8, (/pcols,pverp,dyn_time_lvls/), pdf_zm_varnce_w_2_idx)
     call pbuf_add_field('pdf_zm_mixt_frac',  'global', dtype_r8, (/pcols,pverp,dyn_time_lvls/), pdf_zm_mixt_frac_idx)
 
+    call pbuf_add_field('rcmtend_clubb', 'global', dtype_r8, (/pcols, pver/), rcmtend_clubb_idx)
 #endif
 
   end subroutine clubb_register_cam
@@ -3907,7 +3908,10 @@ end subroutine clubb_init_cnst
     call outfld( 'RVMTEND_CLUBB', temp2d, pcols, lchnk)
 
     temp2d(:ncol,:pver) = ptend_loc%q(:ncol,:pver,ixcldliq)*state1%pdeldry(:ncol,:pver)/state1%pdel(:ncol,:pver)
+    call pbuf_set_field(pbuf, rcmtend_clubb_idx,temp2d)
     call outfld( 'RCMTEND_CLUBB', temp2d, pcols, lchnk)
+
+
 
     temp2d(:ncol,:pver) = ptend_loc%q(:ncol,:pver,ixcldice)*state1%pdeldry(:ncol,:pver)/state1%pdel(:ncol,:pver)
     call outfld( 'RIMTEND_CLUBB', temp2d, pcols, lchnk)

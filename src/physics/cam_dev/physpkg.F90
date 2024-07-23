@@ -2366,9 +2366,8 @@ contains
        if (.not.dycore_is('SE')) then
           call endrun("Explicit enthalpy flux functionality only supported for SE dycore")
        end if
-       !Thomas: we will add call here to subroutine that does the simple dme bflx etc.
-       call enthalpy_adjustment(ncol,lchnk,state,cam_in,cam_out,pbuf,ztodt,itim_old,&
-         qini,totliqini,toticeini,tend)
+       call enthalpy_adjustment(ncol,lchnk,state,cam_in,pbuf,ztodt,itim_old,&
+            qini,totliqini,toticeini,tend)
     else
        !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
        ! Save total energy for global fixer in next timestep
@@ -2466,7 +2465,6 @@ contains
           call endrun ('TPHYSAC error: in aquaplanet mode, but grid contains non-ocean point')
        endif
     endif
-
     call diag_phys_tend_writeout (state, pbuf,  tend, ztodt, qini, cldliqini, cldiceini)
 
     call clybry_fam_set( ncol, lchnk, map2chm, state%q, pbuf )
@@ -2513,7 +2511,7 @@ contains
     use constituents,    only: qmin
     use air_composition, only: thermodynamic_active_species_liq_num,thermodynamic_active_species_liq_idx
     use air_composition, only: thermodynamic_active_species_ice_num,thermodynamic_active_species_ice_idx
-    use air_composition, only: compute_enthalpy_flux, num_enthalpy_vars
+    use air_composition, only: compute_enthalpy_flux, num_enthalpy_vars, cp_or_cv_dycore
     use physics_buffer,  only: pbuf_set_field
     use convect_deep,    only: convect_deep_tend
     use time_manager,    only: is_first_step, get_nstep
@@ -2532,7 +2530,9 @@ contains
     use cam_snapshot,    only: cam_snapshot_all_outfld_tphysbc
     use cam_snapshot_common, only: cam_snapshot_ptend_outfld
     use dyn_tests_utils, only: vc_dycore
-
+    use air_composition, only: te_init,cpairv,compute_enthalpy_flux!xxx to be removed
+    use dyn_tests_utils, only: vc_dycore!xxx to be removed
+    use cam_thermo,      only: get_hydrostatic_energy!xxx to be removed
     ! Arguments
 
     real(r8), intent(in) :: ztodt                          ! 2 delta t (model time increment)
@@ -2608,8 +2608,6 @@ contains
     real(r8),pointer :: prec_sed(:)     ! total precip from cloud sedimentation
     real(r8),pointer :: snow_sed(:)     ! snow from cloud ice sedimentation
 
-    real(r8) :: enthalpy_prec_ac(pcols,num_enthalpy_vars)
-
     ! energy checking variables
     real(r8) :: zero(pcols)                    ! array of zeros
     real(r8) :: zero_sc(pcols*psubcols)        ! array of zeros
@@ -2620,9 +2618,7 @@ contains
     real(r8) :: flx_heat(pcols)
     type(check_tracers_data):: tracerint             ! energy integrals and cummulative boundary fluxes
     real(r8) :: zero_tracers(pcols,pcnst)
-
     logical   :: lq(pcnst)
-
     !-----------------------------------------------------------------------
 
     call t_startf('bc_init')
@@ -2691,26 +2687,6 @@ contains
 
     call t_stopf('bc_init')
 
-    !===================================================
-    ! Global mean total energy fixer
-    !===================================================
-    call t_startf('energy_fixer')
-
-    call tot_energy_phys(state, 'phBF')
-    call tot_energy_phys(state, 'dyBF',vc=vc_dycore)
-
-    if (.not.dycore_is('EUL')) then
-       call check_energy_fix(state, ptend, nstep, flx_heat)
-       call physics_update(state, ptend, ztodt, tend)
-       call check_energy_chng(state, tend, "chkengyfix", nstep, ztodt, zero, zero, zero, flx_heat)
-       call outfld( 'EFIX', flx_heat    , pcols, lchnk   )
-    end if
-
-    call tot_energy_phys(state, 'phBP')
-    call tot_energy_phys(state, 'dyBP',vc=vc_dycore)
-    ! Save state for convective tendency calculations.
-    call diag_conv_tend_ini(state, pbuf)
-
     call cnst_get_ind('Q', ixq)
     call cnst_get_ind('CLDLIQ', ixcldliq)
     call cnst_get_ind('CLDICE', ixcldice)
@@ -2729,6 +2705,37 @@ contains
       toticeini(:ncol,:pver) = toticeini(:ncol,:pver)+state%q(:ncol,:pver,m)
     end do
 
+    !
+    ! compute energy variables for state at the beginning of physics - xxx to be remove
+    !
+    if (compute_enthalpy_flux) then
+      call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,          &
+           state%pdel(1:ncol,1:pver), cp_or_cv_dycore(:ncol,:,lchnk),             &
+           state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), state%T(1:ncol,1:pver),&
+           vc_dycore, ptop=state%pintdry(1:ncol,1), phis = state%phis(1:ncol),    &
+           te = te_init(:ncol,1,lchnk), se=te_init(:ncol,2,lchnk), po=te_init(:ncol,3,lchnk), ke=te_init(:ncol,4,lchnk))
+    endif
+
+    !===================================================
+    ! Global mean total energy fixer
+    !===================================================
+
+    call t_startf('energy_fixer')
+
+    call tot_energy_phys(state, 'phBF')
+    call tot_energy_phys(state, 'dyBF',vc=vc_dycore)
+
+    if (.not.dycore_is('EUL')) then
+       call check_energy_fix(state, ptend, nstep, flx_heat)
+       call physics_update(state, ptend, ztodt, tend)
+       call check_energy_chng(state, tend, "chkengyfix", nstep, ztodt, zero, zero, zero, flx_heat)
+       call outfld( 'EFIX', flx_heat    , pcols, lchnk   )
+    end if
+
+    call tot_energy_phys(state, 'phBP')
+    call tot_energy_phys(state, 'dyBP',vc=vc_dycore)
+    ! Save state for convective tendency calculations.
+    call diag_conv_tend_ini(state, pbuf)
 
     call outfld('TEOUT', teout       , pcols, lchnk   )
     call outfld('TEINP', state%te_ini(:,dyn_te_idx), pcols, lchnk   )
@@ -2874,16 +2881,11 @@ contains
       prec_str = 0._r8
       snow_str = 0._r8
       !
-      ! In first time-step tphysac variables need to be zero'd out 
+      ! In first time-step tphysac variables need to be zero'd out
       !
       if (compute_enthalpy_flux) then
         ifld = pbuf_get_index('ENTHALPY_PREC_AC', errcode=i)
-        enthalpy_prec_ac = 0._r8
-        if (ifld>0) then
-          call pbuf_set_field(pbuf, ifld, enthalpy_prec_ac)
-        else
-          call endrun('tphysbc: pbuf ENTHALPY_PREC_AC not allocated')
-        end if
+        if (ifld>0) call pbuf_set_field(pbuf, ifld, 0._r8)
       end if
 
       if (is_subcol_on()) then

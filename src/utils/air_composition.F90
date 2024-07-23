@@ -118,6 +118,7 @@ module air_composition
    ! cp_or_cv_dycore:  enthalpy or internal energy scaling factor for 
    !                   energy consistency
    real(r8), public, protected, allocatable :: cp_or_cv_dycore(:,:,:)
+   real(r8), public, allocatable :: te_init(:,:,:)!xxx to be removed
    !
    ! Interfaces for public routines
    interface get_cp_dry
@@ -354,7 +355,7 @@ CONTAINS
       if (ierr /= 0) then
          call endrun(errstr//"cp_or_cv_dycore")
       end if
-
+      allocate(te_init(pcols,4,begchunk:endchunk), stat=ierr)!xxx to be removed
       thermodynamic_active_species_idx        = -HUGE(1)
       thermodynamic_active_species_idx_dycore = -HUGE(1)
       thermodynamic_active_species_cp         = 0.0_r8

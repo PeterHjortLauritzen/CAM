@@ -41,6 +41,7 @@ module zm_conv_intr
    public zmconv_ke, zmconv_ke_lnd,  zmconv_org  ! needed by convect_shallow
 
    integer ::& ! indices for fields in the physics buffer
+      zmdt_idx,       &
       zm_mu_idx,      &
       zm_eu_idx,      &
       zm_du_idx,      &
@@ -62,7 +63,8 @@ module zm_conv_intr
       dnifzm_idx,    &     ! detrained convective cloud ice num concen.
       prec_dp_idx,   &
       snow_dp_idx,   &
-      mconzm_idx           ! convective mass flux
+      mconzm_idx,    &     ! convective mass flux
+      rprd_idx
 
    real(r8), parameter :: unset_r8 = huge(1.0_r8)
    real(r8) :: zmconv_c0_lnd = unset_r8
@@ -109,6 +111,7 @@ subroutine zm_conv_register
 
   integer idx
 
+   call pbuf_add_field('ZMDT' , 'physpkg', dtype_r8, (/pcols,pver/), zmdt_idx)
    call pbuf_add_field('ZM_MU', 'physpkg', dtype_r8, (/pcols,pver/), zm_mu_idx)
    call pbuf_add_field('ZM_EU', 'physpkg', dtype_r8, (/pcols,pver/), zm_eu_idx)
    call pbuf_add_field('ZM_DU', 'physpkg', dtype_r8, (/pcols,pver/), zm_du_idx)
@@ -160,6 +163,7 @@ subroutine zm_conv_register
       call cnst_add('ZM_ORG',0._r8,0._r8,0._r8,ixorg,longname='organization parameter')
    endif
 
+   call pbuf_add_field('rprd','physpkg',dtype_r8,(/pcols,pver/),rprd_idx)
 end subroutine zm_conv_register
 
 !=========================================================================================
@@ -382,6 +386,7 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
 
    use time_manager,  only: get_nstep, is_first_step
    use physics_buffer, only : pbuf_get_field, physics_buffer_desc, pbuf_old_tim_idx
+   use physics_buffer, only : pbuf_set_field
    use constituents,  only: pcnst, cnst_get_ind, cnst_is_convtran1
    use check_energy,  only: check_energy_chng
    use physconst,     only: gravit, latice, latvap, tmelt, cpwv, cpliq, rh2o
@@ -647,6 +652,9 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
 
    ftem(:ncol,:pver) = ptend_loc%s(:ncol,:pver)/cpair
    call outfld('ZMDT    ',ftem           ,pcols   ,lchnk   )
+
+   call pbuf_set_field(pbuf, zmdt_idx, ptend_loc%s(:,:pver))
+
    call outfld('ZMDQ    ',ptend_loc%q(1,1,1) ,pcols   ,lchnk   )
    call t_stopf ('zm_convr_run')
 
@@ -736,6 +744,7 @@ subroutine zm_conv_tend(pblh    ,mcon    ,cme     , &
    call outfld('CMFMC_DP   ',mcon ,  pcols   ,lchnk   )
    call outfld('PRECCDZM   ',prec,  pcols   ,lchnk   )
 
+   call pbuf_set_field(pbuf, rprd_idx, rprd)
 
    call t_stopf ('zm_conv_evap_run')
 

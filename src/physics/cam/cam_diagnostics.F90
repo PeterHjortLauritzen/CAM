@@ -1,4 +1,3 @@
-#define debug_entalpy
 module cam_diagnostics
 
 !---------------------------------------------------------------------------------
@@ -395,7 +394,21 @@ contains
     call addfld( 'CPAIRV', (/ 'lev' /), 'I', 'J/K/kg', 'Variable specific heat cap air' )
     call addfld( 'RAIRV', (/ 'lev' /), 'I', 'J/K/kg', 'Variable dry air gas constant' )
 
-#ifdef debug_entalpy
+    !
+    ! enthalpy variables
+    !
+    call addfld('STEND_HFIX', (/ 'lev' /), 'I', 'W/m2', 'Heating tendency from variable latent heat enthalpy fixer' )
+    call addfld('dEdt_enth_fix', horiz_only, 'I', 'W/m2', 'Column integrated dEdt from variable latent heat enthalpy fixer' )
+    call addfld('dEdt_efix_physics', horiz_only, 'I', 'W/m2', 'Column integrated physics energy fixer dEdt from enthalpy fixer' )
+    call addfld('residual', horiz_only, 'I', 'W/m2', '' )
+    call addfld('enth_fix_fct_bc', (/ 'lev' /), 'I', 'W/m2', '' )
+    call addfld('enth_fix_fct_ac', (/ 'lev' /), 'I', 'W/m2', '' )
+    call addfld('enth_fix_fct_bc_tot', horiz_only, 'I', 'W/m2', '' )
+    call addfld('enth_fix_fct_ac_tot', horiz_only, 'I', 'W/m2', '' )
+
+    call addfld('enthalpy_heating_fix_bc', horiz_only, 'I', 'W/m2', '' )
+    call addfld('enthalpy_heating_fix_ac', horiz_only, 'I', 'W/m2', '' )
+
     call addfld('enth_prec_ac_hice', horiz_only, 'I', 'W/m2', '' )
     call addfld('enth_prec_ac_hliq', horiz_only, 'I', 'W/m2', '' )
     call addfld('enth_prec_bc_hice', horiz_only, 'I', 'W/m2', '' )
@@ -405,7 +418,21 @@ contains
     call addfld('enth_prec_bc_fice', horiz_only, 'I', 'W/m2', '' )
     call addfld('enth_prec_bc_fliq', horiz_only, 'I', 'W/m2', '' )
     call addfld('enth_evap_hevap', horiz_only, 'I', 'W/m2', '' )
-#endif
+
+    call addfld('te_tnd', horiz_only, 'I', 'W/m2', 'Total column integrated energy tendency from CAM physics' )
+    call addfld('te_lat', horiz_only, 'I', 'W/m2', 'Total column integrated constant latent heat tendency from CAM physics')
+    call addfld('cnst_lat_heat_srf'       , horiz_only, 'I', 'W/m2', '' )!xxx diags will remove
+    call addfld('cpice_srf'    , horiz_only, 'I', 'W/m2', '' )!xxx diags will remove
+    call addfld('ls_srf'       , horiz_only, 'I', 'W/m2', '' )!xxx diags will remove
+    call addfld('lf_srf'       , horiz_only, 'I', 'W/m2', '' )!xxx diags will remove
+    call addfld('dEdt_dme'     , horiz_only, 'I', 'W/m2', 'Column integrated dEdt from water update')
+    call addfld('dEdt_physics' , horiz_only, 'I', 'W/m2', '' )!xxx diags will remove
+    call addfld('dEdt_cpdycore' , horiz_only, 'I', 'W/m2', 'Column integrated dEdt from updating cp')
+    !
+    !fincl1  = 'enth_prec_ac_hice','enth_prec_ac_hliq','enth_prec_bc_hice','enth_prec_bc_hliq','enth_prec_ac_fice',!xxx
+    !          'enth_prec_ac_fliq','enth_prec_bc_fice','enth_prec_bc_fliq','enth_evap_hevap',!xxx
+    !          'heating_cpice','te_tnd','te_lat','cnst_lat_heat_srf','ls_srf','lf_srf','dEdt_dme','dEdt_physics','dEdt_cpdycore'!xxx
+    !
 
     if (thermo_budget_history) then
        !
