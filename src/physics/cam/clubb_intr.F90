@@ -401,11 +401,8 @@ module clubb_intr
     ice_supersat_idx, & ! ice cloud fraction for SILHS
     rcm_idx, &          ! Cloud water mixing ratio for SILHS
     ztodt_idx,&         ! physics timestep for SILHS
-<<<<<<< HEAD
     clubbtop_idx,     & ! level index for CLUBB top
     rcmtend_clubb_idx
-=======
-    clubbtop_idx        ! level index for CLUBB top
 
   !   For Gravity Wave code
   integer :: &
@@ -420,7 +417,6 @@ module clubb_intr
        wpthlp_clubb_gw_idx, &
        wpthlp_clubb_gw_mc_idx
 
->>>>>>> ESCOMP/cam_development
   ! Indices for microphysical covariance tendencies
   integer :: &
     rtp2_mc_zt_idx,   &
