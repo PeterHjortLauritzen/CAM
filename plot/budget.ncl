@@ -3,8 +3,10 @@ load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_csm.ncl"
 begin
   output_format="pdf"
 
-  dir="/scratch/cluster/pel/cam_enth_simple_QPC6_ne16pg3_ne16pg3_mg17/run/"
-  fname = "cam_enth_simple_QPC6_ne16pg3_ne16pg3_mg17.cam.h0i."
+  dir="/glade/derecho/scratch/pel/cam_enth_simple_384_FLTHIST_ne30pg3_ne30pg3_mg17/run/"
+  fname = "cam_enth_simple_384_FLTHIST_ne30pg3_ne30pg3_mg17.cam.h1i."
+;  dir="/scratch/cluster/pel/cam_enth_simple_QPC6_ne16pg3_ne16pg3_mg17/run/"
+;  fname = "cam_enth_simple_QPC6_ne16pg3_ne16pg3_mg17.cam.h0i."
   fnameall =  systemfunc("ls "+dir+fname+"*.nc")
   fall = addfiles(fnameall,"r")       ; Open netCDF files.
     
@@ -53,7 +55,6 @@ begin
   lf_srf=fall[:]->lf_srf
   dEdt_dme=fall[:]->dEdt_dme
   dEdt_cpdycore=fall[:]->dEdt_cpdycore
-  dEdt_cpicedme=fall[:]->dEdt_cpicedme
 
   res                     = True         ; plot modifications desired
   res@gsnMaximize         = False         ; Maximize size of plot in frame

@@ -981,6 +981,7 @@ end subroutine check_energy_get_integrals
     use physics_types,   only: physics_dme_adjust, dyn_te_idx
     use cam_thermo,      only: cam_thermo_water_update
     use cam_history,     only: outfld
+    use cam_budget,      only: thermo_budget_history
     integer,             intent(in)    :: ncol, lchnk
     type(physics_state), intent(inout) :: state
     type(cam_in_t),      intent(inout) :: cam_in
@@ -1020,7 +1021,7 @@ end subroutine check_energy_get_integrals
     real(r8), dimension(pcols)      :: variable_latent_heat_surface_lf_term !xxx diagnostics
     real(r8), dimension(pcols)      :: enthalpy_flux_tot, residual_enthalpy_terms_only
     real(r8), dimension(pcols,pver) :: fct_bc, fct_ac
-    real(r8), dimension(pcols,pver) :: scale_cpdry_cpdycore, stend_hfix
+    real(r8), dimension(pcols,pver) :: scale_cpdry_cpdycore, ttend_hfix
 
     real(r8), parameter :: eps=1.E-10_r8
 
@@ -1111,6 +1112,10 @@ end subroutine check_energy_get_integrals
     ! with water entering/leaving the column
     !
     call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt)
+    if (thermo_budget_history) then
+       call tot_energy_phys(state, 'phAM')
+       call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
+    endif
     call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,            &
          state%pdel(1:ncol,1:pver), cp_or_cv_dycore(:ncol,:,lchnk),               &
          state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), state%T(1:ncol,1:pver),&
@@ -1209,16 +1214,16 @@ end subroutine check_energy_get_integrals
         do k = 1, pver
           tot = (wgt_bc*fct_bc(i,k)+wgt_ac*fct_ac(i,k))*residual_enthalpy_terms_only(i)
           state%T(i,k) = state%T(i,k)+tot*ztodt/(cp_or_cv_dycore(i,k,lchnk)*state%pdel(i,k)*rga)
-          stend_hfix(i,k) = tot/(state%pdel(i,k)*rga)
+          ttend_hfix(i,k) = tot/(state%pdel(i,k)*rga*cp_or_cv_dycore(i,k,lchnk))
           enthalpy_heating_fix_bc(i) = enthalpy_heating_fix_bc(i)+wgt_bc*fct_bc(i,k)*residual_enthalpy_terms_only(i)
           enthalpy_heating_fix_ac(i) = enthalpy_heating_fix_ac(i)+wgt_ac*fct_ac(i,k)*residual_enthalpy_terms_only(i)
         end do
       else
-        stend_hfix(i,:) = 0.0_r8
+        ttend_hfix(i,:) = 0.0_r8
       end if
     end do
     tend%dtdt(:ncol,:) = (state%T(:ncol,:)-state%temp_ini(:ncol,:))/ztodt
-    call outfld("STEND_HFIX"  , stend_hfix, pcols   ,lchnk)
+    call outfld("TTEND_HFIX"  , ttend_hfix, pcols   ,lchnk)
     call outfld("enthalpy_heating_fix_bc"  , enthalpy_heating_fix_bc, pcols   ,lchnk)
     call outfld("enthalpy_heating_fix_ac"  , enthalpy_heating_fix_ac, pcols   ,lchnk)
 

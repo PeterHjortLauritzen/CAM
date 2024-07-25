@@ -61,7 +61,7 @@ set queue="regular" #  set queue="short
 set caze=${src}_${pecount}_${cset}_${res}
 #/glade/work/pel/cesm_tags/cam6_3_132/cime/scripts/create_newcase --case $scratch/$USER/$caze --compset $cset --res $res  --q $queue --walltime $wall --pecount $pecount    --project $proj --walltime $wall  --run-unsupported
 
-/glade/campaign/cgd/amp/pel/src/$src/cime/scripts/create_newcase --case $scratch/$USER/$caze --compset $cset --res $res   --walltime $wall    --project $proj --walltime $wall --pecount $pecount --run-unsupported
+/glade/u/home/pel/src/$src/cime/scripts/create_newcase --case $scratch/$USER/$caze --compset $cset --res $res   --walltime $wall    --project $proj --walltime $wall --pecount $pecount --run-unsupported
 
 cd $scratch/$USER/$caze
 ./xmlchange STOP_OPTION=$stopoption,STOP_N=$steps
@@ -98,7 +98,7 @@ echo "print_energy_errors = .true." >> user_nl_cam
 echo "se_statefreq = 1" >> user_nl_cam
 echo "avgflag_pertape(1) = 'I'" >> user_nl_cam
 echo "fincl1 = 'U','V','T','Q','PRECT','PRECC','PRECL','OMEGA500'" >> user_nl_cam
-echo "se_ftype=1" >> user_nl_cam
+#echo "se_ftype=1" >> user_nl_cam
 echo "thermo_budget_history = .true." >> user_nl_cam
 echo "thermo_budget_histfile_num = 2" >> user_nl_cam
 echo "avgflag_pertape(2) = 'N'" >> user_nl_cam
@@ -113,4 +113,4 @@ echo "!fincl4 = 'FRAIN_coupler','FSNOW_coupler','FEVAP_coupler','FRAIN_AC','FSNO
 
 
 qcmd -A $proj -- ./case.build 
-./case.submit
+#./case.submit

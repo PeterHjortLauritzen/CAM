@@ -397,7 +397,7 @@ contains
     !
     ! enthalpy variables
     !
-    call addfld('STEND_HFIX', (/ 'lev' /), 'I', 'W/m2', 'Heating tendency from variable latent heat enthalpy fixer' )
+    call addfld('TTEND_HFIX', (/ 'lev' /), 'I', 'W/m2', 'Temperature tendency from variable latent heat enthalpy fixer' )
     call addfld('dEdt_enth_fix', horiz_only, 'I', 'W/m2', 'Column integrated dEdt from variable latent heat enthalpy fixer' )
     call addfld('dEdt_efix_physics', horiz_only, 'I', 'W/m2', 'Column integrated physics energy fixer dEdt from enthalpy fixer' )
     call addfld('residual', horiz_only, 'I', 'W/m2', '' )
