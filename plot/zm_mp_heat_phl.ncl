@@ -2,14 +2,18 @@ load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_code.ncl"
 load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_csm.ncl"
 begin
   output_format="pdf"
-  dir="/glade/derecho/scratch/pel/cam_enth_simple_384_FLTHIST_ne30pg3_ne30pg3_mg17/run/"
-  fname = "cam_enth_simple_384_FLTHIST_ne30pg3_ne30pg3_mg17.cam.h1i."
+;  dir="/glade/derecho/scratch/pel/cam_enth_simple/run/"
+;  fname = "cam_enth_simple.cam.h8a."
+  dir="/glade/derecho/scratch/pel/cam_enth_simple_ocnfrc/run/"
+  fname = "cam_enth_simple_ocnfrc.cam.h8a."
+;  dir="/glade/derecho/scratch/pel/cam_enth_simple_384_FLTHIST_ne30pg3_ne30pg3_mg17/run/"
+;  fname = "cam_enth_simple_384_FLTHIST_ne30pg3_ne30pg3_mg17.cam.h1i."
 ;  dir="/scratch/cluster/pel/cam_enth_simple_QPC6_ne16pg3_ne16pg3_mg17/run/"
 ;  fname = "cam_enth_simple_QPC6_ne16pg3_ne16pg3_mg17.cam.h0i."
   fnameall =  systemfunc("ls "+dir+fname+"*.nc")
   fall = addfiles(fnameall,"r")       ; Open netCDF files.
     
-  tidx = 8
+  tidx = 0
 
   T00 = 290D0
   cpair    = 1004.64D0 
