@@ -209,7 +209,7 @@ contains
     call pbuf_add_field('TOTICEINI', 'physpkg', dtype_r8, (/pcols,pver/), toticeini_idx)
     if (compute_enthalpy_flux) then
        call pbuf_add_field('ENTHALPY_PREC_BC','physpkg', dtype_r8, (/pcols,num_enthalpy_vars/), enthalpy_prec_bc_idx)
-       call pbuf_add_field('ENTHALPY_PREC_AC','physpkg', dtype_r8, (/pcols,num_enthalpy_vars/), enthalpy_prec_ac_idx)
+       call pbuf_add_field('ENTHALPY_PREC_AC','global', dtype_r8, (/pcols,num_enthalpy_vars/), enthalpy_prec_ac_idx)
        call pbuf_add_field('ENTHALPY_EVAP'   ,'physpkg', dtype_r8, (/pcols/),                   enthalpy_evap_idx)
     end if
     
