@@ -1241,7 +1241,9 @@ end subroutine check_energy_get_integrals
     !
     ! state%te_cur(:ncol,dyn_te_idx) holds te_endphys(:ncol)
     !
-    state%te_cur(:ncol,dyn_te_idx) = state%te_cur(:ncol,dyn_te_idx)+ztodt*enthalpy_flux_tot(:ncol)
+    ! ocnfrac: for now apply fixer 
+    !
+    state%te_cur(:ncol,dyn_te_idx) = state%te_cur(:ncol,dyn_te_idx)+ztodt*enthalpy_flux_tot(:ncol)*cam_in%ocnfrac(:ncol)
     call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
     !
     ! the amount of total energy we need energy fixer to fix (associated with enthalpy flux)
