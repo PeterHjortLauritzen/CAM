@@ -12,6 +12,8 @@ setenv PBS_ACCOUNT P93300642
 
 set src="cam_enth_simple"   #cam_enthalpy"
 set caze=cam_enth_simple
+set caze=cam_enth_simple_ocnfrc
+set caze=cam_enth_simple_ocnfrc_fix2
 #set src="cam6_4_015"
 #set caze=cam6_4_015
 
@@ -77,9 +79,10 @@ echo "phys_grid_ctem_za_nlat=90"                                                
 echo "clubb_c8 = 4.35 "                                                                                                                                          >> user_nl_cam
 
 #echo "fincl9 = 'EFIX'"                  >> user_nl_cam
-echo "fincl9 =  'enth_prec_ac_hice','enth_prec_ac_hliq','enth_prec_bc_hice','enth_prec_bc_hliq','enth_prec_ac_fice','enth_prec_ac_fliq','enth_prec_bc_fice',"  >> user_nl_cam
-echo " 'enth_prec_bc_fliq','enth_evap_hevap','cpice_srf','te_tnd','te_lat','cnst_lat_heat_srf','ls_srf','lf_srf','dEdt_dme','dEdt_physics',         " >> user_nl_cam
-echo "'dEdt_cpdycore','residual','dEdt_enth_fix','enth_fix_fct_bc_tot','enth_fix_fct_ac_tot','enthalpy_heating_fix_bc','enthalpy_heating_fix_ac',   " >> user_nl_cam
-echo "'dEdt_efix_physics','EFIX'"    >> user_nl_cam
+echo "fincl9 =  'enth_prec_ac_hice:A','enth_prec_ac_hliq:A','enth_prec_bc_hice:A','enth_prec_bc_hliq:A','enth_prec_ac_fice:A','enth_prec_ac_fliq:A','enth_prec_bc_fice:A',"  >> user_nl_cam
+echo " 'enth_prec_bc_fliq:A','enth_evap_hevap:A','cpice_srf:A','te_tnd:A','te_lat:A','cnst_lat_heat_srf:A','ls_srf:A','lf_srf:A','dEdt_dme:A','dEdt_physics:A',         " >> user_nl_cam
+echo "'dEdt_cpdycore:A','residual:A','dEdt_enth_fix:A','enth_fix_fct_bc_tot:A','enth_fix_fct_ac_tot:A','enthalpy_heating_fix_bc:A','enthalpy_heating_fix_ac:A',   " >> user_nl_cam
+echo "'dEdt_efix_physics:A','EFIX:A'"    >> user_nl_cam
+echo "avgflag_pertape(9) = 'A'" >> user_nl_cam
 #qcmd -A $proj -- ./case.build 
 #./case.submit

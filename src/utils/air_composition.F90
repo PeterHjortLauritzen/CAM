@@ -25,7 +25,7 @@ module air_composition
    ! get_mbarv: molecular weight of dry air
    public :: get_mbarv
 
-   logical, public :: compute_enthalpy_flux=.true.
+   logical, public :: compute_enthalpy_flux
    !
    ! for book keeping of enthalpy variables in physics buffer
    !
@@ -168,9 +168,6 @@ CONTAINS
       namelist /air_composition_nl/ dry_air_species, water_species_in_air, compute_enthalpy_flux
       !-----------------------------------------------------------------------
 
-      call mpi_bcast(compute_enthalpy_flux, 1, mpi_logical, masterprocid, mpicom, ierr)
-      if (ierr /= 0) call endrun(subname//": FATAL: mpi_bcast: compute_enthalpy_flux")
-
       banner = repeat('*', lsize)
       bline = "***"//repeat(' ', lsize - 6)//"***"
 
@@ -189,6 +186,9 @@ CONTAINS
          end if
          close(unitn)
       end if
+
+      call mpi_bcast(compute_enthalpy_flux, 1, mpi_logical, masterprocid, mpicom, ierr)
+      if (ierr /= 0) call endrun(subname//": FATAL: mpi_bcast: compute_enthalpy_flux")
 
       call mpi_bcast(dry_air_species, len(dry_air_species)*num_names_max,     &
            mpi_character, masterprocid, mpicom, ierr)

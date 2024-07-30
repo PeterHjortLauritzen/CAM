@@ -63,8 +63,8 @@ echo "'pom_a1DDF', 'pom_a4DDF', 'so4_a1DDF', 'so4_a2DDF', 'so4_a3DDF', 'soa_a1DD
 echo "'so4_a1_CLXF', 'so4_a2_CLXF', 'SFbc_a4', 'SFpom_a4', 'SFso4_a1', 'SFso4_a2',"                                                                              >> user_nl_cam
 echo "'so4_a1_sfgaex1', 'so4_a2_sfgaex1', 'so4_a3_sfgaex1', 'soa_a1_sfgaex1', 'soa_a2_sfgaex1',"                                                                 >> user_nl_cam
 echo "'SFdst_a1','SFdst_a2', 'SFdst_a3', 'SFncl_a1', 'SFncl_a2', 'SFncl_a3',"                                                                                    >> user_nl_cam
-echo "'num_a2_sfnnuc1', 'SFSO2', 'OCN_FLUX_DMS', 'SAD_SULFC', 'SAD_TROP', 'SAD_AERO',"                                                                           >> user_nl_cam
-echo "'TTEND_HFIX'"      >> user_nl_cam
+echo "'num_a2_sfnnuc1', 'SFSO2', 'OCN_FLUX_DMS', 'SAD_SULFC', 'SAD_TROP', 'SAD_AERO'"                                                                           >> user_nl_cam
+#echo "'TTEND_HFIX'"      >> user_nl_cam
 echo "fincl3 = 'PRECT', 'PRECC', 'FLUT', 'U850', 'U200', 'V850', 'V200', 'OMEGA500', 'TS', 'SST', 'PSL'"                                                         >> user_nl_cam
 
 echo "fincl4 =  'PRECC','PRECL'"                                                                                                                                 >> user_nl_cam
@@ -75,7 +75,7 @@ echo "phys_grid_ctem_zm_nbas=120"                                               
 echo "phys_grid_ctem_za_nlat=90"                                                                                                                                 >> user_nl_cam
 
 echo "clubb_c8 = 4.35 "                                                                                                                                          >> user_nl_cam
-
+echo "avgflag_pertape(9) = 'A'" >> user_nl_cam
 echo "fincl9 = 'EFIX'"                  >> user_nl_cam
 #echo "fincl9 =  'enth_prec_ac_hice','enth_prec_ac_hliq','enth_prec_bc_hice','enth_prec_bc_hliq','enth_prec_ac_fice','enth_prec_ac_fliq','enth_prec_bc_fice',"  >> user_nl_cam
 #echo " 'enth_prec_bc_fliq','enth_evap_hevap','cpice_srf','te_tnd','te_lat','cnst_lat_heat_srf','ls_srf','lf_srf','dEdt_dme','dEdt_physics',         " >> user_nl_cam
