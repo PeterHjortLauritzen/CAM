@@ -417,6 +417,7 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
    use cam_control_mod,  only: simple_phys
    use air_composition,  only: hliq_idx, hice_idx, fliq_idx, fice_idx
    use air_composition,  only: compute_enthalpy_flux, num_enthalpy_vars
+   use cam_history,      only: outfld!xxx debug
    implicit none
 
    ! Input arguments
@@ -503,6 +504,10 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
       cam_out%hsnow (:ncol) = -cam_out%hsnow(:ncol) -fice_tot(:ncol)*tmelt*cpice
       cam_out%hrain (:ncol) = -cam_out%hrain(:ncol) -fliq_tot(:ncol)*tmelt*cpliq
       cam_out%hevap(:ncol)  = -cam_out%hevap(:ncol)+cam_in%cflx(:ncol,1)*tmelt*cpwv
+
+      call outfld("hsnow_liq_ref"  , cam_out%hsnow, pcols   ,lchnk   )!xxx debug
+      call outfld("hrain_liq_ref"  , cam_out%hrain, pcols   ,lchnk   )!xxx debug
+      call outfld("hevap_liq_ref"  , cam_out%hevap, pcols   ,lchnk   )!xxx debug
    else
       call get_prec_vars(ncol,pbuf,&
            precc_out=cam_out%precc,precl_out=cam_out%precl,&

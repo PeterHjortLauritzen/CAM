@@ -427,6 +427,10 @@ contains
     call addfld('dEdt_dme'     , horiz_only, 'A', 'W/m2', 'Column integrated dEdt from water update')
     call addfld('dEdt_physics' , horiz_only, 'A', 'W/m2', '' )!xxx diags will remove
     call addfld('dEdt_cpdycore' , horiz_only, 'A', 'W/m2', 'Column integrated dEdt from updating cp')
+
+    call addfld('hsnow_liq_ref' , horiz_only, 'A', 'W/m2', '' )!xxx diags will remove
+    call addfld('hrain_liq_ref' , horiz_only, 'A', 'W/m2', '' )!xxx diags will remove
+    call addfld('hevap_liq_ref' , horiz_only, 'A', 'W/m2', '' )!xxx diags will remove
     !
     !fincl1  = 'enth_prec_ac_hice','enth_prec_ac_hliq','enth_prec_bc_hice','enth_prec_bc_hliq','enth_prec_ac_fice',!xxx
     !          'enth_prec_ac_fliq','enth_prec_bc_fice','enth_prec_bc_fliq','enth_evap_hevap',!xxx
