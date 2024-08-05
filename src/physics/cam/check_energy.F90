@@ -1256,11 +1256,9 @@ end subroutine check_energy_get_integrals
     !
     ! compute latent heat fluxes
     !
-    constant_latent_heat_surface(:ncol) = cam_in%cflx(:ncol,1)*(latvap+latice) - (fliq_tot(:ncol))*latice!xxx diags
     variable_latent_heat_surface_cpice_term(:ncol) = (cam_in%cflx(:ncol,1) - (fliq_tot(:ncol)))*cpice*state%temp_ini(:ncol,pver)
     variable_latent_heat_surface_ls_term(:ncol) =  (cpwv-cpice) *cam_in%cflx(:ncol,1)*state%temp_ini(:ncol,pver)
     variable_latent_heat_surface_lf_term(:ncol) = -(cpliq-cpice)*fliq_tot(:ncol)*state%temp_ini(:ncol,pver)
-    call outfld ('cnst_lat_heat_srf', constant_latent_heat_surface, pcols, lchnk) !xxx diags will remove
     call outfld ('cpice_srf'        , variable_latent_heat_surface_cpice_term, pcols, lchnk) !xxx diags will remove
     call outfld ('ls_srf'           , variable_latent_heat_surface_ls_term, pcols, lchnk) !xxx diags will remove
     call outfld ('lf_srf'           , variable_latent_heat_surface_lf_term, pcols, lchnk) !xxx diags will remove

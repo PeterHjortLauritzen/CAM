@@ -421,7 +421,6 @@ contains
 
     call addfld('te_tnd', horiz_only, 'A', 'W/m2', 'Total column integrated energy tendency from CAM physics' )
     call addfld('te_lat', horiz_only, 'A', 'W/m2', 'Total column integrated constant latent heat tendency from CAM physics')
-    call addfld('cnst_lat_heat_srf'       , horiz_only, 'A', 'W/m2', '' )!xxx diags will remove
     call addfld('cpice_srf'    , horiz_only, 'A', 'W/m2', '' )!xxx diags will remove
     call addfld('ls_srf'       , horiz_only, 'A', 'W/m2', '' )!xxx diags will remove
     call addfld('lf_srf'       , horiz_only, 'A', 'W/m2', '' )!xxx diags will remove
