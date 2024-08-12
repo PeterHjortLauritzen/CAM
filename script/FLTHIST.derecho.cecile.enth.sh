@@ -12,7 +12,9 @@ setenv PBS_ACCOUNT P93300642
 
 set src="cam_enth_simple"   #cam_enthalpy"
 #set caze=cam_enth_simple
-set caze=cam_enth_simple_ocnfrc_cldfrc_dp1_0.05
+#set caze=cam_enth_simple_ocnfrc_zmconv_ke_1E-5
+#set caze=cam_enth_simple_ocnfrc_efix
+set caze=cam_enth_simple_ocnfrc_temp_ave
 #set caze=cam_enth_simple_ocnfrc_fix2
 #set src="cam6_4_015"
 #set caze=cam6_4_015
@@ -55,7 +57,10 @@ cd $scratch/$USER/$caze
 #echo "micro_mg_vtrmi_factor = 1.5" >> user_nl_cam
 
 #set caze=cam_enth_simple_ocnfrc_cldfrc_dp1_0.05
-echo "cldfrc_dp1 =0.05" >> user_nl_cam
+#echo "cldfrc_dp1 =0.05" >> user_nl_cam
+
+#set caze=cam_enth_simple_ocnfrc_zmconv_ke_1E-5
+#echo "zmconv_ke = 1.E-5" >> user_nl_cam
 
 #
 #
@@ -92,7 +97,7 @@ echo "'so4_a1_CLXF', 'so4_a2_CLXF', 'SFbc_a4', 'SFpom_a4', 'SFso4_a1', 'SFso4_a2
 echo "'so4_a1_sfgaex1', 'so4_a2_sfgaex1', 'so4_a3_sfgaex1', 'soa_a1_sfgaex1', 'soa_a2_sfgaex1',"                                                                 >> user_nl_cam
 echo "'SFdst_a1','SFdst_a2', 'SFdst_a3', 'SFncl_a1', 'SFncl_a2', 'SFncl_a3',"                                                                                    >> user_nl_cam
 echo "'num_a2_sfnnuc1', 'SFSO2', 'OCN_FLUX_DMS', 'SAD_SULFC', 'SAD_TROP', 'SAD_AERO',"                                                                           >> user_nl_cam
-echo "'TTEND_HFIX','WP2_CLUBB'"      >> user_nl_cam
+echo "'TTEND_HFIX','WP2_CLUBB','enth_fix_fct_bc','enth_fix_fct_ac'"      >> user_nl_cam
 echo "fincl3 = 'PRECT', 'PRECC', 'FLUT', 'U850', 'U200', 'V850', 'V200', 'OMEGA500', 'TS', 'SST', 'PSL'"                                                         >> user_nl_cam
 
 echo "fincl4 =  'PRECC','PRECL'"                                                                                                                                 >> user_nl_cam

@@ -4,8 +4,10 @@ begin
   output_format="pdf"
 ;  dir="/glade/derecho/scratch/pel/archive/cam_enth_simple/run/"
 ;  fname = "cam_enth_simple.cam.h8a."
-  dir="/glade/derecho/scratch/pel/archive/cam_enth_simple_ocnfrc/run/"
-  fname = "cam_enth_simple_ocnfrc.cam.h8a."
+;  dir="/glade/derecho/scratch/pel/archive/cam_enth_simple_ocnfrc/run/"
+;  fname = "cam_enth_simple_ocnfrc.cam.h8a."
+  dir="/glade/derecho/scratch/pel/cam_enth_simple_ocnfrc_efix/run/"
+  fname = "cam_enth_simple_ocnfrc_efix.cam.h8a."
 ;  dir="/glade/derecho/scratch/pel/cam_enth_simple_384_FLTHIST_ne30pg3_ne30pg3_mg17/run/"
 ;  fname = "cam_enth_simple_384_FLTHIST_ne30pg3_ne30pg3_mg17.cam.h1i."
 ;  dir="/scratch/cluster/pel/cam_enth_simple_QPC6_ne16pg3_ne16pg3_mg17/run/"
@@ -42,7 +44,7 @@ begin
 
   dEdt_physics=fall[:]->dEdt_physics
   te_tnd=fall[:]->te_tnd
-  cnst_lat_heat_srf=fall[:]->cnst_lat_heat_srf
+;  cnst_lat_heat_srf=fall[:]->cnst_lat_heat_srf
   cpice_srf=fall[:]->cpice_srf
   ls_srf=fall[:]->ls_srf
   lf_srf=fall[:]->lf_srf
@@ -503,7 +505,7 @@ begin
 ; 
 ; ***********************************************
 
-  fld = EFIX(tidx+1,0:ncol_p-1)
+  fld = EFIX(tidx,0:ncol_p-1)
   str = "EFIX"
   fmin = -100.
   fmax = 100.

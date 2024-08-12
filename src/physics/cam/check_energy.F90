@@ -1,3 +1,4 @@
+#define temperature_rain_snow
 module check_energy
 
 !---------------------------------------------------------------------------------
@@ -1022,12 +1023,105 @@ end subroutine check_energy_get_integrals
     real(r8), dimension(pcols)      :: enthalpy_flux_tot, residual_enthalpy_terms_only
     real(r8), dimension(pcols,pver) :: fct_bc, fct_ac
     real(r8), dimension(pcols,pver) :: scale_cpdry_cpdycore, ttend_hfix
-
+#ifdef temperature_rain_snow
+    real(r8), dimension(pcols)      :: temp_ave_bc
+    real(r8), dimension(pcols)      :: temp_ave_ac
+    real(r8), dimension(pcols)      :: temp_ave
+#endif
     real(r8), parameter :: eps=1.E-10_r8
 
     integer :: i, k
     real(r8):: tot, wgt_bc, wgt_ac
 
+
+    !
+    ! compute weighting function
+    !
+    !
+    ! Peter's suggested variables
+    !
+    if (.false.) then
+      zmdt_idx = pbuf_get_index('ZMDT', errcode=i)
+      call pbuf_get_field(pbuf, zmdt_idx, zmdt)   !%s from ZM
+      mpdt_idx = pbuf_get_index('MPDT', errcode=i)
+      call pbuf_get_field(pbuf, mpdt_idx, mpdt)   !%s from PUMAS
+      fct_bc_tot(:ncol) = 0.0_r8
+      fct_ac_tot(:ncol) = 0.0_r8
+      do k = 1, pver
+        fct_bc(:ncol,k)   = MAX(scale_cpdry_cpdycore(:ncol,k)*zmdt(:ncol,k)*state%pdel(:ncol,k)*rga,0.0_r8)
+        fct_ac(:ncol,k)   = MAX(scale_cpdry_cpdycore(:ncol,k)*mpdt(:ncol,k)*state%pdel(:ncol,k)*rga,0.0_r8)
+        fct_bc_tot(:ncol) = fct_bc_tot(:ncol)+fct_bc(:ncol,k)
+        fct_ac_tot(:ncol) = fct_ac_tot(:ncol)+fct_ac(:ncol,k)
+      end do
+    else
+      !
+      ! Adam's suggested variables
+      !
+      mpdice_idx = pbuf_get_index('MPDICE', errcode=i) !cldice tendency from PUMAS
+      call pbuf_get_field(pbuf, mpdice_idx, mpdice)
+      rcmtend_clubb_idx = pbuf_get_index('rcmtend_clubb', errcode=i)!liquid water tendency from CLUBB (kg/kg)
+      call pbuf_get_field(pbuf, rcmtend_clubb_idx, rcmtend_clubb)
+      rprd_idx  = pbuf_get_index('rprd', errcode=i)    !rain production from ZM
+      call pbuf_get_field(pbuf, rprd_idx, rprd)
+ 
+      !
+      ! not implemented": we could use mpdice only for the ice part of enthalpy flux and rcmtend_clubb just for rain!
+      !
+      fct_bc_tot(:ncol) = 0.0_r8
+      fct_ac_tot(:ncol) = 0.0_r8
+      do k = 1, pver
+        fct_bc(:ncol,k)   = latice*MAX(rprd  (:ncol,k),0._r8)*state%pdel(:ncol,k)*rga
+        fct_ac(:ncol,k)   = MAX(rcmtend_clubb(:ncol,k),0._r8)+MAX(mpdice(:ncol,k),0._r8)
+        fct_ac(:ncol,k)   = fct_ac(:ncol,k)*latice*state%pdel(:ncol,k)*rga
+        fct_bc_tot(:ncol) = fct_bc_tot(:ncol)+fct_bc(:ncol,k)
+        fct_ac_tot(:ncol) = fct_ac_tot(:ncol)+fct_ac(:ncol,k)
+      end do
+    end if
+    call outfld("enth_fix_fct_bc_tot"  , fct_bc_tot, pcols   ,lchnk   )
+    call outfld("enth_fix_fct_ac_tot"  , fct_ac_tot, pcols   ,lchnk   )
+    do k = 1, pver
+      do i=1,ncol
+        !
+        ! normalize weighting function
+        !
+        if (fct_bc_tot(i)>eps) then
+          fct_bc(i,k) = fct_bc(i,k)/fct_bc_tot(i)
+        else
+          fct_bc(i,k) = 0._r8
+        end if
+        if (fct_ac_tot(i)>eps) then
+          fct_ac(i,k) = fct_ac(i,k)/fct_ac_tot(i)
+        else
+          fct_ac(i,k) = 0._r8
+        end if
+      end do
+    end do
+    call outfld("enth_fix_fct_bc"  , fct_bc, pcols   ,lchnk   )
+    call outfld("enth_fix_fct_ac"  , fct_ac, pcols   ,lchnk   )
+#ifdef temperature_rain_snow
+    !
+    ! compute average temperature where precipitation was formed
+    !
+    do i=1,ncol
+       temp_ave_ac(i) = 0.0_r8
+       temp_ave_bc(i) = 0.0_r8
+       do k = 1, pver
+          temp_ave_ac(i) = temp_ave_ac(i) + fct_ac(i,k)*state%T(i,k)
+          temp_ave_bc(i) = temp_ave_bc(i) + fct_bc(i,k)*state%T(i,k)
+       end do
+       if (temp_ave_ac(i)<eps) then
+          temp_ave_ac(i) = state%T(i,pver)
+       end if
+       if (temp_ave_bc(i)<eps) then
+          temp_ave_bc(i) = state%T(i,pver)
+       end if
+    end do
+#endif
+
+
+    !
+    ! compute enthalpy fluxes
+    !    
     enthalpy_prec_bc_idx = pbuf_get_index('ENTHALPY_PREC_BC', errcode=i)
     enthalpy_prec_ac_idx = pbuf_get_index('ENTHALPY_PREC_AC', errcode=i)
     enthalpy_evap_idx    = pbuf_get_index('ENTHALPY_EVAP'   , errcode=i)
@@ -1054,6 +1148,15 @@ end subroutine check_energy_get_integrals
     !
     enthalpy_prec_ac(:ncol,hice_idx) =  -enthalpy_prec_ac(:ncol,fice_idx)*cpice*state%T(:ncol,pver)
     enthalpy_prec_ac(:ncol,hliq_idx) =  -enthalpy_prec_ac(:ncol,fliq_idx)*cpliq*state%T(:ncol,pver)
+#ifdef temperature_rain_snow
+    enthalpy_prec_ac(:ncol,hice_idx) =  -enthalpy_prec_ac(:ncol,fice_idx)*cpice*temp_ave_ac(:ncol)
+    enthalpy_prec_ac(:ncol,hliq_idx) =  -enthalpy_prec_ac(:ncol,fliq_idx)*cpliq*temp_ave_ac(:ncol)
+    enthalpy_prec_bc(:ncol,hice_idx) =  -enthalpy_prec_bc(:ncol,fice_idx)*cpice*temp_ave_bc(:ncol)
+    enthalpy_prec_bc(:ncol,hliq_idx) =  -enthalpy_prec_bc(:ncol,fliq_idx)*cpliq*temp_ave_bc(:ncol)
+    temp_ave(:ncol) = 0.5_r8*(temp_ave_ac(:ncol)+temp_ave_bc(:ncol))-state%T(:ncol,pver)
+    call outfld("prect_temp_diff"  ,  temp_ave   , pcols   ,lchnk   )
+!    call pbuf_set_field(pbuf, enthalpy_prec_bc_idx, enthalpy_prec_bc)!xxx overwriting camsrfech value xxx not clean
+#endif
     call pbuf_set_field(pbuf, enthalpy_prec_ac_idx, enthalpy_prec_ac)
     !
     ! compute total enthalpy flux
@@ -1061,6 +1164,7 @@ end subroutine check_energy_get_integrals
     enthalpy_flux_tot(:ncol) = enthalpy_prec_bc(:ncol,hliq_idx)+enthalpy_prec_bc(:ncol,hice_idx)+&
                                enthalpy_prec_ac(:ncol,hliq_idx)+enthalpy_prec_ac(:ncol,hice_idx)+&
                                enthalpy_evap(:ncol)
+
 
     call outfld("enth_prec_ac_hice"  , enthalpy_prec_ac(:,hice_idx)     , pcols   ,lchnk   )
     call outfld("enth_prec_ac_hliq"  , enthalpy_prec_ac(:,hliq_idx)     , pcols   ,lchnk   )
@@ -1138,66 +1242,8 @@ end subroutine check_energy_get_integrals
     call outfld ('dEdt_cpdycore'           , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
     residual_enthalpy_terms_only(:ncol) = enthalpy_flux_tot(:ncol)-dEdt_cpdycore(:ncol)-dEdt_dme(:ncol)
     call outfld ('residual', residual_enthalpy_terms_only, pcols, lchnk) !xxx diags will remove
-    !
-    ! Peter's suggested variables
-    !
-    if (.false.) then
-      zmdt_idx = pbuf_get_index('ZMDT', errcode=i)
-      call pbuf_get_field(pbuf, zmdt_idx, zmdt)   !%s from ZM
-      mpdt_idx = pbuf_get_index('MPDT', errcode=i)
-      call pbuf_get_field(pbuf, mpdt_idx, mpdt)   !%s from PUMAS
-      fct_bc_tot(:ncol) = 0.0_r8
-      fct_ac_tot(:ncol) = 0.0_r8
-      do k = 1, pver
-        fct_bc(:ncol,k)   = MAX(scale_cpdry_cpdycore(:ncol,k)*zmdt(:ncol,k)*state%pdel(:ncol,k)*rga,0.0_r8)
-        fct_ac(:ncol,k)   = MAX(scale_cpdry_cpdycore(:ncol,k)*mpdt(:ncol,k)*state%pdel(:ncol,k)*rga,0.0_r8)
-        fct_bc_tot(:ncol) = fct_bc_tot(:ncol)+fct_bc(:ncol,k)
-        fct_ac_tot(:ncol) = fct_ac_tot(:ncol)+fct_ac(:ncol,k)
-      end do
-    else
-      !
-      ! Adam's suggested variables
-      !
-      rcmtend_clubb_idx = pbuf_get_index('rcmtend_clubb', errcode=i)!liquid water tendency from CLUBB (kg/kg)
-      call pbuf_get_field(pbuf, rcmtend_clubb_idx, rcmtend_clubb)
-      rprd_idx  = pbuf_get_index('rprd', errcode=i)    !rain production from ZM
-      call pbuf_get_field(pbuf, rprd_idx, rprd)
-      mpdice_idx = pbuf_get_index('MPDICE', errcode=i) !cldice tendency from PUMAS
-      call pbuf_get_field(pbuf, mpdice_idx, mpdice)
-      !
-      ! not implemented": we could use mpdice only for the ice part of enthalpy flux and rcmtend_clubb just for rain!
-      !
-      fct_bc_tot(:ncol) = 0.0_r8
-      fct_ac_tot(:ncol) = 0.0_r8
-      do k = 1, pver
-        fct_bc(:ncol,k)   = latice*MAX(rprd  (:ncol,k),0._r8)*state%pdel(:ncol,k)*rga
-        fct_ac(:ncol,k)   = MAX(rcmtend_clubb(:ncol,k),0._r8)+MAX(mpdice(:ncol,k),0._r8)
-        fct_ac(:ncol,k)   = fct_ac(:ncol,k)*latice*state%pdel(:ncol,k)*rga
-        fct_bc_tot(:ncol) = fct_bc_tot(:ncol)+fct_bc(:ncol,k)
-        fct_ac_tot(:ncol) = fct_ac_tot(:ncol)+fct_ac(:ncol,k)
-      end do
-    end if
-    call outfld("enth_fix_fct_bc_tot"  , fct_bc_tot, pcols   ,lchnk   )
-    call outfld("enth_fix_fct_ac_tot"  , fct_ac_tot, pcols   ,lchnk   )
-    do k = 1, pver
-      do i=1,ncol
-        !
-        ! normalize weighting function
-        !
-        if (fct_bc_tot(i)>eps) then
-          fct_bc(i,k) = fct_bc(i,k)/fct_bc_tot(i)
-        else
-          fct_bc(i,k) = 0._r8
-        end if
-        if (fct_ac_tot(i)>eps) then
-          fct_ac(i,k) = fct_ac(i,k)/fct_ac_tot(i)
-        else
-          fct_ac(i,k) = 0._r8
-        end if
-      end do
-    end do
-    call outfld("enth_fix_fct_bc"  , fct_bc, pcols   ,lchnk   )
-    call outfld("enth_fix_fct_ac"  , fct_ac, pcols   ,lchnk   )
+
+    if (.true.) then !if .false. throw everything into the energy fixer (default .true.)
 
     enthalpy_heating_fix_bc = 0.0_r8
     enthalpy_heating_fix_ac = 0.0_r8
@@ -1235,6 +1281,7 @@ end subroutine check_energy_get_integrals
          te = te_enth_fix(:ncol), se=se_enth_fix(:ncol), po=po_enth_fix(:ncol), ke=ke_enth_fix(:ncol))
     dEdt_enth_fix(:ncol) = (te_enth_fix(:ncol)-te(:ncol))/ztodt
     call outfld("dEdt_enth_fix"  ,  dEdt_enth_fix    , pcols   ,lchnk   )
+    endif!throw everything into the energy fixer
     !
     !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
     ! Save total energy for global fixer in next timestep
