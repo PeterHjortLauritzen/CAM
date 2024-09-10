@@ -712,7 +712,10 @@ contains
       umax = 400.0_r8
     end if
     ugw = 342.0_r8 !max gravity wave speed
-
+#ifdef planet_mars
+    umax = 400._r8
+    ugw = 211.0_r8 !assuming scale height of 12km
+#endif
     dt_max_adv             = S_rk/(umax*max_normDinv*lambda_max*ra)
     dt_max_gw              = S_rk/(ugw*max_normDinv*lambda_max*ra)
     dt_max_tracer_se       = S_rk_tracer*min_gw/(umax*max_normDinv*ra)
