@@ -6,7 +6,7 @@ begin
   fname = "cam_enth_simple_debug.cam.h9a."
   fnameall =  systemfunc("ls "+dir+fname+"*.nc")
   fall = addfiles(fnameall,"r")       ; Open netCDF files.
-    
+
   tidx = 5
 
   dEdt_dycore=fall[:]->TE_dEdt_dycore
@@ -15,7 +15,7 @@ begin
   dAF=fall[:]->TE_dAF
 
   tmp=fall[:]->TE_dEdt_dycore
-  
+
   dt=1800.0
   firsttime = 0
   lasttime  = dimsizes(fall[:]->time)-1
@@ -27,7 +27,7 @@ begin
   print("area_sphere="+area_sphere)
   print("ncol_d="+ncol_d)
   lat1d        = fall[0]->lat_d          ; Pull off lat/lon variable and
-  lon1d        = fall[0]->lon_d  
+  lon1d        = fall[0]->lon_d
 
 
   res                     = True         ; plot modifications desired
@@ -54,7 +54,7 @@ begin
 
   res_p=res
 
-  plot = new(12,graphic) 
+  plot = new(12,graphic)
 ; ***********************************************
 ; *NEWPAGENEWPAGENEWPAGENEWPAGENEWPAGENEWPAGE
 ; *NEWPAGENEWPAGENEWPAGENEWPAGENEWPAGENEWPAGE
@@ -62,8 +62,8 @@ begin
 ; ***********************************************
   filePlot = "budget"
   wks = gsn_open_wks(output_format,filePlot)
-  gsn_define_colormap(wks,"NCV_jaisnd");3gauss")      
-    
+  gsn_define_colormap(wks,"NCV_jaisnd");3gauss")
+
 
   res                     = True         ; plot modifications desired
   res@gsnMaximize         = False         ; Maximize size of plot in frame
@@ -90,9 +90,9 @@ begin
   res_p=res
   delete(plot)
   plot = new(15,graphic)
-  
+
 ; ***********************************************
-; 
+;
 ; ***********************************************
 
   fld = dEdt_dycore(tidx,0:ncol_d-1)
@@ -120,7 +120,7 @@ begin
   plot(0) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
-; 
+;
 ; ***********************************************
 
   fld = dEdt_phys_tot_in_dyn(tidx,0:ncol_d-1)
@@ -148,7 +148,7 @@ begin
   plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
-; 
+;
 ; ***********************************************
 
   fld = dBD(tidx,0:ncol_d-1)-dAF(tidx,0:ncol_d-1)
@@ -175,7 +175,7 @@ begin
   res_p@gsnRightString        = "mean: "+sprintf("%3.2g", global_ave        )+" W/m^2"
   plot(2) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
- 
+
 ; ***********************************************
 ; Plot everything
 ; ***********************************************

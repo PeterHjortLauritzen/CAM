@@ -1,10 +1,10 @@
   module conv_water
 
-   ! --------------------------------------------------------------------- ! 
+   ! --------------------------------------------------------------------- !
    ! Purpose:                                                              !
    ! Computes grid-box average liquid (and ice) from stratus and cumulus   !
-   ! Just for the purposes of radiation.                                   !
-   !                                                                       ! 
+   ! These values used by both the radiation and the COSP diagnostics.     !
+   !                                                                       !
    ! Method:                                                               !
    ! Extract information about deep+shallow liquid and cloud fraction from !
    ! the physics buffer.                                                   !
@@ -38,9 +38,10 @@
 ! pbuf indices
 
   integer :: icwmrsh_idx, icwmrdp_idx, fice_idx, sh_frac_idx, dp_frac_idx, &
-             ast_idx, sh_cldliq1_idx, sh_cldice1_idx, rei_idx
+             ast_idx, rei_idx
 
   integer :: ixcldice, ixcldliq
+  integer :: gb_totcldliqmr_idx, gb_totcldicemr_idx
 
 ! Namelist
 integer, parameter :: unset_int = huge(1)
@@ -48,7 +49,7 @@ integer, parameter :: unset_int = huge(1)
 integer  :: conv_water_in_rad = unset_int  ! 0==> No; 1==> Yes-Arithmetic average;
                                            ! 2==> Yes-Average in emissivity.
 integer  :: conv_water_mode
-real(r8) :: frac_limit 
+real(r8) :: frac_limit
 
 !=============================================================================================
 contains
@@ -108,16 +109,15 @@ end subroutine conv_water_readnl
 
     use constituents, only: cnst_add, pcnst
     use physconst,    only: mwdry, cpair
-    
+
     use physics_buffer, only : pbuf_add_field, dtype_r8
 
   !-----------------------------------------------------------------------
 
-    ! these calls were already done in convect_shallow...so here I add the same fields to the physics buffer with a "1" at the end
-! shallow gbm cloud liquid water (kg/kg)
-    call pbuf_add_field('SH_CLDLIQ1','physpkg',dtype_r8,(/pcols,pver/),sh_cldliq1_idx)  
-! shallow gbm cloud ice water (kg/kg)
-    call pbuf_add_field('SH_CLDICE1','physpkg',dtype_r8,(/pcols,pver/),sh_cldice1_idx)  
+    ! grid box total cloud liquid water mixing ratio (kg/kg)
+    call pbuf_add_field('GB_TOTCLDLIQMR', 'physpkg', dtype_r8, (/pcols,pver/), gb_totcldliqmr_idx)
+    ! grid box total cloud ice water mixing ratio (kg/kg)
+    call pbuf_add_field('GB_TOTCLDICEMR', 'physpkg', dtype_r8, (/pcols,pver/), gb_totcldicemr_idx)
 
   end subroutine conv_water_register
 
@@ -127,12 +127,12 @@ end subroutine conv_water_readnl
   !============================================================================ !
 
    subroutine conv_water_init()
-   ! --------------------------------------------------------------------- ! 
+   ! --------------------------------------------------------------------- !
    ! Purpose:                                                              !
    !   Initializes the pbuf indices required by conv_water
-   ! --------------------------------------------------------------------- ! 
+   ! --------------------------------------------------------------------- !
 
-   
+
    use physics_buffer, only : pbuf_get_index
    use cam_history,    only : addfld
 
@@ -142,7 +142,7 @@ end subroutine conv_water_readnl
 
    call cnst_get_ind('CLDICE', ixcldice)
    call cnst_get_ind('CLDLIQ', ixcldliq)
- 
+
    icwmrsh_idx  = pbuf_get_index('ICWMRSH')
    icwmrdp_idx  = pbuf_get_index('ICWMRDP')
    fice_idx     = pbuf_get_index('FICE')
@@ -168,13 +168,13 @@ end subroutine conv_water_readnl
 
    end subroutine conv_water_init
 
-   subroutine conv_water_4rad(state, pbuf, totg_liq, totg_ice)
+   subroutine conv_water_4rad(state, pbuf)
 
-   ! --------------------------------------------------------------------- ! 
+   ! --------------------------------------------------------------------- !
    ! Purpose:                                                              !
    ! Computes grid-box average liquid (and ice) from stratus and cumulus   !
    ! Just for the purposes of radiation.                                   !
-   !                                                                       ! 
+   !                                                                       !
    ! Method:                                                               !
    ! Extract information about deep+shallow liquid and cloud fraction from !
    ! the physics buffer.                                                   !
@@ -185,25 +185,22 @@ end subroutine conv_water_readnl
    !                                                                       !
    !---------------------------------------------------------------------- !
 
-   
+
    use physics_buffer, only : physics_buffer_desc, pbuf_get_field, pbuf_old_tim_idx
 
    use physics_types,   only: physics_state
    use cam_history,     only: outfld
    use phys_control,    only: phys_getopts
-   
+
    implicit none
 
    ! ---------------------- !
    ! Input-Output Arguments !
    ! ---------------------- !
 
-   
+
    type(physics_state), target, intent(in) :: state        ! state variables
    type(physics_buffer_desc),   pointer    :: pbuf(:)
-
-   real(r8), intent(out):: totg_ice(pcols,pver)   ! Total GBA in-cloud ice
-   real(r8), intent(out):: totg_liq(pcols,pver)   ! Total GBA in-cloud liquid
 
    ! --------------- !
    ! Local Workspace !
@@ -222,8 +219,9 @@ end subroutine conv_water_readnl
    real(r8), pointer, dimension(:,:) ::  dp_icwmr ! Deep conv. cloud water
    real(r8), pointer, dimension(:,:) ::  sh_icwmr ! Shallow conv. cloud water
    real(r8), pointer, dimension(:,:) ::  fice     ! Ice partitioning ratio
-   real(r8), pointer, dimension(:,:) ::  sh_cldliq ! shallow convection gbx liq cld mixing ratio for COSP
-   real(r8), pointer, dimension(:,:) ::  sh_cldice ! shallow convection gbx ice cld mixing ratio for COSP
+
+   real(r8), pointer, dimension(:,:) :: totg_ice  ! Grid box total cloud ice mixing ratio
+   real(r8), pointer, dimension(:,:) :: totg_liq  ! Grid box total cloud liquid mixing ratio
 
    real(r8) :: conv_ice(pcols,pver)               ! Convective contributions to IC cloud ice
    real(r8) :: conv_liq(pcols,pver)               ! Convective contributions to IC cloud liquid
@@ -231,13 +229,13 @@ end subroutine conv_water_readnl
    real(r8) :: tot_liq(pcols,pver)                ! Total IC liquid
 
    integer  :: i,k,itim_old                       ! Lon, lev indices buff stuff.
-   real(r8) :: cu_icwmr                           ! Convective  water for this grid-box.   
-   real(r8) :: ls_icwmr                           ! Large-scale water for this grid-box. 
-   real(r8) :: tot_icwmr                          ! Large-scale water for this grid-box.  
-   real(r8) :: ls_frac                            ! Large-scale cloud frac for this grid-box. 
-   real(r8) :: tot0_frac, cu0_frac, dp0_frac, sh0_frac 
+   real(r8) :: cu_icwmr                           ! Convective  water for this grid-box.
+   real(r8) :: ls_icwmr                           ! Large-scale water for this grid-box.
+   real(r8) :: tot_icwmr                          ! Large-scale water for this grid-box.
+   real(r8) :: ls_frac                            ! Large-scale cloud frac for this grid-box.
+   real(r8) :: tot0_frac, cu0_frac, dp0_frac, sh0_frac
    real(r8) :: kabs, kabsi, kabsl, alpha, dp0, sh0, ic_limit
-   real(r8) :: wrk1         
+   real(r8) :: wrk1
 
    real(r8) :: totg_ice_sh(pcols,pver)   ! Grid-mean IWP from shallow convective cloud
    real(r8) :: totg_liq_sh(pcols,pver)   ! Grid-mean LWP from shallow convective cloud
@@ -256,7 +254,7 @@ end subroutine conv_water_readnl
    ! --------- !
 
    parameter( kabsl = 0.090361_r8, ic_limit = 1.e-12_r8 )
-   character(len=16) :: microp_scheme 
+   character(len=16) :: microp_scheme
 
    ncol  = state%ncol
    lchnk = state%lchnk
@@ -273,14 +271,18 @@ end subroutine conv_water_readnl
    call pbuf_get_field(pbuf, icwmrdp_idx, dp_icwmr )
    call pbuf_get_field(pbuf, fice_idx,    fice )
 
- ! Get convective in-cloud fraction    
+ ! Get convective in-cloud fraction
 
    call pbuf_get_field(pbuf, sh_frac_idx,  sh_frac )
    call pbuf_get_field(pbuf, dp_frac_idx,  dp_frac )
    call pbuf_get_field(pbuf, rei_idx,      rei )
 
    itim_old = pbuf_old_tim_idx()
-   call pbuf_get_field(pbuf, ast_idx,  ast,  start=(/1,1,itim_old/), kount=(/pcols,pver,1/) ) 
+   call pbuf_get_field(pbuf, ast_idx,  ast,  start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
+   ! Fields computed below and stored in pbuf.
+   call pbuf_get_field(pbuf, gb_totcldicemr_idx, totg_ice)
+   call pbuf_get_field(pbuf, gb_totcldliqmr_idx, totg_liq)
 
    ! --------------------------------------------------------------- !
    ! Loop through grid-boxes and determine:                          !
@@ -316,7 +318,7 @@ end subroutine conv_water_readnl
 
             cu0_frac = 0._r8
             cu_icwmr = 0._r8
-         
+
             ls_frac = ast(i,k)
             if( ls_frac < frac_limit ) then
                 ls_frac  = 0._r8
@@ -327,11 +329,11 @@ end subroutine conv_water_readnl
 
             tot0_frac = ls_frac
             tot_icwmr = ls_icwmr
-           
+
       else
 
           ! Select radiation constants (effective radii) for emissivity averaging.
-            
+
             if( microp_scheme == 'RK' .or. microp_scheme == 'SPCAM_sam1mom') then
                kabsi = 0.005_r8 + 1._r8/rei(i,k)
             else
@@ -340,26 +342,26 @@ end subroutine conv_water_readnl
             kabs  = kabsl * ( 1._r8 - wrk1 ) + kabsi * wrk1
             alpha = -1.66_r8*kabs*pdel(i,k)/gravit*1000.0_r8
 
-          ! Selecting cumulus in-cloud water.            
+          ! Selecting cumulus in-cloud water.
 
             select case (conv_water_mode) ! Type of average
             case (1) ! Area weighted arithmetic average
                cu_icwmr = ( sh0_frac * sh_icwmr(i,k) + dp0_frac*dp_icwmr(i,k))/max(frac_limit,cu0_frac)
             case (2)
                sh0 = exp(alpha*sh_icwmr(i,k))
-               dp0 = exp(alpha*dp_icwmr(i,k))               
+               dp0 = exp(alpha*dp_icwmr(i,k))
                cu_icwmr = log((sh0_frac*sh0+dp0_frac*dp0)/max(frac_limit,cu0_frac))
                cu_icwmr = cu_icwmr/alpha
             case default ! Area weighted 'arithmetic in emissivity' average.
 !               call endrun ('CONV_WATER_4_RAD: Unknown option for conv_water_in_rad - exiting')
             end select
 
-          ! Selecting total in-cloud water. 
+          ! Selecting total in-cloud water.
           ! Attribute large-scale/convective area fraction differently from default.
 
-            ls_frac   = ast(i,k) 
+            ls_frac   = ast(i,k)
             ls_icwmr  = (ls_liq(i,k) + ls_ice(i,k))/max(frac_limit,ls_frac) ! Convert to IC value.
-            tot0_frac = (ls_frac + cu0_frac) 
+            tot0_frac = (ls_frac + cu0_frac)
 
             select case (conv_water_mode) ! Type of average
             case (1) ! Area weighted 'arithmetic in emissivity' average
@@ -407,15 +409,8 @@ end subroutine conv_water_readnl
    end do
    end do
 
-!add pbuff calls for COSP
-   call pbuf_get_field(pbuf, sh_cldliq1_idx, sh_cldliq  )
-   call pbuf_get_field(pbuf, sh_cldice1_idx, sh_cldice  )
-
-   sh_cldliq(:ncol,:pver)=sh_icwmr(:ncol,:pver)*(1-fice(:ncol,:pver))*sh_frac(:ncol,:pver)
-   sh_cldice(:ncol,:pver)=sh_icwmr(:ncol,:pver)*fice(:ncol,:pver)*sh_frac(:ncol,:pver)
-
   ! Output convective IC WMRs
-   
+
    call outfld( 'ICLMRCU ', conv_liq  , pcols, lchnk )
    call outfld( 'ICIMRCU ', conv_ice  , pcols, lchnk )
    call outfld( 'ICLMRTOT', tot_liq   , pcols, lchnk )

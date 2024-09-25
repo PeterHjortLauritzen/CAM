@@ -5,7 +5,7 @@ module rrtmgp_inputs
 ! RRTMGP.  Subset the number of model levels if CAM's top exceeds RRTMGP's
 ! valid domain.  Add an extra layer if CAM's top is below 1 Pa.
 ! The vertical indexing increases from top to bottom of atmosphere in both
-! CAM and RRTMGP arrays.   
+! CAM and RRTMGP arrays.
 !--------------------------------------------------------------------------------
 
 use shr_kind_mod,     only: r8=>shr_kind_r8
@@ -27,13 +27,13 @@ use cloud_rad_props,  only: get_liquid_optics_sw, liquid_cloud_get_rad_props_lw,
                             get_ice_optics_sw,    ice_cloud_get_rad_props_lw,    &
                             get_snow_optics_sw,   snow_cloud_get_rad_props_lw,   &
                             get_grau_optics_sw,   grau_cloud_get_rad_props_lw
-                                 
+
 use mcica_subcol_gen, only: mcica_subcol_sw, mcica_subcol_lw
 
 use aer_rad_props,    only: aer_rad_props_sw, aer_rad_props_lw
 
 use mo_gas_concentrations, only: ty_gas_concs
-use mo_gas_optics_rrtmgp,  only: ty_gas_optics_rrtmgp 
+use mo_gas_optics_rrtmgp,  only: ty_gas_optics_rrtmgp
 use mo_optical_props,      only: ty_optical_props_2str, ty_optical_props_1scl
 
 use cam_history_support,   only: fillvalue
@@ -80,7 +80,7 @@ contains
 !==================================================================================================
 
 subroutine rrtmgp_inputs_init(ktcam, ktrad)
-      
+
    ! Note that this routine must be called after the calls to set_wavenumber_bands which set
    ! the sw/lw band boundaries in the radconstants module.
 
@@ -101,7 +101,7 @@ subroutine rrtmgp_set_state( &
    state, cam_in, ncol, nlay, nday,           &
    idxday, coszrs, kdist_sw, t_sfc, emis_sfc,  &
    t_rad, pmid_rad, pint_rad, t_day, pmid_day, &
-   pint_day, coszrs_day, alb_dir, alb_dif) 
+   pint_day, coszrs_day, alb_dir, alb_dif)
 
    ! arguments
    type(physics_state),         intent(in) :: state     ! CAM physics state
@@ -113,7 +113,7 @@ subroutine rrtmgp_set_state( &
    real(r8),                    intent(in) :: coszrs(:) ! cosine of solar zenith angle
    class(ty_gas_optics_rrtmgp), intent(in) :: kdist_sw  ! spectral information
 
-   real(r8), intent(out) :: t_sfc(ncol)              ! surface temperature [K] 
+   real(r8), intent(out) :: t_sfc(ncol)              ! surface temperature [K]
    real(r8), intent(out) :: emis_sfc(nlwbands,ncol)  ! emissivity at surface []
    real(r8), intent(out) :: t_rad(ncol,nlay)         ! layer midpoint temperatures [K]
    real(r8), intent(out) :: pmid_rad(ncol,nlay)      ! layer midpoint pressures [Pa]
@@ -150,11 +150,20 @@ subroutine rrtmgp_set_state( &
 
    ! Add extra layer values if needed.
    if (nlay == pverp) then
-      t_rad(:,1)      = state%t(:ncol,1)
-      pmid_rad(:,1)   = 0.5_r8 * state%pint(:ncol,1)
+      t_rad(:,1) = state%t(:ncol,1)
       ! The top reference pressure from the RRTMGP coefficients datasets is 1.005183574463 Pa
       ! Set the top of the extra layer just below that.
       pint_rad(:,1) = 1.01_r8
+
+      ! next interface down in LT will always be > 1Pa
+      ! but in MT we apply adjustment to have it be 1.02 Pa if it was too high
+      where (pint_rad(:,2) <= pint_rad(:,1)) pint_rad(:,2) = pint_rad(:,1)+0.01_r8
+
+      ! set the highest pmid (in the "extra layer") to the midpoint (guarantees > 1Pa)
+      pmid_rad(:,1)   = pint_rad(:,1) + 0.5_r8 * (pint_rad(:,2) - pint_rad(:,1))
+
+      ! For case of CAM MT, also ensure pint_rad(:,2) > pint_rad(:,1) & pmid_rad(:,2) > max(pmid_rad(:,1), min_pressure)
+      where (pmid_rad(:,2) <= kdist_sw%get_press_min()) pmid_rad(:,2) = pint_rad(:,2) + 0.01_r8
    else
       ! nlay < pverp, thus the 1 Pa level is within a CAM layer.  Assuming the top interface of
       ! this layer is at a pressure < 1 Pa, we need to adjust the top of this layer so that it
@@ -177,7 +186,7 @@ subroutine rrtmgp_set_state( &
       pint_day(i,:) = pint_rad(idxday(i),:)
       coszrs_day(i) = coszrs(idxday(i))
    end do
- 
+
    ! Assign albedos to the daylight columns (from E3SM implementation)
    ! Albedos are imported from the surface models as broadband (visible, and near-IR),
    ! and we need to map these to appropriate narrower bands used in RRTMGP. Bands
@@ -273,8 +282,8 @@ function get_molar_mass_ratio(gas_name) result(massratio)
    character(len=*), parameter :: sub='get_molar_mass_ratio'
    !----------------------------------------------------------------------------
 
-   select case (trim(gas_name)) 
-      case ('H2O') 
+   select case (trim(gas_name))
+      case ('H2O')
          massratio = amdw
       case ('CO2')
          massratio = amdc
@@ -358,20 +367,20 @@ subroutine rad_gas_get_vmr(icall, gas_name, state, pbuf, nlay, numactivecols, ga
    end if
 
    ! special case: H2O is specific humidity, not mixing ratio. Use r = q/(1-q):
-   if (gas_name == 'H2O') then 
+   if (gas_name == 'H2O') then
       mmr = mmr / (1._r8 - mmr)
-   end if  
+   end if
 
    ! convert MMR to VMR, multipy by ratio of dry air molar mas to gas molar mass.
    massratio = get_molar_mass_ratio(gas_name)
    gas_vmr = mmr * massratio
 
    ! special case: Setting O3 in the extra layer:
-   ! 
-   ! For the purpose of attenuating solar fluxes above the CAM model top, we assume that ozone 
-   ! mixing decreases linearly in each column from the value in the top layer of CAM to zero at 
-   ! the pressure level set by P_top. P_top has been set to 50 Pa (0.5 hPa) based on model tuning 
-   ! to produce temperatures at the top of CAM that are most consistent with WACCM at similar pressure levels. 
+   !
+   ! For the purpose of attenuating solar fluxes above the CAM model top, we assume that ozone
+   ! mixing decreases linearly in each column from the value in the top layer of CAM to zero at
+   ! the pressure level set by P_top. P_top has been set to 50 Pa (0.5 hPa) based on model tuning
+   ! to produce temperatures at the top of CAM that are most consistent with WACCM at similar pressure levels.
 
    if ((gas_name == 'O3') .and. (nlay == pverp)) then
       P_top = 50.0_r8
@@ -380,10 +389,10 @@ subroutine rad_gas_get_vmr(icall, gas_name, state, pbuf, nlay, numactivecols, ga
             P_mid = state%pmid(idx(i),1) ! pressure (Pa) at midpoint of top layer of CAM
             alpha = log(P_int/P_top)
             beta =  log(P_mid/P_int)/log(P_mid/P_top)
-      
+
             a =  ( (1._r8 + alpha) * exp(-alpha) - 1._r8 ) / alpha
             b =  1._r8 - exp(-alpha)
-   
+
             if (alpha .gt. 0) then             ! only apply where top level is below 80 km
                chi_mid = gas_vmr(i,1)          ! molar mixing ratio of O3 at midpoint of top layer
                chi_0 = chi_mid /  (1._r8 + beta)
@@ -559,7 +568,7 @@ subroutine rrtmgp_set_cloud_lw( &
    cld_lw_abs_cloudsim  = cld_lw_abs(idx_lw_cloudsim,:,:)
    snow_lw_abs_cloudsim = snow_lw_abs(idx_lw_cloudsim,:,:)
    grau_lw_abs_cloudsim = grau_lw_abs(idx_lw_cloudsim,:,:)
-   
+
    ! Extract just the layers of CAM where RRTMGP does calculations.
 
    ! Subset "chunk" data so just the number of CAM layers in the
@@ -569,7 +578,7 @@ subroutine rrtmgp_set_cloud_lw( &
 
    ! Enforce tauc >= 0.
    tauc = merge(tauc, 0.0_r8, tauc > 0.0_r8)
-   
+
    ! MCICA uses spectral data (on bands) to construct subcolumns (one per g-point)
    call mcica_subcol_lw( &
       kdist_lw, nlwbands, nlwgpts, ncol, nlaycam, &
@@ -834,7 +843,7 @@ subroutine rrtmgp_set_cloud_sw( &
          kdist_sw, nswbands, nswgpts, nday, nlay, &
          nver, changeseed, pmid, cldf, tauc,     &
          ssac, asmc, taucmcl, ssacmcl, asmcmcl)
-   
+
       ! Initialize object for SW cloud optical properties.
       errmsg = cloud_sw%alloc_2str(nday, nlay, kdist_sw)
       if (len_trim(errmsg) > 0) then
@@ -965,7 +974,7 @@ subroutine rrtmgp_set_aer_sw( &
       aer_tau(:,:,:)     = aer_tau(    :,:,rrtmg_to_rrtmgp_swbands)
       aer_tau_w(:,:,:)   = aer_tau_w(  :,:,rrtmg_to_rrtmgp_swbands)
       aer_tau_w_g(:,:,:) = aer_tau_w_g(:,:,rrtmg_to_rrtmgp_swbands)
-                  
+
       ! If there is an extra layer in the radiation then this initialization
       ! will provide default values.
       aer_sw%tau = 0.0_r8

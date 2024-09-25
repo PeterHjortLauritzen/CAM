@@ -103,7 +103,7 @@ module camsrfexch
      real(r8) :: tref(pcols)             ! ref height surface air temp
      real(r8) :: qref(pcols)             ! ref height specific humidity
      real(r8) :: u10(pcols)              ! 10m wind speed
-     real(r8) :: ugustOut(pcols)         ! gustiness added 
+     real(r8) :: ugustOut(pcols)         ! gustiness added
      real(r8) :: u10withGusts(pcols)     ! 10m wind speed with gusts added
      real(r8) :: ts(pcols)               ! merged surface temp
      real(r8) :: sst(pcols)              ! sea surface temp
@@ -514,7 +514,7 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
          enthalpy_prec_bc(:ncol,hice_idx) =  0.0_r8
          enthalpy_prec_bc(:ncol,hliq_idx) =  0.0_r8
          cam_out%hevap(:ncol)             = 0.0_r8
-         
+
          cam_out%hsnow (:ncol) = 0.0_r8
          cam_out%hrain (:ncol) = -enthalpy_prec_ac(:ncol,hliq_idx)
       case DEFAULT
@@ -525,7 +525,7 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
          !
          cam_out%hevap(:ncol) = cam_in%cflx(:ncol,1)*cam_in%ts(:ncol)*cpwv
       end select
-         
+
       call pbuf_set_field(pbuf, enthalpy_prec_bc_idx, enthalpy_prec_bc)
       call pbuf_set_field(pbuf, enthalpy_evap_idx, cam_out%hevap)
 
