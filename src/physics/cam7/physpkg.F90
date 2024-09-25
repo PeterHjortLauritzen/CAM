@@ -2936,7 +2936,7 @@ contains
     call t_startf('cam_export')
     call pbuf_get_field(pbuf, psl_idx, psl)
     call cpslec(ncol, state%pmid, state%phis, state%ps, state%t, psl, gravit, rair)
-    call cam_export (state,cam_out,pbuf)
+    call cam_export (state,cam_in,cam_out,pbuf)
     call t_stopf('cam_export')
 
     ! Write export state to history file

@@ -1005,7 +1005,7 @@ contains
     ! Save total enery after physics for energy conservation checks
     teout = state%te_cur(:,dyn_te_idx)
 
-    call cam_export(state, cam_out, pbuf)
+    call cam_export(state, cam_in, cam_out, pbuf)
 
   end subroutine tphysbc
 
