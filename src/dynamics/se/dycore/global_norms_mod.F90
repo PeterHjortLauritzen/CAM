@@ -577,7 +577,7 @@ contains
     deallocate(gp%weights)
 
     call automatically_set_viscosity_coefficients(hybrid,ne,max_min_dx,min_min_dx,nu_p  ,1.0_r8 ,'_p  ')
-    call automatically_set_viscosity_coefficients(hybrid,ne,max_min_dx,min_min_dx,nu    ,1.0_r8,'    ')
+    call automatically_set_viscosity_coefficients(hybrid,ne,max_min_dx,min_min_dx,nu    ,0.5_r8,'    ')
     call automatically_set_viscosity_coefficients(hybrid,ne,max_min_dx,min_min_dx,nu_div,2.5_r8 ,'_div')
 
     if (nu_q<0) nu_q = nu_p ! necessary for consistency

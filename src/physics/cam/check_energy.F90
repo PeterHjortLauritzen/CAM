@@ -1,4 +1,4 @@
-#define temperature_rain_snow
+!#define temperature_rain_snow
 module check_energy
 
 !---------------------------------------------------------------------------------
@@ -975,14 +975,15 @@ end subroutine check_energy_get_integrals
     use cam_abortutils,  only: endrun
     use air_composition, only: hliq_idx, hice_idx, fliq_idx, fice_idx, num_enthalpy_vars
     use air_composition, only: cpairv, cp_or_cv_dycore, te_init
-    use physconst,       only: cpliq, cpice, cpwv
-    use physconst,       only: rga, latvap, latice
-    use dyn_tests_utils, only: vc_dycore
+    use air_composition, only: enthalpy_flux_method
+    use physconst,       only: cpliq, cpice, cpwv, tmelt, rga, latvap, latice
+    use dyn_tests_utils, only: vc_dycore, vc_height, vc_dry_pressure
     use cam_thermo,      only: get_hydrostatic_energy
-    use physics_types,   only: physics_dme_adjust, dyn_te_idx
+    use physics_types,   only: physics_dme_adjust, dyn_te_idx, set_dry_to_wet
     use cam_thermo,      only: cam_thermo_water_update
     use cam_history,     only: outfld
     use cam_budget,      only: thermo_budget_history
+    use dycore,          only: dycore_is
     integer,             intent(in)    :: ncol, lchnk
     type(physics_state), intent(inout) :: state
     type(cam_in_t),      intent(inout) :: cam_in
@@ -1007,6 +1008,8 @@ end subroutine check_energy_get_integrals
 
     real(r8), dimension(pcols)      :: te        , se        , po        , ke
     real(r8), dimension(pcols)      :: te_endphys, se_endphys, po_endphys, ke_endphys
+    real(r8), dimension(pcols)      :: se_endphys_ref, se_dme_ref
+    
     real(r8), dimension(pcols)      :: te_dme    , se_dme    , po_dme    , ke_dme
     real(r8), dimension(pcols)      :: te_enth_fix      , se_enth_fix        , po_enth_fix    , ke_enth_fix
     real(r8), dimension(pcols)      :: fct_bc_tot, fct_ac_tot
@@ -1021,7 +1024,8 @@ end subroutine check_energy_get_integrals
     real(r8), dimension(pcols)      :: variable_latent_heat_surface_ls_term !xxx diagnostics
     real(r8), dimension(pcols)      :: variable_latent_heat_surface_lf_term !xxx diagnostics
     real(r8), dimension(pcols)      :: enthalpy_flux_tot, residual_enthalpy_terms_only
-    real(r8), dimension(pcols,pver) :: fct_bc, fct_ac
+    real(r8), dimension(pcols)      :: implied_adjustment
+    real(r8), dimension(pcols,pver) :: fct_bc, fct_ac, temp
     real(r8), dimension(pcols,pver) :: scale_cpdry_cpdycore, ttend_hfix
 #ifdef temperature_rain_snow
     real(r8), dimension(pcols)      :: temp_ave_bc
@@ -1033,94 +1037,10 @@ end subroutine check_energy_get_integrals
     integer :: i, k
     real(r8):: tot, wgt_bc, wgt_ac
 
-
+    logical :: enthalpy_fixer = .false.
+    logical :: moist_mixing_ratio_dycore
     !
-    ! compute weighting function
-    !
-    !
-    ! Peter's suggested variables
-    !
-    if (.false.) then
-      zmdt_idx = pbuf_get_index('ZMDT', errcode=i)
-      call pbuf_get_field(pbuf, zmdt_idx, zmdt)   !%s from ZM
-      mpdt_idx = pbuf_get_index('MPDT', errcode=i)
-      call pbuf_get_field(pbuf, mpdt_idx, mpdt)   !%s from PUMAS
-      fct_bc_tot(:ncol) = 0.0_r8
-      fct_ac_tot(:ncol) = 0.0_r8
-      do k = 1, pver
-        fct_bc(:ncol,k)   = MAX(scale_cpdry_cpdycore(:ncol,k)*zmdt(:ncol,k)*state%pdel(:ncol,k)*rga,0.0_r8)
-        fct_ac(:ncol,k)   = MAX(scale_cpdry_cpdycore(:ncol,k)*mpdt(:ncol,k)*state%pdel(:ncol,k)*rga,0.0_r8)
-        fct_bc_tot(:ncol) = fct_bc_tot(:ncol)+fct_bc(:ncol,k)
-        fct_ac_tot(:ncol) = fct_ac_tot(:ncol)+fct_ac(:ncol,k)
-      end do
-    else
-      !
-      ! Adam's suggested variables
-      !
-      mpdice_idx = pbuf_get_index('MPDICE', errcode=i) !cldice tendency from PUMAS
-      call pbuf_get_field(pbuf, mpdice_idx, mpdice)
-      rcmtend_clubb_idx = pbuf_get_index('rcmtend_clubb', errcode=i)!liquid water tendency from CLUBB (kg/kg)
-      call pbuf_get_field(pbuf, rcmtend_clubb_idx, rcmtend_clubb)
-      rprd_idx  = pbuf_get_index('rprd', errcode=i)    !rain production from ZM
-      call pbuf_get_field(pbuf, rprd_idx, rprd)
- 
-      !
-      ! not implemented": we could use mpdice only for the ice part of enthalpy flux and rcmtend_clubb just for rain!
-      !
-      fct_bc_tot(:ncol) = 0.0_r8
-      fct_ac_tot(:ncol) = 0.0_r8
-      do k = 1, pver
-        fct_bc(:ncol,k)   = latice*MAX(rprd  (:ncol,k),0._r8)*state%pdel(:ncol,k)*rga
-        fct_ac(:ncol,k)   = MAX(rcmtend_clubb(:ncol,k),0._r8)+MAX(mpdice(:ncol,k),0._r8)
-        fct_ac(:ncol,k)   = fct_ac(:ncol,k)*latice*state%pdel(:ncol,k)*rga
-        fct_bc_tot(:ncol) = fct_bc_tot(:ncol)+fct_bc(:ncol,k)
-        fct_ac_tot(:ncol) = fct_ac_tot(:ncol)+fct_ac(:ncol,k)
-      end do
-    end if
-    call outfld("enth_fix_fct_bc_tot"  , fct_bc_tot, pcols   ,lchnk   )
-    call outfld("enth_fix_fct_ac_tot"  , fct_ac_tot, pcols   ,lchnk   )
-    do k = 1, pver
-      do i=1,ncol
-        !
-        ! normalize weighting function
-        !
-        if (fct_bc_tot(i)>eps) then
-          fct_bc(i,k) = fct_bc(i,k)/fct_bc_tot(i)
-        else
-          fct_bc(i,k) = 0._r8
-        end if
-        if (fct_ac_tot(i)>eps) then
-          fct_ac(i,k) = fct_ac(i,k)/fct_ac_tot(i)
-        else
-          fct_ac(i,k) = 0._r8
-        end if
-      end do
-    end do
-    call outfld("enth_fix_fct_bc"  , fct_bc, pcols   ,lchnk   )
-    call outfld("enth_fix_fct_ac"  , fct_ac, pcols   ,lchnk   )
-#ifdef temperature_rain_snow
-    !
-    ! compute average temperature where precipitation was formed
-    !
-    do i=1,ncol
-       temp_ave_ac(i) = 0.0_r8
-       temp_ave_bc(i) = 0.0_r8
-       do k = 1, pver
-          temp_ave_ac(i) = temp_ave_ac(i) + fct_ac(i,k)*state%T(i,k)
-          temp_ave_bc(i) = temp_ave_bc(i) + fct_bc(i,k)*state%T(i,k)
-       end do
-       if (temp_ave_ac(i)<eps) then
-          temp_ave_ac(i) = state%T(i,pver)
-       end if
-       if (temp_ave_bc(i)<eps) then
-          temp_ave_bc(i) = state%T(i,pver)
-       end if
-    end do
-#endif
-
-
-    !
-    ! compute enthalpy fluxes
+    ! compute precipitation fluxes
     !    
     enthalpy_prec_bc_idx = pbuf_get_index('ENTHALPY_PREC_BC', errcode=i)
     enthalpy_prec_ac_idx = pbuf_get_index('ENTHALPY_PREC_AC', errcode=i)
@@ -1143,31 +1063,242 @@ end subroutine check_energy_get_integrals
     !
     enthalpy_prec_ac(:ncol,fice_idx) = fice_tot(:ncol)-enthalpy_prec_bc(:ncol,fice_idx)
     enthalpy_prec_ac(:ncol,fliq_idx) = fliq_tot(:ncol)-enthalpy_prec_bc(:ncol,fliq_idx)
+
     !
-    ! compute precipitation enthalpy fluxes from tphysbc
+    ! xxx should just be input variable!!!
     !
-    enthalpy_prec_ac(:ncol,hice_idx) =  -enthalpy_prec_ac(:ncol,fice_idx)*cpice*state%T(:ncol,pver)
-    enthalpy_prec_ac(:ncol,hliq_idx) =  -enthalpy_prec_ac(:ncol,fliq_idx)*cpliq*state%T(:ncol,pver)
+    ! FV: convert dry-type mixing ratios to moist here because physics_dme_adjust
+    !     assumes moist. This is done in p_d_coupling for other dynamics. Bundy, Feb 2004.
+    moist_mixing_ratio_dycore = dycore_is('LR').or. dycore_is('FV3')
+    if (moist_mixing_ratio_dycore) call set_dry_to_wet(state, convert_cnst_type='dry')
+    !
+    ! compute precipitation enthalpy fluxes
+    !
+    select case (enthalpy_flux_method)
+    case(-1)
+       ! Save total energy for global fixer in next timestep
+       call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
+       !
+       ! update cp/cv for energy computation based in updated water variables
+       !
+!       if (trim(cam_take_snapshot_before) == "physics_dme_adjust") then
+!          call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
+!               fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
+!       end if
+       
+       !
+       ! Note: dme_adjust expects all %q to be wet when doing the adjustment unless adjust_only_moist_q=.true.
+       !
+       call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt,adjust_only_moist_q=.not.moist_mixing_ratio_dycore)
+!       if (trim(cam_take_snapshot_after) == "physics_dme_adjust") then
+!          call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
+!               fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
+       !       end if
+       !
+       ! if you don't do physics_dme_adjust then to_dry_factor is incorrect for the dry air mass component of cpstar
+       !
+       call cam_thermo_water_update(state%q(:ncol,:,:), lchnk, ncol, vc_dycore,&
+            to_dry_factor=state%pdel(:ncol,:)/state%pdeldry(:ncol,:))       
+       call tot_energy_phys(state, 'phAM')
+       call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
+
+       if (vc_dycore == vc_height.or.vc_dycore == vc_dry_pressure) then
+          !
+          ! MPAS and SE specific scaling of temperature for enforcing energy consistency
+          ! (and to make sure that temperature dependent diagnostic tendencies
+          !  are computed correctly; e.g. dtcore)
+          !
+          scale_cpdry_cpdycore(:ncol,:pver) = cpairv(:ncol,:pver,lchnk)/cp_or_cv_dycore(:ncol,:pver,lchnk)
+          state%T(:ncol,:pver)              = state%temp_ini(:ncol,:pver)+scale_cpdry_cpdycore(:ncol,:pver)*&
+               (state%T(:ncol,:pver)- state%temp_ini(:ncol,:pver))
+          tend%dtdt(:ncol,:)                = scale_cpdry_cpdycore(:ncol,:)*tend%dtdt(:ncol,:)
+          !
+          ! else: do nothing for dycores with energy consistent with CAM physics
+          !
+       end if
+    case(0)
+       enthalpy_prec_ac(:ncol,hice_idx) =  -enthalpy_prec_ac(:ncol,fice_idx)*cpliq*cam_in%ts(:ncol)
+       enthalpy_prec_ac(:ncol,hliq_idx) =  -enthalpy_prec_ac(:ncol,fliq_idx)*cpliq*cam_in%ts(:ncol)
+       !
+       ! compute total enthalpy flux
+       !
+       enthalpy_flux_tot(:ncol) = enthalpy_prec_bc(:ncol,hliq_idx)+enthalpy_prec_bc(:ncol,hice_idx)+&
+            enthalpy_prec_ac(:ncol,hliq_idx)+enthalpy_prec_ac(:ncol,hice_idx)+&
+            enthalpy_evap(:ncol)
+       !
+       ! make sure energy fixer does not fix enthalpy flux passed to ocean
+       !
+       state%te_cur(:ncol,dyn_te_idx) = state%te_cur(:ncol,dyn_te_idx)+ztodt*enthalpy_flux_tot(:ncol)*cam_in%ocnfrac(:ncol)
+       !
+       ! diagnostics
+       !
+       dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*cam_in%ocnfrac(:ncol)
+       call outfld ('enth_flux_to_ocn' , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
+       dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*(1.0_r8-cam_in%ocnfrac(:ncol))
+       call outfld ('enth_flux_to_not_ocn' , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove       
+       !
+       ! save state for energy fixer
+       !
+       call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
+       !
+       ! compute dycore energy
+       !
+       temp(1:ncol,:)   = state%temp_ini(1:ncol,:)+cpairv(:ncol,:,lchnk)/cp_or_cv_dycore(:ncol,:,lchnk)*&
+            (state%T(1:ncol,:)-state%temp_ini(1:ncol,:))
+       call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,            &
+            state%pdel(1:ncol,1:pver), cp_or_cv_dycore(:ncol,:,lchnk),               &
+            state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), temp(1:ncol,1:pver),&
+            vc_dycore, ptop=state%pintdry(1:ncol,1), phis = state%phis(1:ncol),     &
+            te = te_endphys(:ncol), se=se_endphys(:ncol), po=po_endphys(:ncol), ke=ke_endphys(:ncol))!xxx clean-up energy vars not used
+       !
+       ! must call physics_dme_adjust before the water update (otherwise dry air mass incorrect)
+       !
+       call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt,adjust_only_moist_q=.not.moist_mixing_ratio_dycore)
+       call cam_thermo_water_update(state%q(:ncol,:,:), lchnk, ncol, vc_dycore,&
+            to_dry_factor=state%pdel(:ncol,:)/state%pdeldry(:ncol,:))
+       !
+       ! compute energy after adjustments
+       !       
+       temp(1:ncol,:)   = state%temp_ini(1:ncol,:)+cpairv(:ncol,:,lchnk)/cp_or_cv_dycore(:ncol,:,lchnk)*&
+            (state%T(1:ncol,:)-state%temp_ini(1:ncol,:))
+       call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,          &
+            state%pdel(1:ncol,1:pver), cp_or_cv_dycore(:ncol,:,lchnk),                           &
+            state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), temp(1:ncol,1:pver),&
+            vc_dycore, ptop=state%pintdry(1:ncol,1), phis = state%phis(1:ncol),    &
+            te = te(:ncol), se=se(:ncol), po=po(:ncol), ke=ke(:ncol))
+       dEdt_cpdycore(:ncol) = (se(:ncol)-se_endphys(:ncol))/ztodt
+       call outfld ('dEdt_cpdycore'           , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
+       !
+       ! dme adjust diagnostics
+       !
+       if (thermo_budget_history) then
+          call tot_energy_phys(state, 'phAM')
+          call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
+       endif
+       if (vc_dycore == vc_height.or.vc_dycore == vc_dry_pressure) then
+          !
+          ! scale for dycore consistency
+          !
+          scale_cpdry_cpdycore(:ncol,:pver) = cpairv(:ncol,:pver,lchnk)/cp_or_cv_dycore(:ncol,:pver,lchnk)
+          state%T(:ncol,:pver)              = state%temp_ini(:ncol,:pver)+scale_cpdry_cpdycore(:ncol,:pver)*&
+               (state%T(:ncol,:pver)- state%temp_ini(:ncol,:pver))
+          tend%dtdt(:ncol,:)                = scale_cpdry_cpdycore(:ncol,:)*tend%dtdt(:ncol,:)
+       end if
+       call outfld("enth_prec_ac_hliq"  , enthalpy_prec_ac(:,hliq_idx)     , pcols   ,lchnk   )
+    case(1)
+       !
+       ! compute dycore energy
+       !
+       temp(1:ncol,:)   = state%temp_ini(1:ncol,:)+cpairv(:ncol,:,lchnk)/cp_or_cv_dycore(:ncol,:,lchnk)*&
+            (state%T(1:ncol,:)-state%temp_ini(1:ncol,:))
+       call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,            &
+            state%pdel(1:ncol,1:pver), cp_or_cv_dycore(:ncol,:,lchnk),               &
+            state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), temp(1:ncol,1:pver),&
+            vc_dycore, ptop=state%pintdry(1:ncol,1), phis = state%phis(1:ncol),     &
+            te = te_endphys(:ncol), se=se_endphys(:ncol), po=po_endphys(:ncol), ke=ke_endphys(:ncol))!xxx clean-up energy vars not used
+       !
+       ! compute reference "enthalpy" energy for conversion to liquid reference state
+       !
+       temp(1:ncol,:)   = tmelt
+       call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,            &
+            state%pdel(1:ncol,1:pver), cp_or_cv_dycore(:ncol,:,lchnk),               &
+            state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), temp(1:ncol,1:pver),&
+            vc_dycore, ptop=state%pintdry(1:ncol,1), phis = state%phis(1:ncol),     &
+            se=se_endphys_ref(:ncol))
+       !
+       ! must call physics_dme_adjust before the water update (otherwise dry air mass incorrect)
+       !
+       call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt,adjust_only_moist_q=.not.moist_mixing_ratio_dycore)
+       call cam_thermo_water_update(state%q(:ncol,:,:), lchnk, ncol, vc_dycore,&
+            to_dry_factor=state%pdel(:ncol,:)/state%pdeldry(:ncol,:))
+       !
+       ! compute energy after adjustments
+       !       
+       temp(1:ncol,:)   = state%temp_ini(1:ncol,:)+cpairv(:ncol,:,lchnk)/cp_or_cv_dycore(:ncol,:,lchnk)*&
+            (state%T(1:ncol,:)-state%temp_ini(1:ncol,:))
+       call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,          &
+            state%pdel(1:ncol,1:pver), cp_or_cv_dycore(:ncol,:,lchnk),                           &
+            state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), temp(1:ncol,1:pver),&
+            vc_dycore, ptop=state%pintdry(1:ncol,1), phis = state%phis(1:ncol),    &
+            te = te(:ncol), se=se(:ncol), po=po(:ncol), ke=ke(:ncol))
+       temp(1:ncol,:)   = tmelt
+       call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,          &
+            state%pdel(1:ncol,1:pver), cp_or_cv_dycore(:ncol,:,lchnk),                           &
+            state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), temp(1:ncol,1:pver),&
+            vc_dycore, ptop=state%pintdry(1:ncol,1), phis = state%phis(1:ncol),    &
+            se=se_dme_ref(:ncol))
+       dEdt_cpdycore(:ncol) = (se(:ncol)-se_endphys(:ncol))/ztodt
+       call outfld ('dEdt_cpdycore'           , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
+       !
+       ! dme adjust diagnostics
+       !
+       if (thermo_budget_history) then
+          call tot_energy_phys(state, 'phAM')
+          call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
+       endif
+       !
+       ! save state for energy fixer
+       !
+       call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
+       if (vc_dycore == vc_height.or.vc_dycore == vc_dry_pressure) then
+          !
+          ! scale for dycore consistency
+          !
+          scale_cpdry_cpdycore(:ncol,:pver) = cpairv(:ncol,:pver,lchnk)/cp_or_cv_dycore(:ncol,:pver,lchnk)
+          state%T(:ncol,:pver)              = state%temp_ini(:ncol,:pver)+scale_cpdry_cpdycore(:ncol,:pver)*&
+               (state%T(:ncol,:pver)- state%temp_ini(:ncol,:pver))
+          tend%dtdt(:ncol,:)                = scale_cpdry_cpdycore(:ncol,:)*tend%dtdt(:ncol,:)
+       end if
+       !
+       ! compute implied enthalpy flux
+       !
+       implied_adjustment(:ncol) = dEdt_cpdycore(:ncol)
+       enthalpy_prec_ac(:ncol,hice_idx) = 0.0_r8
+       enthalpy_prec_ac(:ncol,hliq_idx) = implied_adjustment(:ncol)
+       !
+       ! compute total enthalpy flux
+       !
+       enthalpy_flux_tot(:ncol) = enthalpy_prec_bc(:ncol,hliq_idx)+enthalpy_prec_bc(:ncol,hice_idx)+&
+            enthalpy_prec_ac(:ncol,hliq_idx)+enthalpy_prec_ac(:ncol,hice_idx)+&
+            enthalpy_evap(:ncol)
+
+       !
+       ! make sure energy fixer does not fix enthalpy flux passed to ocean
+       !
+       state%te_cur(:ncol,dyn_te_idx) = state%te_cur(:ncol,dyn_te_idx)+ztodt*enthalpy_flux_tot(:ncol)*cam_in%ocnfrac(:ncol)
+       !
+       ! diagnostics
+       !
+       dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*cam_in%ocnfrac(:ncol)
+       call outfld ('enth_flux_to_ocn' , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
+       dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*(1.0_r8-cam_in%ocnfrac(:ncol))
+       call outfld ('enth_flux_to_not_ocn' , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove       
+       call outfld("enth_prec_ac_hliq"  , enthalpy_prec_ac(:,hliq_idx)     , pcols   ,lchnk   )
+       !
+       ! change reference state for ocean
+       !
+       implied_adjustment(:ncol) = dEdt_cpdycore(:ncol)-(se_dme_ref(:ncol)-se_endphys_ref(:ncol))/ztodt
+       enthalpy_prec_ac(:ncol,hice_idx) = 0.0_r8
+       enthalpy_prec_ac(:ncol,hliq_idx) = implied_adjustment(:ncol)
+    case DEFAULT
+       enthalpy_prec_ac(:ncol,hice_idx) =  -enthalpy_prec_ac(:ncol,fice_idx)*cpice*state%T(:ncol,pver)
+       enthalpy_prec_ac(:ncol,hliq_idx) =  -enthalpy_prec_ac(:ncol,fliq_idx)*cpliq*state%T(:ncol,pver)       
 #ifdef temperature_rain_snow
-    enthalpy_prec_ac(:ncol,hice_idx) =  -enthalpy_prec_ac(:ncol,fice_idx)*cpice*temp_ave_ac(:ncol)
-    enthalpy_prec_ac(:ncol,hliq_idx) =  -enthalpy_prec_ac(:ncol,fliq_idx)*cpliq*temp_ave_ac(:ncol)
-    enthalpy_prec_bc(:ncol,hice_idx) =  -enthalpy_prec_bc(:ncol,fice_idx)*cpice*temp_ave_bc(:ncol)
-    enthalpy_prec_bc(:ncol,hliq_idx) =  -enthalpy_prec_bc(:ncol,fliq_idx)*cpliq*temp_ave_bc(:ncol)
-    temp_ave(:ncol) = 0.5_r8*(temp_ave_ac(:ncol)+temp_ave_bc(:ncol))-state%T(:ncol,pver)
-    call outfld("prect_temp_diff"  ,  temp_ave   , pcols   ,lchnk   )
-!    call pbuf_set_field(pbuf, enthalpy_prec_bc_idx, enthalpy_prec_bc)!xxx overwriting camsrfech value xxx not clean
+       enthalpy_prec_ac(:ncol,hice_idx) =  -enthalpy_prec_ac(:ncol,fice_idx)*cpice*temp_ave_ac(:ncol)
+       enthalpy_prec_ac(:ncol,hliq_idx) =  -enthalpy_prec_ac(:ncol,fliq_idx)*cpliq*temp_ave_ac(:ncol)
+       enthalpy_prec_bc(:ncol,hice_idx) =  -enthalpy_prec_bc(:ncol,fice_idx)*cpice*temp_ave_bc(:ncol)
+       enthalpy_prec_bc(:ncol,hliq_idx) =  -enthalpy_prec_bc(:ncol,fliq_idx)*cpliq*temp_ave_bc(:ncol)
+       temp_ave(:ncol) = 0.5_r8*(temp_ave_ac(:ncol)+temp_ave_bc(:ncol))-state%T(:ncol,pver)
+       call outfld("prect_temp_diff"  ,  temp_ave   , pcols   ,lchnk   )
 #endif
+    end select
+
     call pbuf_set_field(pbuf, enthalpy_prec_ac_idx, enthalpy_prec_ac)
-    !
-    ! compute total enthalpy flux
-    !
-    enthalpy_flux_tot(:ncol) = enthalpy_prec_bc(:ncol,hliq_idx)+enthalpy_prec_bc(:ncol,hice_idx)+&
-                               enthalpy_prec_ac(:ncol,hliq_idx)+enthalpy_prec_ac(:ncol,hice_idx)+&
-                               enthalpy_evap(:ncol)
+
 
 
     call outfld("enth_prec_ac_hice"  , enthalpy_prec_ac(:,hice_idx)     , pcols   ,lchnk   )
-    call outfld("enth_prec_ac_hliq"  , enthalpy_prec_ac(:,hliq_idx)     , pcols   ,lchnk   )
+
     call outfld("enth_prec_bc_hice"  , enthalpy_prec_bc(:,hice_idx)     , pcols   ,lchnk   )
     call outfld("enth_prec_bc_hliq"  , enthalpy_prec_bc(:,hliq_idx)     , pcols   ,lchnk   )
     call outfld("enth_prec_ac_fice"  , enthalpy_prec_ac(:,fice_idx)     , pcols   ,lchnk   )
@@ -1175,131 +1306,7 @@ end subroutine check_energy_get_integrals
     call outfld("enth_prec_bc_fice"  , enthalpy_prec_bc(:,fice_idx)     , pcols   ,lchnk   )
     call outfld("enth_prec_bc_fliq"  , enthalpy_prec_bc(:,fliq_idx)     , pcols   ,lchnk   )
     call outfld("enth_evap_hevap"    , enthalpy_evap   (:)              , pcols   ,lchnk   )
-    !
-    !-------------------------------------------------------------------------------------------
-    !
-    ! scale temperature for consistency with dycore
-    !
-    ! all computations henceforth are consistent with variable latent heat total energy formula
-    !
-    ! Equation 78 in https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2022MS003117
-    !
-    !-------------------------------------------------------------------------------------------
-    !
-    do k = 1, pver
-      do i = 1, ncol
-        scale_cpdry_cpdycore(i,k) = cpairv(i,k,lchnk)/cp_or_cv_dycore(i,k,lchnk)
-        state%T(i,k)     = state%temp_ini(i,k)+scale_cpdry_cpdycore(i,k)*(state%T(i,k)- state%temp_ini(i,k))
-      end do
-    end do
-    !
-    ! compute total energy after physics using equation 78
-    !
-    call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,            &
-         state%pdel(1:ncol,1:pver), cp_or_cv_dycore(:ncol,:,lchnk),               &
-         state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), state%T(1:ncol,1:pver),&
-         vc_dycore, ptop=state%pintdry(1:ncol,1), phis = state%phis(1:ncol),     &
-         te = te_endphys(:ncol), se=se_endphys(:ncol), po=po_endphys(:ncol), ke=ke_endphys(:ncol))
-    !
-    ! the column integrated total energy change should match accumlated te_tnd:
-    !
-    !                         dEdt_physics=te_tnd
-    !
-    ! te_lat is the constant latent heat terms at surface
-    !
-    call outfld ('te_tnd',tend%te_tnd  , pcols, lchnk)
-    call outfld ('te_lat',tend%te_lat  , pcols, lchnk)
-    dEdt_physics(:ncol) = (te_endphys(:ncol)-te_init(:ncol,1,lchnk))/ztodt
-    call outfld ('dEdt_physics', dEdt_physics, pcols, lchnk)
-    !
-    ! do dry-mass adjustment and compute column integrated enthalpy tendency associated
-    ! with water entering/leaving the column
-    !
-    call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt)
-    if (thermo_budget_history) then
-       call tot_energy_phys(state, 'phAM')
-       call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
-    endif
-    call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,            &
-         state%pdel(1:ncol,1:pver), cp_or_cv_dycore(:ncol,:,lchnk),               &
-         state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), state%T(1:ncol,1:pver),&
-         vc_dycore, ptop=state%pintdry(1:ncol,1), phis = state%phis(1:ncol),     &
-         te = te_dme(:ncol), se=se_dme(:ncol), po=po_dme(:ncol), ke=ke_dme(:ncol))
-    dEdt_dme(:ncol) = (se_dme(:ncol)-se_endphys(:ncol))/ztodt
-    call outfld ('dEdt_dme', dEdt_dme, pcols, lchnk)
-    !
-    ! Update cp (effectively adding variable latent heat terms to energy equation)
-    ! and compute column integrated enthalpy tendency associated with that
-    !
-    call cam_thermo_water_update(state%q(:ncol,:,:), lchnk, ncol, vc_dycore,&
-         to_dry_factor=state%pdel(:ncol,:)/state%pdeldry(:ncol,:))
-    call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,          &
-         state%pdel(1:ncol,1:pver), cp_or_cv_dycore(:ncol,:,lchnk),                           &
-         state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), state%T(1:ncol,1:pver),&
-         vc_dycore, ptop=state%pintdry(1:ncol,1), phis = state%phis(1:ncol),    &
-         te = te(:ncol), se=se(:ncol), po=po(:ncol), ke=ke(:ncol))
-    dEdt_cpdycore(:ncol) = (se(:ncol)-se_dme(:ncol))/ztodt
-    call outfld ('dEdt_cpdycore'           , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
-    residual_enthalpy_terms_only(:ncol) = enthalpy_flux_tot(:ncol)-dEdt_cpdycore(:ncol)-dEdt_dme(:ncol)
-    call outfld ('residual', residual_enthalpy_terms_only, pcols, lchnk) !xxx diags will remove
 
-    if (.true.) then !if .false. throw everything into the energy fixer (default .true.)
-
-    enthalpy_heating_fix_bc = 0.0_r8
-    enthalpy_heating_fix_ac = 0.0_r8
-    do i=1,ncol
-      tot = enthalpy_prec_bc(i,hliq_idx)+enthalpy_prec_bc(i,hice_idx)+enthalpy_prec_ac(i,hliq_idx)+enthalpy_prec_ac(i,hice_idx)
-      if (tot<-eps) then
-        wgt_bc = (enthalpy_prec_bc(i,hliq_idx)+enthalpy_prec_bc(i,hice_idx))/tot
-        wgt_ac = (enthalpy_prec_ac(i,hliq_idx)+enthalpy_prec_ac(i,hice_idx))/tot
-      else
-        wgt_bc = 0._r8
-        wgt_ac = 0._r8
-      end if
-      if (residual_enthalpy_terms_only(i)<-eps) then
-        do k = 1, pver
-          tot = (wgt_bc*fct_bc(i,k)+wgt_ac*fct_ac(i,k))*residual_enthalpy_terms_only(i)
-          state%T(i,k) = state%T(i,k)+tot*ztodt/(cp_or_cv_dycore(i,k,lchnk)*state%pdel(i,k)*rga)
-          ttend_hfix(i,k) = tot/(state%pdel(i,k)*rga*cp_or_cv_dycore(i,k,lchnk))
-          enthalpy_heating_fix_bc(i) = enthalpy_heating_fix_bc(i)+wgt_bc*fct_bc(i,k)*residual_enthalpy_terms_only(i)
-          enthalpy_heating_fix_ac(i) = enthalpy_heating_fix_ac(i)+wgt_ac*fct_ac(i,k)*residual_enthalpy_terms_only(i)
-        end do
-      else
-        ttend_hfix(i,:) = 0.0_r8
-      end if
-    end do
-    tend%dtdt(:ncol,:) = (state%T(:ncol,:)-state%temp_ini(:ncol,:))/ztodt
-    call outfld("TTEND_HFIX"  , ttend_hfix, pcols   ,lchnk)
-    call outfld("enthalpy_heating_fix_bc"  , enthalpy_heating_fix_bc, pcols   ,lchnk)
-    call outfld("enthalpy_heating_fix_ac"  , enthalpy_heating_fix_ac, pcols   ,lchnk)
-
-
-    call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,          &
-         state%pdel(1:ncol,1:pver), cp_or_cv_dycore(:ncol,:,lchnk),                           &
-         state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), state%T(1:ncol,1:pver),&
-         vc_dycore, ptop=state%pintdry(1:ncol,1), phis = state%phis(1:ncol),    &
-         te = te_enth_fix(:ncol), se=se_enth_fix(:ncol), po=po_enth_fix(:ncol), ke=ke_enth_fix(:ncol))
-    dEdt_enth_fix(:ncol) = (te_enth_fix(:ncol)-te(:ncol))/ztodt
-    call outfld("dEdt_enth_fix"  ,  dEdt_enth_fix    , pcols   ,lchnk   )
-    endif!throw everything into the energy fixer
-    !
-    !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-    ! Save total energy for global fixer in next timestep
-    !
-    ! state%te_cur(:ncol,dyn_te_idx) holds te_endphys(:ncol)
-    !
-    ! ocnfrac: for now apply fixer 
-    !
-    state%te_cur(:ncol,dyn_te_idx) = state%te_cur(:ncol,dyn_te_idx)+ztodt*enthalpy_flux_tot(:ncol)*cam_in%ocnfrac(:ncol)
-    call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
-    !
-    ! the amount of total energy we need energy fixer to fix (associated with enthalpy flux)
-    !
-    dEdt_efix(:ncol) = (state%te_cur(:ncol,dyn_te_idx)-te_enth_fix(:ncol))/ztodt
-    call outfld("dEdt_efix_physics"  ,  dEdt_efix  , pcols   ,lchnk   )
-    !
-    ! diagnostics
-    !
     !
     ! compute latent heat fluxes
     !
@@ -1309,5 +1316,7 @@ end subroutine check_energy_get_integrals
     call outfld ('cpice_srf'        , variable_latent_heat_surface_cpice_term, pcols, lchnk) !xxx diags will remove
     call outfld ('ls_srf'           , variable_latent_heat_surface_ls_term, pcols, lchnk) !xxx diags will remove
     call outfld ('lf_srf'           , variable_latent_heat_surface_lf_term, pcols, lchnk) !xxx diags will remove
+
+    
   end subroutine enthalpy_adjustment
 end module check_energy

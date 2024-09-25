@@ -11,7 +11,7 @@ setenv PBS_ACCOUNT P93300642
 #set src="cam_development"
 
 set src="cam_enth_simple"   #cam_enthalpy"
-set caze=enthalpy_flux_method_1
+set caze=cam_enth_simple_debug
 #set caze=cam_enth_simple_ocnfrc_zmconv_ke_1E-5
 #set caze=cam_enth_simple_ocnfrc_efix
 #set caze=cam_enth_simple_ocnfrc_cpstar
@@ -25,55 +25,31 @@ set scratch="/glade/derecho/scratch"
 set queue="regular" #  set queue="short
 
 
-/glade/u/home/pel/src/$src/cime/scripts/create_newcase --compset FLTHIST --res ne30pg3_ne30pg3_mg17 --case $scratch/$USER/$caze --run-unsupported --pecount 2160 --project  P93300042
+/glade/u/home/pel/src/$src/cime/scripts/create_newcase --compset FLTHIST --res ne30pg3_ne30pg3_mg17 --case $scratch/$USER/$caze --run-unsupported --pecount 216 --project  P93300042
 cd $scratch/$USER/$caze
 ./xmlchange --append CAM_CONFIG_OPTS="-rad rrtmgp"
 ./xmlchange RUN_STARTDATE=1995-01-01
-./xmlchange STOP_N=2
-./xmlchange STOP_OPTION=nyears
-./xmlchange RESUBMIT=5
+./xmlchange STOP_N=1
+./xmlchange STOP_OPTION=ndays
+./xmlchange JOB_WALLCLOCK_TIME=00:20:00
+./xmlchange DOUT_S=FALSE
+#./xmlchange RESUBMIT=5
 
 ./xmlchange TIMER_LEVEL=10
 ./xmlchange RUN_STARTDATE=1995-01-01
 ./case.setup
-
-#
-# specialized experiment
-#
-#echo "clubb_l_do_expldiff_rtm_thlm=.false." >> user_nl_cam
-
-#echo "microp_aero_wsubi_scale = 0.5" >> user_nl_cam #set caze=cam_enth_simple_ocnfrc_microp_aero_wsubi_scale_0.5
-
-#set caze=cam_enth_simple_ocnfrc_zmconv_num_cin_5
-#echo "zmconv_num_cin = 5" >> user_nl_cam
-
-#set caze=cam_enth_simple_ocnfrc_zmconv_tau7200
-#echo "zmconv_tau = 7200" >> user_nl_cam
-
-#set caze=cam_enth_simple_ocnfrc_micro_mg_dcs250
-#echo "micro_mg_dcs = 250e-6" >> user_nl_cam
-
-#set caze=cam_enth_simple_ocnfrc_micro_mg_vtrmi_factor_1.5
-#echo "micro_mg_vtrmi_factor = 1.5" >> user_nl_cam
-
-#set caze=cam_enth_simple_ocnfrc_cldfrc_dp1_0.05
-#echo "cldfrc_dp1 =0.05" >> user_nl_cam
-
-#set caze=cam_enth_simple_ocnfrc_zmconv_ke_1E-5
-#echo "zmconv_ke = 1.E-5" >> user_nl_cam
-
 #
 #
 #
 echo "compute_enthalpy_flux = .true."                >> user_nl_cam
 echo "mfilt    =       0,       5,     20,      40,      12,       120,      1,   1,12"                >> user_nl_cam
-echo "nhtfrq              =       0,     -24,    -24,      -3,       0,       -2,      0,  -8760,0,0"   >> user_nl_cam
+echo "nhtfrq              =       0,     -24,    -24,      -3,       0,       -2,      0,  -8760,1,1"   >> user_nl_cam
 echo "ndens               =       2,       2,      2,       2,       2,       1,      2,   1,1"       >> user_nl_cam
 echo "interpolate_output  =  .true.,  .true., .true., .false., .false., .true.,  .true., .false.,.false."   >> user_nl_cam
 echo "interpolate_nlat    =     192,     192,    192,     192,     192,     192,   192,   192"      >> user_nl_cam
 echo "interpolate_nlon    =     288,     288,    288,     288,     288,     288,   288 ,   288"     >> user_nl_cam
 
-#echo "empty_htapes = .true."              >> user_nl_cam
+echo "empty_htapes = .true."              >> user_nl_cam
 
 echo "fincl1 = 'ACTNI', 'ACTNL', 'ACTREI', 'ACTREL', 'AODDUST', 'AODVIS', 'AODVISdn','BURDENBC', 'BURDENDUST', 'BURDENPOM', 'BURDENSEASALT', "                   >> user_nl_cam
 echo "'BURDENSO4', 'BURDENSOA', 'CAPE', 'CCN3', 'CDNUMC', 'CH4', 'CLDHGH', 'CLDICE', 'CLDLIQ', 'CLDLOW', 'CLDMED', 'CLDTOT', 'CLOUD', 'CMFMC_DP', "              >> user_nl_cam
@@ -110,14 +86,13 @@ echo "phys_grid_ctem_za_nlat=90"                                                
 echo "clubb_c8 = 4.35 "                                                                                                                                          >> user_nl_cam
 
 #echo "fincl9 = 'EFIX'"                  >> user_nl_cam
-echo "fincl9 =  'enth_prec_ac_hice:A','enth_prec_ac_hliq:A','enth_prec_bc_hice:A','enth_prec_bc_hliq:A','enth_prec_ac_fice:A','enth_prec_ac_fliq:A','enth_prec_bc_fice:A',"  >> user_nl_cam
-echo " 'enth_prec_bc_fliq:A','enth_evap_hevap:A','cpice_srf:A','te_tnd:A','te_lat:A','ls_srf:A','lf_srf:A','dEdt_dme:A','dEdt_physics:A',         " >> user_nl_cam
-echo "'dEdt_cpdycore:A','residual:A','dEdt_enth_fix:A','enth_fix_fct_bc_tot:A','enth_fix_fct_ac_tot:A','enthalpy_heating_fix_bc:A','enthalpy_heating_fix_ac:A',   " >> user_nl_cam
-echo "'dEdt_efix_physics:A','EFIX:A','enth_flux_to_not_ocn:I','enth_flux_to_ocn:I','hsnow_liq_ref:I','hrain_liq_ref:I','hevap_liq_ref:I'"    >> user_nl_cam
-echo "avgflag_pertape(9) = 'A'" >> user_nl_cam
-echo "thermo_budget_histfile_num             = 8"    >> user_nl_cam
-echo "thermo_budget_history          = .true."    >> user_nl_cam
-echo "avgflag_pertape(8) = 'N'"    >> user_nl_cam
+echo "fincl9 =  'enth_prec_ac_hice:I','enth_prec_ac_hliq:I','enth_prec_bc_hice:I','enth_prec_bc_hliq:I','enth_prec_ac_fice:I','enth_prec_ac_fliq:I','enth_prec_bc_fice:I',"  >> user_nl_cam
+echo " 'enth_prec_bc_fliq:I','enth_evap_hevap:I','cpice_srf:I','te_tnd:I','te_lat:I','ls_srf:I','lf_srf:I','dEdt_dme:I','dEdt_physics:I',         " >> user_nl_cam
+echo "'dEdt_cpdycore:I','residual:I','dEdt_enth_fix:I','enth_fix_fct_bc_tot:I','enth_fix_fct_ac_tot:I','enthalpy_heating_fix_bc:I','enthalpy_heating_fix_ac:I',   " >> user_nl_cam
+echo "'dEdt_efix_physics:I','EFIX:I'"    >> user_nl_cam
+echo "avgflag_pertape(9) = 'I'" >> user_nl_cam
+echo "avgflag_pertape(10) = 'I'" >> user_nl_cam
+echo "fincl10= 'dEdt_dycore','dEdt_floating_dyn','dEdt_vert_remap','dEdt_phys_tot_in_dyn','dEdt_del4','dEdt_del4_fric_heat','dEdt_del4_tot','dEdt_del2_sponge','dEdt_del2_del4_tot','dEdt_residual'" >> user_nl_cam
 
-#qcmd -A $proj -- ./case.build 
+qcmd -A $proj -- ./case.build 
 #./case.submit

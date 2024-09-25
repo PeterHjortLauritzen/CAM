@@ -1191,10 +1191,11 @@ end subroutine physics_ptend_copy
   end subroutine physics_cnst_limit
 
 !===============================================================================
-  subroutine physics_dme_adjust(state, tend, qini, liqini, iceini, dt)
+  subroutine physics_dme_adjust(state, tend, qini, liqini, iceini, dt, adjust_only_moist_q)
     use air_composition, only: dry_air_species_num,thermodynamic_active_species_num
     use air_composition, only: thermodynamic_active_species_idx
     use dycore,          only: dycore_is
+    use constituents,    only: cnst_type
     !-----------------------------------------------------------------------
     !
     ! Purpose: Adjust the dry mass in each layer back to the value of physics input state
@@ -1229,6 +1230,7 @@ end subroutine physics_ptend_copy
     real(r8),            intent(in   ) :: liqini(pcols,pver)  ! initial total liquid
     real(r8),            intent(in   ) :: iceini(pcols,pver)  ! initial total ice
     real(r8),            intent(in   ) :: dt                  ! model physics timestep
+    logical, optional,   intent(in   ) :: adjust_only_moist_q ! adjust only state%q that are moist mixing ratio
     !
     !---------------------------Local workspace-----------------------------
     !
@@ -1248,9 +1250,13 @@ end subroutine physics_ptend_copy
 
     real(r8),allocatable :: cpairv_loc(:,:)
     integer :: m_cnst
+
+    logical :: adjust_only_moist_q_local = .FALSE.
     !
     !-----------------------------------------------------------------------
 
+    if (present(adjust_only_moist_q)) adjust_only_moist_q_local = adjust_only_moist_q
+    
     if (state%psetcols .ne. pcols) then
        call endrun('physics_dme_adjust: cannot pass in a state which has sub-columns')
     end if
@@ -1273,7 +1279,9 @@ end subroutine physics_ptend_copy
         
         ! adjust constituents to conserve mass in each layer
         do m = 1, pcnst
-          state%q(:ncol,k,m) = state%q(:ncol,k,m) / fdq(:ncol)
+          if ((adjust_only_moist_q_local.and.cnst_type(m)=='wet').or..not.adjust_only_moist_q_local) then
+             state%q(:ncol,k,m) = state%q(:ncol,k,m) / fdq(:ncol)
+          end if
         end do
         ! compute new total pressure variables
         state%pdel  (:ncol,k  ) = state%pdel(:ncol,k  ) * fdq(:ncol)
@@ -1293,7 +1301,9 @@ end subroutine physics_ptend_copy
         fdq(:ncol) = 1._r8 + tot_water(:ncol,2) - tot_water(:ncol,1)
         ! adjust constituents to conserve mass in each layer
         do m = 1, pcnst
-          state%q(:ncol,k,m) = state%q(:ncol,k,m) / fdq(:ncol)
+           if ((adjust_only_moist_q_local.and.cnst_type(m)=='wet').or..not.adjust_only_moist_q_local) then
+              state%q(:ncol,k,m) = state%q(:ncol,k,m) / fdq(:ncol)
+           end if
         end do
         ! compute new total pressure variables
         state%pdel  (:ncol,k  ) = state%pdel(:ncol,k  ) * fdq(:ncol)

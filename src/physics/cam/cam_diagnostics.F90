@@ -409,6 +409,9 @@ contains
     call addfld('enthalpy_heating_fix_bc', horiz_only, 'A', 'W/m2', '' )
     call addfld('enthalpy_heating_fix_ac', horiz_only, 'A', 'W/m2', '' )
 
+    call addfld('enth_flux_to_ocn', horiz_only, 'A', 'W/m2', '' )
+    call addfld('enth_flux_to_not_ocn', horiz_only, 'A', 'W/m2', '' )
+    
     call addfld('enth_prec_ac_hice', horiz_only, 'A', 'W/m2', '' )
     call addfld('enth_prec_ac_hliq', horiz_only, 'A', 'W/m2', '' )
     call addfld('enth_prec_bc_hice', horiz_only, 'A', 'W/m2', '' )

@@ -26,6 +26,7 @@ module air_composition
    public :: get_mbarv
 
    logical, public :: compute_enthalpy_flux
+   integer, public :: enthalpy_flux_method=1
    !
    ! for book keeping of enthalpy variables in physics buffer
    !
