@@ -158,7 +158,7 @@ contains
     use dyn_comp,           only: dyn_register
     use offline_driver,     only: offline_driver_reg
     use hemco_interface,    only: HCOI_Chunk_Init
-    use air_composition,    only: compute_enthalpy_flux, num_enthalpy_vars
+    use air_composition,    only: enthalpy_flux_method, num_enthalpy_vars
     !---------------------------Local variables-----------------------------
     !
     integer  :: m        ! loop index
@@ -209,9 +209,9 @@ contains
     call pbuf_add_field('CLDICEINI', 'physpkg', dtype_r8, (/pcols,pver/), cldiceini_idx)
     call pbuf_add_field('TOTLIQINI', 'physpkg', dtype_r8, (/pcols,pver/), totliqini_idx)
     call pbuf_add_field('TOTICEINI', 'physpkg', dtype_r8, (/pcols,pver/), toticeini_idx)
-    if (compute_enthalpy_flux) then
+    if (enthalpy_flux_method>0) then
        call pbuf_add_field('ENTHALPY_PREC_BC','physpkg', dtype_r8, (/pcols,num_enthalpy_vars/), enthalpy_prec_bc_idx)
-       call pbuf_add_field('ENTHALPY_PREC_AC','global', dtype_r8, (/pcols,num_enthalpy_vars/), enthalpy_prec_ac_idx)
+       call pbuf_add_field('ENTHALPY_PREC_AC','global' , dtype_r8, (/pcols,num_enthalpy_vars/), enthalpy_prec_ac_idx)
        call pbuf_add_field('ENTHALPY_EVAP'   ,'physpkg', dtype_r8, (/pcols/),                   enthalpy_evap_idx)
     end if
 
@@ -1422,7 +1422,7 @@ contains
     use cam_thermo,         only: cam_thermo_water_update
     use cam_budget,         only: thermo_budget_history
     use dyn_tests_utils,    only: vc_dycore, vc_height, vc_dry_pressure
-    use air_composition,    only: cpairv, cp_or_cv_dycore, compute_enthalpy_flux
+    use air_composition,    only: cpairv, cp_or_cv_dycore, enthalpy_flux_method
     !
     ! Arguments
     !
@@ -2378,7 +2378,7 @@ contains
       call check_energy_chng(state, tend, "nudging", nstep, ztodt, zero, zero, zero, zero)
     endif
 
-    if (compute_enthalpy_flux) then
+    if (enthalpy_flux_method>0) then
        if (.not.dycore_is('SE')) then
           call endrun("Explicit enthalpy flux functionality only supported for SE dycore")
        end if
@@ -2530,7 +2530,7 @@ contains
     use constituents,    only: qmin
     use air_composition, only: thermodynamic_active_species_liq_num,thermodynamic_active_species_liq_idx
     use air_composition, only: thermodynamic_active_species_ice_num,thermodynamic_active_species_ice_idx
-    use air_composition, only: compute_enthalpy_flux, num_enthalpy_vars, cp_or_cv_dycore
+    use air_composition, only: enthalpy_flux_method, num_enthalpy_vars, cp_or_cv_dycore
     use physics_buffer,  only: pbuf_set_field
     use convect_deep,    only: convect_deep_tend
     use time_manager,    only: is_first_step, get_nstep
@@ -2549,7 +2549,7 @@ contains
     use cam_snapshot,    only: cam_snapshot_all_outfld_tphysbc
     use cam_snapshot_common, only: cam_snapshot_ptend_outfld
     use dyn_tests_utils, only: vc_dycore
-    use air_composition, only: te_init,cpairv,compute_enthalpy_flux!xxx to be removed
+    use air_composition, only: te_init,cpairv,enthalpy_flux_method!xxx to be removed
     use dyn_tests_utils, only: vc_dycore!xxx to be removed
     use cam_thermo,      only: get_hydrostatic_energy!xxx to be removed
     ! Arguments
@@ -2731,7 +2731,7 @@ contains
     !
     ! compute energy variables for state at the beginning of physics - xxx to be remove
     !
-    if (compute_enthalpy_flux) then
+    if (enthalpy_flux_method) then
       call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,          &
            state%pdel(1:ncol,1:pver), cp_or_cv_dycore(:ncol,:,lchnk),             &
            state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), state%T(1:ncol,1:pver),&
@@ -2905,7 +2905,7 @@ contains
       !
       ! In first time-step tphysac variables need to be zero'd out
       !
-      if (compute_enthalpy_flux) then
+      if (enthalpy_flux_method) then
         ifld = pbuf_get_index('ENTHALPY_PREC_AC', errcode=i)
         if (ifld>0) call pbuf_set_field(pbuf, ifld, 0._r8)
       end if

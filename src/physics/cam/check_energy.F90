@@ -1093,6 +1093,11 @@ end subroutine check_energy_get_integrals
     !
     select case (enthalpy_flux_method)
     case(-1)
+       !
+       !***************************************************
+       ! no explicit enthalpy flux option
+       !***************************************************
+       !
        ! Save total energy for global fixer in next timestep
        call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
        !
@@ -1134,8 +1139,16 @@ end subroutine check_energy_get_integrals
           !
        end if
     case(0)
-       enthalpy_prec_ac(:ncol,hice_idx) =  -enthalpy_prec_ac(:ncol,fice_idx)*cpliq*cam_in%ts(:ncol)
-       enthalpy_prec_ac(:ncol,hliq_idx) =  -enthalpy_prec_ac(:ncol,fliq_idx)*cpliq*cam_in%ts(:ncol)
+       !
+       !**********************************************************************
+       ! replicate code in CAM from coupler
+       !
+       ! note liquid reference state which is inconsistent with atmosphere
+       !
+       !**********************************************************************
+       !
+       enthalpy_prec_ac(:ncol,hice_idx) =  -enthalpy_prec_ac(:ncol,fice_idx)*cpliq*(cam_in%ts(:ncol)-tmelt)
+       enthalpy_prec_ac(:ncol,hliq_idx) =  -enthalpy_prec_ac(:ncol,fliq_idx)*cpliq*(cam_in%ts(:ncol)-tmelt)
        !
        ! compute total enthalpy flux
        !

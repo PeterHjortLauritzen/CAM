@@ -416,7 +416,7 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
    use rad_constituents, only: rad_cnst_get_gas
    use cam_control_mod,  only: simple_phys
    use air_composition,  only: hliq_idx, hice_idx, fliq_idx, fice_idx
-   use air_composition,  only: compute_enthalpy_flux, num_enthalpy_vars, enthalpy_flux_method
+   use air_composition,  only: enthalpy_flux_method, num_enthalpy_vars, enthalpy_flux_method
    use cam_history,      only: outfld!xxx debug
    implicit none
 
@@ -457,7 +457,7 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
    psl_idx = pbuf_get_index('PSL')
    call pbuf_get_field(pbuf, psl_idx, psl)
 
-   if (compute_enthalpy_flux) then
+   if (enthalpy_flux_method>0) then
       enthalpy_prec_bc_idx = pbuf_get_index('ENTHALPY_PREC_BC', errcode=i)
       enthalpy_prec_ac_idx = pbuf_get_index('ENTHALPY_PREC_AC', errcode=i)
       enthalpy_evap_idx    = pbuf_get_index('ENTHALPY_EVAP'   , errcode=i)
@@ -491,12 +491,12 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
          !
          ! CESM3 development option using cpliq for all species and SST temperature
          !
-         enthalpy_prec_bc(:ncol,hice_idx) =  -enthalpy_prec_bc(:ncol,fice_idx)*cpliq*cam_in%ts(:ncol)
-         enthalpy_prec_bc(:ncol,hliq_idx) =  -enthalpy_prec_bc(:ncol,fliq_idx)*cpliq*cam_in%ts(:ncol)
+         enthalpy_prec_bc(:ncol,hice_idx) =  -enthalpy_prec_bc(:ncol,fice_idx)*cpliq*(cam_in%ts(:ncol)-tmelt)
+         enthalpy_prec_bc(:ncol,hliq_idx) =  -enthalpy_prec_bc(:ncol,fliq_idx)*cpliq*(cam_in%ts(:ncol)-tmelt)
          !
          ! compute evaporation enthalpy flux
          !
-         cam_out%hevap(:ncol) = cam_in%cflx(:ncol,1)*cam_in%ts(:ncol)*cpliq
+         cam_out%hevap(:ncol) = cam_in%cflx(:ncol,1)*cpliq*(cam_in%ts(:ncol)-tmelt)
          !
          ! Compute enthalpy fluxes for the coupler:
          !
@@ -505,9 +505,9 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
          !
          ! ->Change enthalpy flux to sign convention of ocean model and change to liquid reference state
          !
-         cam_out%hsnow (:ncol) = -cam_out%hsnow(:ncol) -fice_tot(:ncol)*tmelt*cpliq
-         cam_out%hrain (:ncol) = -cam_out%hrain(:ncol) -fliq_tot(:ncol)*tmelt*cpliq
-         cam_out%hevap(:ncol)  = -cam_out%hevap(:ncol)+cam_in%cflx(:ncol,1)*tmelt*cpliq
+         cam_out%hsnow (:ncol) = -cam_out%hsnow(:ncol)!xxx -fice_tot(:ncol)*tmelt*cpliq
+         cam_out%hrain (:ncol) = -cam_out%hrain(:ncol)!xxx -fliq_tot(:ncol)*tmelt*cpliq
+         cam_out%hevap(:ncol)  = -cam_out%hevap(:ncol)!xxx +cam_in%cflx(:ncol,1)*tmelt*cpliq
       case(1)
          !
          ! we only know total entalphy flux - add in rain field

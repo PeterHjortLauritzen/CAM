@@ -25,8 +25,7 @@ module air_composition
    ! get_mbarv: molecular weight of dry air
    public :: get_mbarv
 
-   logical, public :: compute_enthalpy_flux
-   integer, public :: enthalpy_flux_method=1
+   integer, public :: enthalpy_flux_method=0
    !
    ! for book keeping of enthalpy variables in physics buffer
    !
@@ -152,7 +151,7 @@ CONTAINS
    subroutine air_composition_readnl(nlfile)
       use namelist_utils, only: find_group_name
       use spmd_utils,     only: masterproc, mpicom, masterprocid
-      use spmd_utils,     only: mpi_character, mpi_logical
+      use spmd_utils,     only: mpi_character, mpi_logical, mpi_integer
       use cam_logfile,    only: iulog
 
       ! Dummy argument: filepath for file containing namelist input
@@ -166,7 +165,7 @@ CONTAINS
       character(len=lsize)        :: bline
 
       ! Variable components of dry air and water species in air
-      namelist /air_composition_nl/ dry_air_species, water_species_in_air, compute_enthalpy_flux
+      namelist /air_composition_nl/ dry_air_species, water_species_in_air, enthalpy_flux_method
       !-----------------------------------------------------------------------
 
       banner = repeat('*', lsize)
@@ -188,8 +187,8 @@ CONTAINS
          close(unitn)
       end if
 
-      call mpi_bcast(compute_enthalpy_flux, 1, mpi_logical, masterprocid, mpicom, ierr)
-      if (ierr /= 0) call endrun(subname//": FATAL: mpi_bcast: compute_enthalpy_flux")
+      call mpi_bcast(enthalpy_flux_method, 1, mpi_integer, masterprocid, mpicom, ierr)
+      if (ierr /= 0) call endrun(subname//": FATAL: mpi_bcast: enthalpy_flux_method")
 
       call mpi_bcast(dry_air_species, len(dry_air_species)*num_names_max,     &
            mpi_character, masterprocid, mpicom, ierr)
@@ -216,9 +215,7 @@ CONTAINS
            dry_air_species_num + water_species_in_air_num
 
       if (masterproc) then
-         if (compute_enthalpy_flux) then
-            write(iulog, *) "Computing enthalpy flux: compute_enthalpy_flux=",compute_enthalpy_flux
-         endif
+         write(iulog, *) "enthalpy_flux_method = ",enthalpy_flux_method
          write(iulog, *) banner
          write(iulog, *) bline
 

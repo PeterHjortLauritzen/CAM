@@ -3187,7 +3187,7 @@
 <water_species_in_air microphys="mg2"                    >'Q','CLDLIQ','CLDICE','RAINQM','SNOWQM'         </water_species_in_air>
 <water_species_in_air microphys="mg3"                    >'Q','CLDLIQ','CLDICE','RAINQM','SNOWQM','GRAUQM'</water_species_in_air>
 
-<compute_enthalpy_flux> .false. </compute_enthalpy_flux>
+<enthalpy_flux_method> 0 </enthalpy_flux_method>
 
 <!-- ================================================================== -->
 <!-- Defaults for FV3                                                   -->
