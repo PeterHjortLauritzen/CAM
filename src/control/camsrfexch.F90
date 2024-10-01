@@ -445,6 +445,7 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
    !
    real(r8), dimension(:,:), pointer            :: enthalpy_prec_ac
    real(r8), dimension(pcols)                   :: fliq_tot, fice_tot
+   real(r8), dimension(pcols)                   :: tmp
    real(r8), dimension(pcols,num_enthalpy_vars) :: enthalpy_prec_bc
 
    character(len=*), parameter :: sub = 'cam_export'
@@ -504,9 +505,9 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
          !
          ! ->Change enthalpy flux to sign convention of ocean model and change to liquid reference state
          !
-         cam_out%hsnow (:ncol) = -cam_out%hsnow(:ncol) -fice_tot(:ncol)*tmelt*cpice
+         cam_out%hsnow (:ncol) = -cam_out%hsnow(:ncol) -fice_tot(:ncol)*tmelt*cpliq
          cam_out%hrain (:ncol) = -cam_out%hrain(:ncol) -fliq_tot(:ncol)*tmelt*cpliq
-         cam_out%hevap(:ncol)  = -cam_out%hevap(:ncol)+cam_in%cflx(:ncol,1)*tmelt*cpwv
+         cam_out%hevap(:ncol)  = -cam_out%hevap(:ncol)+cam_in%cflx(:ncol,1)*tmelt*cpliq
       case(1)
          !
          ! we only know total entalphy flux - add in rain field
@@ -529,11 +530,12 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
       call pbuf_set_field(pbuf, enthalpy_prec_bc_idx, enthalpy_prec_bc)
       call pbuf_set_field(pbuf, enthalpy_evap_idx, cam_out%hevap)
 
-
-
-      call outfld("hsnow_liq_ref"  , cam_out%hsnow, pcols   ,lchnk   )!xxx debug
-      call outfld("hrain_liq_ref"  , cam_out%hrain, pcols   ,lchnk   )!xxx debug
-      call outfld("hevap_liq_ref"  , cam_out%hevap, pcols   ,lchnk   )!xxx debug
+      tmp(:ncol) = cam_out%hsnow(:ncol)*cam_in%ocnfrac(:ncol)
+      call outfld("hsnow_liq_ref"  , tmp, pcols   ,lchnk   )!xxx debug
+      tmp(:ncol) = cam_out%hrain(:ncol)*cam_in%ocnfrac(:ncol)
+      call outfld("hrain_liq_ref"  ,  tmp, pcols   ,lchnk   )!xxx debug
+      tmp(:ncol) = cam_out%hevap(:ncol)*cam_in%ocnfrac(:ncol)
+      call outfld("hevap_liq_ref"  , tmp, pcols   ,lchnk   )!xxx debug
    else
       call get_prec_vars(ncol,pbuf,&
            precc_out=cam_out%precc,precl_out=cam_out%precl,&
