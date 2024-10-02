@@ -2530,7 +2530,7 @@ contains
     use constituents,    only: qmin
     use air_composition, only: thermodynamic_active_species_liq_num,thermodynamic_active_species_liq_idx
     use air_composition, only: thermodynamic_active_species_ice_num,thermodynamic_active_species_ice_idx
-    use air_composition, only: enthalpy_flux_method, num_enthalpy_vars, cp_or_cv_dycore
+    use air_composition, only: num_enthalpy_vars, cp_or_cv_dycore
     use physics_buffer,  only: pbuf_set_field
     use convect_deep,    only: convect_deep_tend
     use time_manager,    only: is_first_step, get_nstep
@@ -2731,7 +2731,7 @@ contains
     !
     ! compute energy variables for state at the beginning of physics - xxx to be remove
     !
-    if (enthalpy_flux_method) then
+    if (enthalpy_flux_method>0) then
       call get_hydrostatic_energy(state%q(1:ncol,1:pver,1:pcnst),.true.,          &
            state%pdel(1:ncol,1:pver), cp_or_cv_dycore(:ncol,:,lchnk),             &
            state%u(1:ncol,1:pver), state%v(1:ncol,1:pver), state%T(1:ncol,1:pver),&
@@ -2905,7 +2905,7 @@ contains
       !
       ! In first time-step tphysac variables need to be zero'd out
       !
-      if (enthalpy_flux_method) then
+      if (enthalpy_flux_method>0) then
         ifld = pbuf_get_index('ENTHALPY_PREC_AC', errcode=i)
         if (ifld>0) call pbuf_set_field(pbuf, ifld, 0._r8)
       end if

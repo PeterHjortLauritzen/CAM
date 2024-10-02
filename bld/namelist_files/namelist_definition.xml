@@ -7942,7 +7942,7 @@ Default: Set by build-namelist.
 <entry id="enthalpy_flux_method" type="integer"  category="physconst"
        group="air_composition_nl" valid_values="0,1,2" >
 Enthalpy flux method used to compute enthalpy flux for CAM and other components
-Default: -1
+Default: 0
 </entry>
 
 <!-- SE dycore -->

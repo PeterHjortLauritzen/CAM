@@ -1,4 +1,3 @@
-!#define temperature_rain_snow
 module check_energy
 
 !---------------------------------------------------------------------------------
@@ -1092,7 +1091,7 @@ end subroutine check_energy_get_integrals
     ! compute precipitation enthalpy fluxes
     !
     select case (enthalpy_flux_method)
-    case(-1)
+    case(0)
        !
        !***************************************************
        ! no explicit enthalpy flux option
@@ -1138,9 +1137,10 @@ end subroutine check_energy_get_integrals
           ! else: do nothing for dycores with energy consistent with CAM physics
           !
        end if
-    case(0)
+    case(1)
        !
        !**********************************************************************
+       !
        ! replicate code in CAM from coupler
        !
        ! note liquid reference state which is inconsistent with atmosphere
@@ -1215,7 +1215,7 @@ end subroutine check_energy_get_integrals
           tend%dtdt(:ncol,:)                = scale_cpdry_cpdycore(:ncol,:)*tend%dtdt(:ncol,:)
        end if
        call outfld("enth_prec_ac_hliq"  , enthalpy_prec_ac(:,hliq_idx)     , pcols   ,lchnk   )
-    case(1)
+    case(2)
        !
        ! compute dycore energy
        !

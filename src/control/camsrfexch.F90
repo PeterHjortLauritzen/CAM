@@ -487,7 +487,7 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
       ! compute precipitation enthalpy fluxes from tphysbc
       !
       select case (enthalpy_flux_method)
-      case(0)
+      case(1)
          !
          ! CESM3 development option using cpliq for all species and SST temperature
          !
@@ -508,7 +508,7 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
          cam_out%hsnow (:ncol) = -cam_out%hsnow(:ncol)!xxx -fice_tot(:ncol)*tmelt*cpliq
          cam_out%hrain (:ncol) = -cam_out%hrain(:ncol)!xxx -fliq_tot(:ncol)*tmelt*cpliq
          cam_out%hevap(:ncol)  = -cam_out%hevap(:ncol)!xxx +cam_in%cflx(:ncol,1)*tmelt*cpliq
-      case(1)
+      case(2)
          !
          ! we only know total entalphy flux - add in rain field
          !
