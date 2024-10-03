@@ -1153,8 +1153,8 @@ end subroutine check_energy_get_integrals
        ! compute total enthalpy flux
        !
        enthalpy_flux_tot(:ncol) = enthalpy_prec_bc(:ncol,hliq_idx)+enthalpy_prec_bc(:ncol,hice_idx)+&
-            enthalpy_prec_ac(:ncol,hliq_idx)+enthalpy_prec_ac(:ncol,hice_idx)+&
-            enthalpy_evap(:ncol)
+                                  enthalpy_prec_ac(:ncol,hliq_idx)+enthalpy_prec_ac(:ncol,hice_idx)+&
+                                  enthalpy_evap(:ncol)
        !
        ! make sure energy fixer does not fix enthalpy flux passed to ocean
        !

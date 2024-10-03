@@ -417,7 +417,6 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
    use cam_control_mod,  only: simple_phys
    use air_composition,  only: hliq_idx, hice_idx, fliq_idx, fice_idx
    use air_composition,  only: enthalpy_flux_method, num_enthalpy_vars, enthalpy_flux_method
-   use cam_history,      only: outfld!xxx debug
    implicit none
 
    ! Input arguments
@@ -497,6 +496,7 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
          ! compute evaporation enthalpy flux
          !
          cam_out%hevap(:ncol) = cam_in%cflx(:ncol,1)*cpliq*(cam_in%ts(:ncol)-tmelt)
+         enthalpy_evap(:ncol) = cam_out%hevap(:ncol)! set physics buffer variable
          !
          ! Compute enthalpy fluxes for the coupler:
          !
