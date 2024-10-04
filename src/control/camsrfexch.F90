@@ -496,7 +496,6 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
          ! compute evaporation enthalpy flux
          !
          cam_out%hevap(:ncol) = cam_in%cflx(:ncol,1)*cpliq*(cam_in%ts(:ncol)-tmelt)
-         enthalpy_evap(:ncol) = cam_out%hevap(:ncol)! set physics buffer variable
          !
          ! Compute enthalpy fluxes for the coupler:
          !
@@ -528,7 +527,7 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
       end select
 
       call pbuf_set_field(pbuf, enthalpy_prec_bc_idx, enthalpy_prec_bc)
-      call pbuf_set_field(pbuf, enthalpy_evap_idx, cam_out%hevap)
+      call pbuf_set_field(pbuf, enthalpy_evap_idx, -cam_out%hevap)!use sign for atmosphere
 
       tmp(:ncol) = cam_out%hsnow(:ncol)*cam_in%ocnfrac(:ncol)
       call outfld("hsnow_liq_ref"  , tmp, pcols   ,lchnk   )!xxx debug
