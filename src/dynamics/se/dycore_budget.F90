@@ -376,8 +376,8 @@ subroutine print_budget(hstwr)
 !        end if
       end if
     else
-      write(iulog,'(a47,F6.2,a6)')" dE/dt physics tendency in dynamics (dBD-dAF)   ",dEdt_phys_total_in_dyn(1)," W/M^2"
-      write(iulog,'(a47,F6.2,a6)')" dE/dt physics tendency in physics  (dyAM-dyBF) ",dEdt_phys_total_dynE(1)," W/M^2"
+      write(iulog,'(a58,F6.2,a6)')" dE/dt physics tendency+efix+dme in dynamics (dBD-dAF)   ",dEdt_phys_total_in_dyn(1)," W/M^2"
+      write(iulog,'(a58,F6.2,a6)')" dE/dt physics tendency+efix+dme in physics  (dyAM-dyBF) ",dEdt_phys_total_dynE(1)," W/M^2"
       write(iulog,*)" "
       write(iulog,*) " When runnig with a physics grid this consistency check does not make sense"
       write(iulog,*) " since it is computed on the GLL grid whereas we enforce energy conservation"

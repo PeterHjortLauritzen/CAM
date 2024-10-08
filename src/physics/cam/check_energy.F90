@@ -1120,8 +1120,7 @@ end subroutine check_energy_get_integrals
        !
        call cam_thermo_water_update(state%q(:ncol,:,:), lchnk, ncol, vc_dycore,&
             to_dry_factor=state%pdel(:ncol,:)/state%pdeldry(:ncol,:))
-       call tot_energy_phys(state, 'phAM')
-       call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
+
 
        if (vc_dycore == vc_height.or.vc_dycore == vc_dry_pressure) then
           !
@@ -1160,16 +1159,17 @@ end subroutine check_energy_get_integrals
        !
        state%te_cur(:ncol,dyn_te_idx) = state%te_cur(:ncol,dyn_te_idx)+ztodt*enthalpy_flux_tot(:ncol)*cam_in%ocnfrac(:ncol)
        !
+       ! save state for energy fixer
+       !
+       call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
+       !
        ! diagnostics
        !
        dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*cam_in%ocnfrac(:ncol)
        call outfld ('enth_flux_to_ocn' , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
        dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*(1.0_r8-cam_in%ocnfrac(:ncol))
        call outfld ('enth_flux_to_not_ocn' , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
-       !
-       ! save state for energy fixer
-       !
-       call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
+
        !
        ! compute dycore energy
        !
@@ -1204,7 +1204,8 @@ end subroutine check_energy_get_integrals
        if (thermo_budget_history) then
           call tot_energy_phys(state, 'phAM')
           call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
-       endif
+       end if
+
        if (vc_dycore == vc_height.or.vc_dycore == vc_dry_pressure) then
           !
           ! scale for dycore consistency
@@ -1260,16 +1261,18 @@ end subroutine check_energy_get_integrals
        dEdt_cpdycore(:ncol) = (se(:ncol)-se_endphys(:ncol))/ztodt
        call outfld ('dEdt_cpdycore'           , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
        !
-       ! dme adjust diagnostics
-       !
-       if (thermo_budget_history) then
-          call tot_energy_phys(state, 'phAM')
-          call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
-       endif
-       !
        ! save state for energy fixer
        !
        call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
+       if (thermo_budget_history) then
+          call tot_energy_phys(state, 'phAM')
+          call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
+       end if
+    if (thermo_budget_history) then
+       call tot_energy_phys(state, 'phAM')
+       call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
+    end if!xxx
+
        if (vc_dycore == vc_height.or.vc_dycore == vc_dry_pressure) then
           !
           ! scale for dycore consistency

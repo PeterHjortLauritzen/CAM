@@ -11,7 +11,7 @@ setenv PBS_ACCOUNT P93300642
 #set src="cam_development"
 
 set src="cam_enth_simple"   #cam_enthalpy"
-set caze=enthalpy_flux_method_1
+set caze=new_enthalpy_flux_method_1
 #set caze=cam_enth_simple_ocnfrc_zmconv_ke_1E-5
 #set caze=cam_enth_simple_ocnfrc_efix
 #set caze=cam_enth_simple_ocnfrc_cpstar
@@ -65,7 +65,7 @@ cd $scratch/$USER/$caze
 #
 #
 #
-echo "compute_enthalpy_flux = .true."                >> user_nl_cam
+echo "enthalpy_flux_method = 1"                >> user_nl_cam
 echo "mfilt    =       0,       5,     20,      40,      12,       120,      1,   1,12"                >> user_nl_cam
 echo "nhtfrq              =       0,     -24,    -24,      -3,       0,       -2,      0,  -8760,0,0"   >> user_nl_cam
 echo "ndens               =       2,       2,      2,       2,       2,       1,      2,   1,1"       >> user_nl_cam
