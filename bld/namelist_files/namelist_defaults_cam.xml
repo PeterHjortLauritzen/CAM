@@ -241,7 +241,8 @@
 
 <ncdata dyn="se" hgrid="ne240np4" nlev="30"             ic_ymd="101" >atm/cam/inic/homme/cami-mam3_0000-01-ne240np4_L30_c111004.nc</ncdata>
 
-<ncdata dyn="se" hgrid="ne16np4"  nlev="49"  mars="1"  >atm/cam/inic/se/Mars_ne16_ne16_mg17_L49.cam.i.0001-04-01-00000.nc</ncdata>
+<!-- <ncdata dyn="se" hgrid="ne16np4"  nlev="49"  mars="1"  >atm/cam/inic/se/Mars_ne16_ne16_mg17_L49.cam.i.0001-04-01-00000.nc</ncdata> -->
+<ncdata dyn="se" hgrid="ne16np4"  nlev="49"  mars="1"  >atm/cam/inic/se/init.HS.no-topo.nc</ncdata>
 
 <ncdata dyn="se" hgrid="ne5np4"  nlev="26"  aquaplanet="1" ic_ymd="101" >atm/cam/inic/se/ape_cam4_ne5np4_L26_c170517.nc</ncdata>
 <ncdata dyn="se" hgrid="ne16np4"  nlev="26"  aquaplanet="1" ic_ymd="101" >atm/cam/inic/se/ape_cam4_ne16np4_L26_c170417.nc</ncdata>
@@ -344,6 +345,7 @@
 <scale_dry_air_mass phys="cam7"                                                    >  98288.0D0 </scale_dry_air_mass>
 <scale_dry_air_mass phys="spcam_m2005"                                             >  98288.0D0 </scale_dry_air_mass>
 <scale_dry_air_mass phys="spcam_sam1mom"                                           >  98288.0D0 </scale_dry_air_mass>
+<scale_dry_air_mass mars="1"                                                       >      0.0D0 </scale_dry_air_mass>
 
 <!-- Ridge parameterization (gamma) -->
 <bnd_rdggm hgrid="0.9x1.25">atm/cam/topo/fv_0.9x1.25_nc3000_Nsw006_Nrs002_Co008_Fi001_ZR_c160505.nc</bnd_rdggm>
@@ -448,19 +450,57 @@
 <bam_SSLTA rad="socrates">atm/cam/physprops/ssam_camrt_c080918.nc</bam_SSLTA>
 <bam_SSLTC rad="socrates">atm/cam/physprops/sscm_camrt_c080918.nc</bam_SSLTC>
 
+<!-- CAM-Chem bulk aerosols (different aerosol names used in prescribed and prognostic modes) -->
+<!-- Optics for CAM-EXORT - These were just copied to get CAM-MARS running -->
+<bam_sulf  rad="exort">atm/cam/physprops/sulfate_camrt_c080918.nc</bam_sulf>
+<bam_SO4   rad="exort">atm/cam/physprops/sulfate_camrt_c080918.nc</bam_SO4>
+<bam_dust1 rad="exort">atm/cam/physprops/dust1_camrt_c120518.nc</bam_dust1>
+<bam_DST01 rad="exort">atm/cam/physprops/dust1_camrt_c120518.nc</bam_DST01>
+<bam_dust2 rad="exort">atm/cam/physprops/dust2_camrt_c120518.nc</bam_dust2>
+<bam_DST02 rad="exort">atm/cam/physprops/dust2_camrt_c120518.nc</bam_DST02>
+<bam_dust3 rad="exort">atm/cam/physprops/dust3_camrt_c120518.nc</bam_dust3>
+<bam_DST03 rad="exort">atm/cam/physprops/dust3_camrt_c120518.nc</bam_DST03>
+<bam_dust4 rad="exort">atm/cam/physprops/dust4_camrt_c120518.nc</bam_dust4>
+<bam_DST04 rad="exort">atm/cam/physprops/dust4_camrt_c120518.nc</bam_DST04>
+<bam_bcar1 rad="exort">atm/cam/physprops/bcpho_camrt_c080918.nc</bam_bcar1>
+<bam_CB1   rad="exort">atm/cam/physprops/bcpho_camrt_c080918.nc</bam_CB1>
+<bam_bcar2 rad="exort">atm/cam/physprops/bcphi_camrt_c080918.nc</bam_bcar2>
+<bam_CB2   rad="exort">atm/cam/physprops/bcphi_camrt_c080918.nc</bam_CB2>
+<bam_ocar1 rad="exort">atm/cam/physprops/ocpho_camrt_c080918.nc</bam_ocar1>
+<bam_OC1   rad="exort">atm/cam/physprops/ocpho_camrt_c080918.nc</bam_OC1>
+<bam_ocar2 rad="exort">atm/cam/physprops/ocphi_camrt_c080918.nc</bam_ocar2>
+<bam_OC2   rad="exort">atm/cam/physprops/ocphi_camrt_c080918.nc</bam_OC2>
+<bam_SSLTA rad="exort">atm/cam/physprops/ssam_camrt_c080918.nc</bam_SSLTA>
+<bam_SSLTC rad="exort">atm/cam/physprops/sscm_camrt_c080918.nc</bam_SSLTC>
+
 <!-- single gas k-coefficients for ExoRT -->
-<k_h2o_file  rad="exort"> atm/cam/physprops/n68_8gpt_h2o_hitran16_Nnu1e4_c25_voigt_noplinth_q0_grrtm.nc</k_h2o_file>
-<k_co2_file  rad="exort"> atm/cam/physprops/n68_8gpt_co2_hitran16_Nnu1e4_c500_subL_q1_grrtm.nc</k_co2_file>
-<k_ch4_file  rad="exort"> atm/cam/physprops/n68_8gpt_ch4_hitran16_Nnu1e4_c25_voigt_q0_grrtm.nc</k_ch4_file>
-<k_c2h6_file rad="exort"> atm/cam/physprops/n68_8gpt_c2h6_hitran16_Nnu1e4_c25_voigt_q0_grrtm.nc</k_c2h6_file>
-<kh2o_mtckd_file rad="exort"> atm/cam/physprops/KH2O_MTCKD3.3_SELF.FRGN_n68_ngauss.nc</kh2o_mtckd_file>
-<kn2n2cia_file rad="exort"> atm/cam/physprops/N2-N2_cia_n68.nc</kn2n2cia_file>
-<kn2h2cia_file rad="exort"> atm/cam/physprops/N2-H2_cia_n68.nc</kn2h2cia_file>
-<kh2h2cia_file rad="exort"> atm/cam/physprops/H2-H2_cia_n68.nc</kh2h2cia_file>
-<kco2co2cia_sw_file rad="exort"> atm/cam/physprops/CO2-CO2_cia_sw_n68.nc</kco2co2cia_sw_file>
-<kco2co2cia_lw_file rad="exort"> atm/cam/physprops/CO2-CO2_cia_lw_n68.nc</kco2co2cia_lw_file>
-<kco2ch4cia_file rad="exort"> atm/cam/physprops/CO2-CH4_cia_n68.nc</kco2ch4cia_file>
-<kco2h2cia_file rad="exort"> atm/cam/physprops/CO2-H2_cia_n68.nc</kco2h2cia_file>
+<solar_file rad="exort">src/physics/exo-rt/ext/data/solar/G2V_SUN_n68.nc</solar_file>
+<cldoptsL_file rad="exort">src/physics/exo-rt/ext/data/cloud/cloudoptics_h2o_liquid_mie_n84.nc</cldoptsL_file>
+<cldoptsI_file rad="exort">src/physics/exo-rt/ext/data/cloud/cloudoptics_h2o_ice_mie_n84.nc</cldoptsI_file>
+<k_h2o_file  rad="exort">src/physics/exo-rt/ext/data/kdist/n68h2o/hitran2016/n68_8gpt_h2o_hitran16_Nnu1e4_c25_voigt_noplinth_q0_grrtm.nc</k_h2o_file>
+<k_co2_file  rad="exort">src/physics/exo-rt/ext/data/kdist/n68co2/hitran2016/n68_8gpt_co2_hitran16_Nnu1e4_c500_subL_q1_grrtm.nc</k_co2_file>
+<k_o2_file  rad="exort">src/physics/exo-rt/ext/data/kdist/n68o2/n68_8gpt_o2_hitran20_Nnu1e4_c25_voigt_q0_grrtm.nc</k_o2_file>
+<k_o3_file  rad="exort">src/physics/exo-rt/ext/data/kdist/n68o3/n68_8gpt_o3_hitran20_Nnu1e4_c25_voigt_q0_ubremen_SW_xsect_grrtm.nc</k_o3_file>
+<k_ch4_file  rad="exort">src/physics/exo-rt/ext/data/kdist/n68ch4/hitran2016/n68_8gpt_ch4_hitran16_Nnu1e4_c25_voigt_q0_grrtm.nc</k_ch4_file>
+<k_c2h6_file rad="exort">src/physics/exo-rt/ext/data/kdist/n68c2h6/hitran2016/n68_8gpt_c2h6_hitran16_Nnu1e4_c25_voigt_q0_grrtm.nc</k_c2h6_file>
+<kh2o_mtckd_file rad="exort">src/physics/exo-rt/ext/data/continuum/KH2O_MTCKD3.3_SELF.FRGN_n68_ngauss.nc</kh2o_mtckd_file>
+<kn2n2cia_file rad="exort">src/physics/exo-rt/ext/data/cia/n68equiv/N2-N2_cia_n68.nc</kn2n2cia_file>
+<kn2h2cia_file rad="exort">src/physics/exo-rt/ext/data/cia/n68equiv/N2-H2_cia_n68.nc</kn2h2cia_file>
+<kh2h2cia_file rad="exort">src/physics/exo-rt/ext/data/cia/n68equiv/H2-H2_cia_n68.nc</kh2h2cia_file>
+<kco2co2cia_sw_file rad="exort">src/physics/exo-rt/ext/data/cia/n68equiv/CO2-CO2_cia_sw_n68.nc</kco2co2cia_sw_file>
+<kco2co2cia_lw_file rad="exort">src/physics/exo-rt/ext/data/cia/n68equiv/CO2-CO2_cia_lw_n68.nc</kco2co2cia_lw_file>
+<kco2ch4cia_file rad="exort">src/physics/exo-rt/ext/data/cia/n68equiv/CO2-CH4_cia_n68.nc</kco2ch4cia_file>
+<kco2h2cia_file rad="exort">src/physics/exo-rt/ext/data/cia/n68equiv/CO2-H2_cia_n68.nc</kco2h2cia_file>
+<ko2o2cia_file rad="exort">src/physics/exo-rt/ext/data/cia/n68equiv/O2-O2_cia_n68.nc</ko2o2cia_file>
+<ko2n2cia_file rad="exort">src/physics/exo-rt/ext/data/cia/n68equiv/O2-N2_cia_n68.nc</ko2n2cia_file>
+<ko2co2cia_file rad="exort">src/physics/exo-rt/ext/data/cia/n68equiv/O2-CO2_cia_n68.nc</ko2co2cia_file>
+
+<do_exo_rt_spectral rad="exort"> .true. </do_exo_rt_spectral>
+<do_exo_rt_clearsky rad="exort"> .true. </do_exo_rt_clearsky>
+<do_exo_rt_optimize_bands rad="exort"> .true. </do_exo_rt_optimize_bands>
+<do_exo_rt rad="exort"> .true. </do_exo_rt>
+<do_exo_gw rad="exort"> .false. </do_exo_gw>
+<do_exo_synchronous rad="exort"> .false. </do_exo_synchronous>
 
 <!-- CAM-Chem bulk aerosols (different names used in prescribed and prognostic modes) -->
 <!-- Optics for RRTMG -->
@@ -544,6 +584,15 @@
 <mam_ncl  rad="rrtmgp">atm/cam/physprops/ssam_rrtmg_c100508.nc</mam_ncl>
 <mam_dst  rad="rrtmgp">atm/cam/physprops/dust_aeronet_rrtmg_c141106.nc</mam_dst>
 <mam_nh4  rad="rrtmgp">atm/cam/physprops/sulfate_rrtmg_c080918.nc</mam_nh4>
+<!-- Modal aerosol properties for exort -->
+<mam_so4  rad="exort">atm/cam/physprops/sulfate_rrtmg_c080918.nc</mam_so4>
+<mam_pom  rad="exort" mam="3mode">atm/cam/physprops/ocpho_rrtmg_c101112.nc</mam_pom>
+<mam_pom  rad="exort">atm/cam/physprops/ocpho_rrtmg_c130709.nc</mam_pom>
+<mam_soa  rad="exort">atm/cam/physprops/ocphi_rrtmg_c100508.nc</mam_soa>
+<mam_bc   rad="exort">atm/cam/physprops/bcpho_rrtmg_c100508.nc</mam_bc>
+<mam_ncl  rad="exort">atm/cam/physprops/ssam_rrtmg_c100508.nc</mam_ncl>
+<mam_dst  rad="exort">atm/cam/physprops/dust_aeronet_rrtmg_c141106.nc</mam_dst>
+<mam_nh4  rad="exort">atm/cam/physprops/sulfate_rrtmg_c080918.nc</mam_nh4>
 
 <!-- Eruptive volcanic aerosols  -->
 <VOLC_MMR                        rad="camrt">atm/cam/physprops/volc_camRT_byradius_sigma1.6_c130724.nc</VOLC_MMR>
@@ -558,6 +607,11 @@
 <VOLC_MMR1 rad="rrtmgp">atm/cam/physprops/volc_camRRTMG_byradius_sigma1.6_mode1_c210211.nc</VOLC_MMR1>
 <VOLC_MMR2 rad="rrtmgp">atm/cam/physprops/volc_camRRTMG_byradius_sigma1.6_mode2_c210211.nc</VOLC_MMR2>
 <VOLC_MMR3 rad="rrtmgp">atm/cam/physprops/volc_camRRTMG_byradius_sigma1.2_mode3_c210211.nc</VOLC_MMR3>
+<!-- Eruptive volcanic aerosols for exomars -->
+<VOLC_MMR rad="exort">atm/cam/physprops/volc_camRRTMG_byradius_sigma1.6_c130724.nc</VOLC_MMR>
+<VOLC_MMR1 rad="exort">atm/cam/physprops/volc_camRRTMG_byradius_sigma1.6_mode1_c210211.nc</VOLC_MMR1>
+<VOLC_MMR2 rad="exort">atm/cam/physprops/volc_camRRTMG_byradius_sigma1.6_mode2_c210211.nc</VOLC_MMR2>
+<VOLC_MMR3 rad="exort">atm/cam/physprops/volc_camRRTMG_byradius_sigma1.2_mode3_c210211.nc</VOLC_MMR3>
 
 <!-- Modal optics calculations -->
 <mam3_mode1_file rad="rrtmg">atm/cam/physprops/mam4_mode1_rrtmg_aeronetdust_c141106.nc</mam3_mode1_file>
@@ -618,6 +672,35 @@
 <mam7_mode5_file rad="rrtmgp">atm/cam/physprops/mam7_mode5_rrtmg_c120904.nc</mam7_mode5_file>
 <mam7_mode6_file rad="rrtmgp">atm/cam/physprops/mam7_mode6_rrtmg_c120904.nc</mam7_mode6_file>
 <mam7_mode7_file rad="rrtmgp">atm/cam/physprops/mam7_mode7_rrtmg_c120904.nc</mam7_mode7_file>
+<!-- Modal optics for EXORT -->
+<mam3_mode1_file rad="exort">atm/cam/physprops/mam4_mode1_rrtmg_aeronetdust_c141106.nc</mam3_mode1_file>
+<mam3_mode2_file rad="exort">atm/cam/physprops/mam4_mode2_rrtmg_aitkendust_c141106.nc </mam3_mode2_file>
+<mam3_mode3_file rad="exort">atm/cam/physprops/mam4_mode3_rrtmg_aeronetdust_c141106.nc</mam3_mode3_file>
+
+<mam3_mode1_file rad="exort" ver="strat">atm/cam/physprops/mam4_mode1_rrtmg_aeronetdust_sig1.6_dgnh.48_c140304.nc</mam3_mode1_file>
+<mam3_mode3_file rad="exort" ver="strat">atm/cam/physprops/mam4_mode3_rrtmg_aeronetdust_sig1.2_dgnl.40_c150219.nc</mam3_mode3_file>
+
+<mam4_mode1_file rad="exort">atm/cam/physprops/mam4_mode1_rrtmg_aeronetdust_c141106.nc</mam4_mode1_file>
+<mam4_mode2_file rad="exort">atm/cam/physprops/mam4_mode2_rrtmg_aitkendust_c141106.nc</mam4_mode2_file>
+<mam4_mode3_file rad="exort">atm/cam/physprops/mam4_mode3_rrtmg_aeronetdust_c141106.nc</mam4_mode3_file>
+<mam4_mode4_file rad="exort">atm/cam/physprops/mam4_mode4_rrtmg_c130628.nc</mam4_mode4_file>
+
+<mam4_mode1_file rad="exort" ver="strat">atm/cam/physprops/mam4_mode1_rrtmg_aeronetdust_sig1.6_dgnh.48_c140304.nc</mam4_mode1_file>
+<mam4_mode3_file rad="exort" ver="strat">atm/cam/physprops/mam4_mode3_rrtmg_aeronetdust_sig1.2_dgnl.40_c150219.nc</mam4_mode3_file>
+
+<mam5_mode1_file rad="exort" ver="strat">atm/cam/physprops/mam4_mode1_rrtmg_aeronetdust_sig1.6_dgnh.48_c140304.nc</mam5_mode1_file>
+<mam5_mode2_file rad="exort" ver="strat">atm/cam/physprops/mam4_mode2_rrtmg_aitkendust_c141106.nc</mam5_mode2_file>
+<mam5_mode3_file rad="exort" ver="strat">atm/cam/physprops/mam4_mode3_rrtmg_aeronetdust_c141106.nc</mam5_mode3_file>
+<mam5_mode4_file rad="exort" ver="strat">atm/cam/physprops/mam4_mode4_rrtmg_c130628.nc</mam5_mode4_file>
+<mam5_mode5_file rad="exort" ver="strat">atm/cam/physprops/mam4_mode3_rrtmg_aeronetdust_sig1.2_dgnl.40_c150219.nc</mam5_mode5_file>
+
+<mam7_mode1_file rad="exort">atm/cam/physprops/mam7_mode1_rrtmg_c120904.nc</mam7_mode1_file>
+<mam7_mode2_file rad="exort">atm/cam/physprops/mam7_mode2_rrtmg_c120904.nc</mam7_mode2_file>
+<mam7_mode3_file rad="exort">atm/cam/physprops/mam7_mode3_rrtmg_c120904.nc</mam7_mode3_file>
+<mam7_mode4_file rad="exort">atm/cam/physprops/mam7_mode4_rrtmg_c120904.nc</mam7_mode4_file>
+<mam7_mode5_file rad="exort">atm/cam/physprops/mam7_mode5_rrtmg_c120904.nc</mam7_mode5_file>
+<mam7_mode6_file rad="exort">atm/cam/physprops/mam7_mode6_rrtmg_c120904.nc</mam7_mode6_file>
+<mam7_mode7_file rad="exort">atm/cam/physprops/mam7_mode7_rrtmg_c120904.nc</mam7_mode7_file>
 
 <water_refindex_file>atm/cam/physprops/water_refindex_rrtmg_c080910.nc</water_refindex_file>
 
@@ -3131,6 +3214,7 @@
 <fv3_nwat phys="kessler"                                                    > 3         </fv3_nwat>
 <fv3_nwat phys="tj2016"                                                     > 1         </fv3_nwat>
 <fv3_nwat phys="grayrad"                                                    > 1         </fv3_nwat>
+<fv3_nwat phys="simple_mars"                                                > 1         </fv3_nwat>
 <fv3_fv_sg_adj                                                              > 0         </fv3_fv_sg_adj>
 <fv3_grid_type                                                              > 0         </fv3_grid_type>
 <fv3_hord_dp        dyn="fv3"                                               > -10        </fv3_hord_dp>
@@ -3193,7 +3277,7 @@
 <se_hypervis_scaling se_refined_mesh="1" hypervis_type="tensor" >3.22D0 </se_hypervis_scaling>
 
 <se_hypervis_subcycle                                            > 3 </se_hypervis_subcycle>
-<se_hypervis_subcycle  mars="1"                                  > 8 </se_hypervis_subcycle>
+<se_hypervis_subcycle  mars="1"                                  > 10 </se_hypervis_subcycle>
 <se_hypervis_subcycle  waccm_phys="1"                                           > 2 </se_hypervis_subcycle>
 <se_hypervis_subcycle  hgrid="ne16np4"                                          > 4 </se_hypervis_subcycle>
 <se_hypervis_subcycle  hgrid="ne16np4"  waccm_phys="1" waccmx="0"               > 9 </se_hypervis_subcycle>
@@ -3238,14 +3322,20 @@
 <se_nu_top waccmx="1"                        > 1.0e6 </se_nu_top>
 <se_nu_top model_top="mt"                    > 1.0e6 </se_nu_top>
 <se_nu_top waccm_phys="1"                    > 1.0e6 </se_nu_top>
+<se_nu_top mars="1"                          > 1.0e6 </se_nu_top>
 
 <se_molecular_diff               >  0.0 </se_molecular_diff>
 <se_molecular_diff waccmx="1"    >  1.0 </se_molecular_diff>
 
 <se_sponge_del4_nu_fac    > -1 </se_sponge_del4_nu_fac>
+<se_sponge_del4_nu_fac mars="1"   > 5.0 </se_sponge_del4_nu_fac>
+
 <se_sponge_del4_nu_div_fac> -1 </se_sponge_del4_nu_div_fac>
 <se_sponge_del4_nu_div_fac hgrid="ne16np4" waccm_phys="1" waccmx="0"> 7.5 </se_sponge_del4_nu_div_fac>
-<se_sponge_del4_lev       > -1 </se_sponge_del4_lev>
+<se_sponge_del4_nu_div_fac mars="1" > 7.5 </se_sponge_del4_nu_div_fac>
+
+<se_sponge_del4_lev           > -1 </se_sponge_del4_lev>
+<se_sponge_del4_lev  mars="1" >  5 </se_sponge_del4_lev>
 
 <se_qsplit > 1 </se_qsplit>
 

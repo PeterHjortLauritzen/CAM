@@ -480,7 +480,7 @@ if ($phys eq 'adiabatic') {
     ++$phys_mode_flags;
 }
 my $ideal_mode = 0;
-if ($phys eq 'kessler' or $phys eq 'held_suarez' or $phys eq 'tj2016' or $phys eq 'grayrad' ) {
+if ($phys eq 'kessler' or $phys eq 'held_suarez' or $phys eq 'tj2016' or $phys eq 'grayrad'  or $phys eq 'simple_mars' ) {
     $ideal_mode = 1;
     ++$phys_mode_flags;
 }
@@ -711,6 +711,119 @@ elsif ($rad_pkg =~ m/rrtmgp/) {
     my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
     $nl->set_variable_value('radiation_nl', 'rrtmgp_coefs_sw_file', $abs_path);
 }
+elsif ($rad_pkg =~ m/exort/) {
+    # Dataset for exort k coefficient files are checked out of an external repo into
+    # the source code directory.  The paths to this data are relative
+    # to the root directory of the cam component.
+    my $cam_dir = $cfg->get('cam_dir');
+
+    add_default($nl, 'cldoptsL_file');
+    my $rel_path = $nl->get_value('cldoptsL_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'cldoptsL_file', $abs_path);
+
+    add_default($nl, 'cldoptsI_file');
+    my $rel_path = $nl->get_value('cldoptsI_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'cldoptsI_file', $abs_path);
+
+    add_default($nl, 'solar_file');
+    my $rel_path = $nl->get_value('solar_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'solar_file', $abs_path);
+
+    add_default($nl, 'k_h2o_file');
+    my $rel_path = $nl->get_value('k_h2o_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'k_h2o_file', $abs_path);
+
+    add_default($nl, 'k_co2_file');
+    my $rel_path = $nl->get_value('k_co2_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'k_co2_file', $abs_path);
+
+    add_default($nl, 'k_o2_file');
+    my $rel_path = $nl->get_value('k_o2_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'k_o2_file', $abs_path);
+
+    add_default($nl, 'k_o3_file');
+    my $rel_path = $nl->get_value('k_o3_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'k_o3_file', $abs_path);
+
+    add_default($nl, 'k_ch4_file');
+    my $rel_path = $nl->get_value('k_ch4_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'k_ch4_file', $abs_path);
+
+    add_default($nl, 'k_c2h6_file');
+    my $rel_path = $nl->get_value('k_c2h6_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'k_c2h6_file', $abs_path);
+
+    add_default($nl, 'kh2o_mtckd_file');
+    my $rel_path = $nl->get_value('kh2o_mtckd_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'kh2o_mtckd_file', $abs_path);
+
+    add_default($nl, 'kn2n2cia_file');
+    my $rel_path = $nl->get_value('kn2n2cia_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'kn2n2cia_file', $abs_path);
+
+    add_default($nl, 'kn2h2cia_file');
+    my $rel_path = $nl->get_value('kn2h2cia_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'kn2h2cia_file', $abs_path);
+
+    add_default($nl, 'kh2h2cia_file');
+    my $rel_path = $nl->get_value('kh2h2cia_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'kh2h2cia_file', $abs_path);
+
+    add_default($nl, 'kco2co2cia_sw_file');
+    my $rel_path = $nl->get_value('kco2co2cia_sw_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'kco2co2cia_sw_file', $abs_path);
+
+    add_default($nl, 'kco2co2cia_lw_file');
+    my $rel_path = $nl->get_value('kco2co2cia_lw_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'kco2co2cia_lw_file', $abs_path);
+
+    add_default($nl, 'kco2ch4cia_file');
+    my $rel_path = $nl->get_value('kco2ch4cia_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'kco2ch4cia_file', $abs_path);
+
+    add_default($nl, 'kco2h2cia_file');
+    my $rel_path = $nl->get_value('kco2h2cia_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'kco2h2cia_file', $abs_path);
+
+    add_default($nl, 'ko2o2cia_file');
+    my $rel_path = $nl->get_value('ko2o2cia_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'ko2o2cia_file', $abs_path);
+
+    add_default($nl, 'ko2n2cia_file');
+    my $rel_path = $nl->get_value('ko2n2cia_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'ko2n2cia_file', $abs_path);
+
+    add_default($nl, 'ko2co2cia_file');
+    my $rel_path = $nl->get_value('ko2co2cia_file');
+    my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
+    $nl->set_variable_value('radiation_nl', 'ko2co2cia_file', $abs_path);
+
+    add_default($nl, 'do_exo_rt_spectral');
+    add_default($nl, 'do_exo_rt_clearsky');
+    add_default($nl, 'do_exo_rt_optimize_bands');
+    add_default($nl, 'do_exo_rt');
+    add_default($nl, 'do_exo_synchronous');
+    add_default($nl, 'do_exo_gw');
+}
 
 # Solar irradiance
 
@@ -926,10 +1039,10 @@ if ((($chem =~ /ghg_mam4/) or ($chem =~ /waccm_ma/) or ($chem =~ /waccm_sc_mam/)
     $radval .= ",'N:N2O:N2O','N:CH4:CH4','N:CFC11:CFC11','N:CFC12:CFC12'";
 }
 
-# If Mars add set up for H2O N2 CO2
-#if ($cfg->get('mars')) {
-#    $radval .= ",'A:N2:N2','A:CO2:CO2'";
-#}
+# If Mars add set up rad for CO2
+if ($cfg->get('mars')) {
+    $radval .= ",'A:CO2:CO2'";
+}
 
 # Aerosol contributions to rad_climate
 
@@ -3232,7 +3345,7 @@ if ($cfg->get('microphys') =~ /^mg/) {
         my $abs_path = quote_string(set_abs_filepath($rel_path, $cam_dir));
         #overwrite the relative pathname with the absolute pathname
         $nl->set_variable_value('pumas_stochastic_tau_nl', 'pumas_stochastic_tau_kernel_filename', $abs_path);
-      
+
     }else {
     # For CESM2, the decision was made to set micro_do_sb_physics to false
     # This variable is replaced with micro_mg_warm_rain in cam7 runs
@@ -5085,6 +5198,8 @@ sub check_snapshot_settings {
             push (@validList_bc, ("'thatcher_jablonowski_precip_tend'"));
         } elsif ($phys eq 'grayrad') {
             push (@validList_bc, ("'frierson_tend'"));
+        } elsif ($phys eq 'simple_mars') {
+            push (@validList_bc, ("'mars_tend'"));
         }
         if ($chem ne 'none') {
             push (@validList_bc, ("'chem_timestep_tend'"));

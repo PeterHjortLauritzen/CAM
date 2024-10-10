@@ -307,13 +307,43 @@
 
   <!-- cam mars untested compsets -->
   <compset>
-    <alias>FMARSRRTMG</alias>
-    <lname>2000_CAM%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+    <alias>FMARSC3</alias>
+    <lname>2000_CAM30%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>FMARSC4</alias>
+    <lname>2000_CAM40%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>FMARSC5</alias>
+    <lname>2000_CAM50%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>FMARSC6</alias>
+    <lname>2000_CAM60%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>FMARSC6LND</alias>
+    <lname>2000_CAM60%MARS_CLM50%SP_SICE_SOCN_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>FMARSC6</alias>
+    <lname>2000_CAM60%MARS_CLM50%SP_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
 
   <compset>
     <alias>FMARS</alias>
-    <lname>2000_CAM%MARS%SOCR_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+    <lname>2000_CAM60%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>FMARSC7</alias>
+    <lname>2000_CAM70%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
 
   <compset>
@@ -328,7 +358,7 @@
 
   <compset>
     <alias>FMARSHS94</alias>
-    <lname>2000_CAM%MARS%HS94_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+    <lname>2000_CAM%HS94%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
 
 

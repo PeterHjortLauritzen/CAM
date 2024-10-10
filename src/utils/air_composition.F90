@@ -77,8 +77,12 @@ module air_composition
 
    ! standard dry air (constant composition)
    real(r8), public, protected :: mmro2 = unsetr  ! Mass mixing ratio of O2
+#ifdef planet_mars
+   real(r8), public, protected :: mmrco2 = unsetr  ! Mass mixing ratio of CO2
+#endif
    real(r8), public, protected :: mmrn2 = unsetr  ! Mass mixing ratio of N2
    real(r8), public, protected :: o2_mwi = unsetr ! Inverse mol. weight of O2
+   real(r8), public, protected :: co2_mwi = unsetr ! Inverse mol. weight of O2
    real(r8), public, protected :: n2_mwi = unsetr ! Inverse mol. weight of N2
    real(r8), public, protected :: mbar = unsetr   ! Mean mass at mid level
 
@@ -105,7 +109,7 @@ module air_composition
    real(r8), public, protected, allocatable :: cappav(:,:,:)
    ! mbarv: composition dependent atmosphere mean mass
    real(r8), public, protected, allocatable :: mbarv(:,:,:)
-   ! cp_or_cv_dycore:  enthalpy or internal energy scaling factor for 
+   ! cp_or_cv_dycore:  enthalpy or internal energy scaling factor for
    !                   energy consistency
    real(r8), public, protected, allocatable :: cp_or_cv_dycore(:,:,:)
    !
@@ -271,13 +275,23 @@ CONTAINS
       ice_num = 0
       has_liq = .false.
       has_ice = .false.
+
+#ifdef planet_mars
+      ! mwdry = 43.52 = .97 co2 and .03 n2
+      ! standard dry air (constant composition)
+      n2_mwi = 1._r8 / 28._r8
+      co2_mwi = 1._r8 / 44._r8
+      mmrco2 = 0.981_r8
+      mmrn2  = 0.019_r8
+      mbar = 1._r8 / ((mmrco2 * co2_mwi) + (mmrn2 * n2_mwi))
+#else
       ! standard dry air (constant composition)
       o2_mwi = 1._r8 / 32._r8
       n2_mwi = 1._r8 / 28._r8
       mmro2 = 0.235_r8
       mmrn2 = 0.765_r8
       mbar = 1._r8 / ((mmro2 * o2_mwi) + (mmrn2 * n2_mwi))
-
+#endif
       ! init for variable composition dry air
 
       isize = dry_air_species_num + water_species_in_air_num
@@ -612,6 +626,7 @@ CONTAINS
       ! array initialized by the dycore
       thermodynamic_active_species_ice_idx_dycore = -99
 
+#ifndef planet_mars
       if (water_species_in_air_num /= 1 + liq_num+ice_num) then
          write(iulog, '(2a,2(i0,a))') subname,                                &
               "  water_species_in_air_num = ",                                &
@@ -619,6 +634,7 @@ CONTAINS
               (1 + liq_num + ice_num), " (1 + liq_num + ice_num)"
          call endrun(subname//': water_species_in_air_num /= 1+liq_num+ice_num')
       end if
+#endif
       enthalpy_reference_state = 'ice'
       if (masterproc) then
          write(iulog, *)   'Enthalpy reference state           : ',           &
@@ -674,7 +690,7 @@ CONTAINS
         call get_R(mmr(:ncol,:,:), thermodynamic_active_species_idx, &
              cp_or_cv_dycore(:ncol,:,lchnk), fact=to_dry_factor, Rdry=rairv(:ncol,:,lchnk))
         !
-        ! internal energy coefficient for MPAS 
+        ! internal energy coefficient for MPAS
         ! (equation 92 in Eldred et al. 2023; https://rmets.onlinelibrary.wiley.com/doi/epdf/10.1002/qj.4353)
         !
         cp_or_cv_dycore(:ncol,:,lchnk)=cp_or_cv_dycore(:ncol,:,lchnk)*&

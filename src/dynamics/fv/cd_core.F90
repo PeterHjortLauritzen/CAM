@@ -20,7 +20,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    ! DESCRIPTION:
    !    Perform a dynamical update for one small time step; the small
    !    time step is limitted by the fastest wave within the Lagrangian control-
-   !    volume 
+   !    volume
 
 
    use shr_kind_mod,      only: r8 => shr_kind_r8
@@ -31,6 +31,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    use cam_logfile,       only: iulog
    use spmd_utils,        only: masterproc
    use cam_abortutils,    only: endrun
+   use physconst,         only: ptsd
 
 #if defined( SPMD )
    use mod_comm,      only : mp_send4d_ns, mp_recv4d_ns,     &
@@ -87,13 +88,13 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    logical,  intent(in) :: am_fixer       ! logical switch for fixer (generate out args)
    logical,  intent(in) :: high_order_top ! use uniform 4th order everywhere (incl. model top)
 
-   real(r8), intent(in) ::   & 
+   real(r8), intent(in) ::   &
       cp3vc(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast)         !C_p on yz
-   real(r8), intent(in) ::   & 
+   real(r8), intent(in) ::   &
       cap3vc(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast)        !cappa on yz
-   real(r8), intent(in) ::   & 
+   real(r8), intent(in) ::   &
       cp3v(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km)  ! C_p on xy
-   real(r8), intent(in) ::   & 
+   real(r8), intent(in) ::   &
       cap3v(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km) ! cappa on xy -- on "a" grid
 
    ! Input time independent arrays:
@@ -104,12 +105,12 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 
    ! INPUT/OUTPUT PARAMETERS:
 
-   real(r8), intent(inout) ::   &   
+   real(r8), intent(inout) ::   &
       u(grid%im,grid%jfirst-grid%ng_d:grid%jlast+grid%ng_s,grid%kfirst:grid%klast) ! u-Wind (m/s)
-   real(r8), intent(inout) ::   &   
+   real(r8), intent(inout) ::   &
       v(grid%im,grid%jfirst-grid%ng_s:grid%jlast+grid%ng_d,grid%kfirst:grid%klast) ! v-Wind (m/s)
-   
-   real(r8), intent(inout) ::   & 
+
+   real(r8), intent(inout) ::   &
       delp(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast)          ! Delta pressure (pascal)
    real(r8), intent(inout) ::   &
       pt(grid%im,grid%jfirst-grid%ng_d:grid%jlast+grid%ng_d,grid%kfirst:grid%klast)! Scaled-Pot. temp.
@@ -138,13 +139,13 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8), intent(inout) ::   &
       wz3(grid%im,grid%jfirst-1:grid%jlast  ,grid%kfirst:grid%klast+1)
    real(r8), intent(inout) ::   &
-      pxc(grid%im,grid%jfirst-1:grid%jlast+1,grid%kfirst:grid%klast+1) 
+      pxc(grid%im,grid%jfirst-1:grid%jlast+1,grid%kfirst:grid%klast+1)
    real(r8), intent(inout) ::   &
       wz(grid%im,grid%jfirst-1:grid%jlast+1,grid%kfirst:grid%klast+1)
    real(r8), intent(inout) ::   &
-      pkcc(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast+1) 
+      pkcc(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast+1)
    real(r8), intent(inout) ::   &
-      wzc(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast+1) 
+      wzc(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast+1)
    real(r8), intent(inout) ::   &
       wzxy(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km+1)
    real(r8), intent(inout) ::   &
@@ -155,13 +156,13 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       wzkp(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast+1)
 
    ! OUTPUT PARAMETERS:
-   real(r8), intent(out) ::   & 
+   real(r8), intent(out) ::   &
       pe(grid%im,grid%kfirst:grid%klast+1,grid%jfirst:grid%jlast)         ! Edge pressure (pascal)
    real(r8), intent(out) ::   &
       pk(grid%im,grid%jfirst:grid%jlast,grid%kfirst:grid%klast+1)         ! Pressure to the kappa
-   real(r8), intent(out) ::   & 
+   real(r8), intent(out) ::   &
       ptxy(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km) ! Potential temperature XY decomp
-   real(r8), intent(out) ::   & 
+   real(r8), intent(out) ::   &
       pkxy(grid%ifirstxy:grid%ilastxy,grid%jfirstxy:grid%jlastxy,grid%km+1) ! P-to-the-kappa XY decomp
    real(r8), intent(out) ::   &
       pexy(grid%ifirstxy:grid%ilastxy,grid%km+1,grid%jfirstxy:grid%jlastxy) ! Edge pressure XY decomp
@@ -193,7 +194,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8) ::  ua(grid%im,grid%jfirst-grid%ng_d:grid%jlast+grid%ng_d,grid%kfirst:grid%klast)
    real(r8) ::  va(grid%im,grid%jfirst-grid%ng_s:grid%jlast+grid%ng_d,grid%kfirst:grid%klast)
 
-   real(r8) :: pec(grid%im,grid%kfirst:grid%klast+1,grid%jfirst:grid%jlast) 
+   real(r8) :: pec(grid%im,grid%kfirst:grid%klast+1,grid%jfirst:grid%jlast)
 
    ! Local scalars
    real(r8), parameter ::  D0_0                    =   0.0_r8
@@ -205,8 +206,11 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8), parameter ::  D10_0                   =  10.0_r8
    real(r8), parameter ::  D128_0                  = 128.0_r8
    real(r8), parameter ::  D180_0                  = 180.0_r8
+#ifdef planet_mars
+   real(r8), parameter ::  D1E5                    = ptsd
+#else
    real(r8), parameter ::  D1E5                    = 1.0e5_r8
-
+#endif
    real(r8), parameter ::  ratmax                  = 0.81_r8
    real(r8), parameter ::  tiny                    = 1.0e-10_r8
 
@@ -219,7 +223,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    integer :: ng_c               ! ghost latitudes on C grid
    integer :: ng_d               ! ghost lats on D (Max NS dependencies, ng_d >= ng_c)
    integer :: ng_s               ! max(ng_c+1,ng_d) significant if ng_c = ng_d
-   
+
    integer :: jfirst
    integer :: jlast
    integer :: kfirst
@@ -231,7 +235,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    integer :: npes_yz
 
    integer i, j, k, ml
-   integer js1g1, js2g0, js2g1, jn2g1, js4g0, jn3g0 
+   integer js1g1, js2g0, js2g1, jn2g1, js4g0, jn3g0
    integer jn2g0, jn1g1
    integer iord , jord
 
@@ -258,9 +262,9 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    ! - div24del2flag: 2 for ldiv2 (default), 4 for ldiv4, 42 for ldiv4 + ldel2
    ! - ldiv2 and ldel2 cannot coexist
 
-   logical :: ldiv2 = .true.  
-   logical :: ldiv4 = .false.  
-   logical :: ldel2 = .false.   
+   logical :: ldiv2 = .true.
+   logical :: ldiv4 = .false.
+   logical :: ldel2 = .false.
 
    ! AM correction and fixer
    integer  :: iord_c_min
@@ -274,8 +278,8 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8), pointer :: cosp(:)
    real(r8), pointer :: cose(:)
 
-   real(r8), allocatable :: help(:,:,:) 
-   real(r8), allocatable :: kelp(:,:,:) 
+   real(r8), allocatable :: help(:,:,:)
+   real(r8), allocatable :: kelp(:,:,:)
    real(r8), allocatable :: dpn(:,:,:)
    real(r8), allocatable :: dpo(:,:,:)
    real(r8), allocatable :: dpr(:,:,:)
@@ -284,7 +288,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    real(r8), allocatable :: ddus(:,:)
 
    ! referenced outside AM conditional even though it's not used
-   real(r8) :: ddpa(grid%im,grid%jfirst-1:grid%jlast  ,grid%kfirst:grid%klast  ) 
+   real(r8) :: ddpa(grid%im,grid%jfirst-1:grid%jlast  ,grid%kfirst:grid%klast  )
    real(r8) :: ddu( grid%im,grid%jfirst  :grid%jlast  ,grid%kfirst:grid%klast  )
    real(r8) :: vf(  grid%im,grid%jfirst-2:grid%jlast+2,grid%kfirst:grid%klast  )   ! v-Winds on U points
 
@@ -306,21 +310,21 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    ! Option for which version of geopk to use with yz decomposition.
    ! If geopkdist=false, variables are transposed to/from xy decomposition
    !   for use in geopk.
-   ! If geopkdist=true, either geopk_d or geopk16 is used. Both 
-   !   compute local partial sums in z and then communicate those 
+   ! If geopkdist=true, either geopk_d or geopk16 is used. Both
+   !   compute local partial sums in z and then communicate those
    !   sums to combine them. geopk_d does not try to parallelize in the
    !   z-direction except in a pipeline fashion controlled by the
    !   parameter geopkblocks, and is bit-for-bit the same as the
-   !   transpose-based algorithm. geopk16 exploits z-direction 
-   !   parallelism and requires 16-byte arithmetic (DSIZE=16) 
+   !   transpose-based algorithm. geopk16 exploits z-direction
+   !   parallelism and requires 16-byte arithmetic (DSIZE=16)
    !   to reproduce the same numerics (and to be reproducible with
-   !   respect to process count). The geopk16 default is to use 
+   !   respect to process count). The geopk16 default is to use
    !   8-byte arithmetic (DSIZE=8). This is faster than
    !   16-byte, but also gives up reproducibility. On many systems
-   !   performance of geopk_d is comparable to geopk16 even with 
+   !   performance of geopk_d is comparable to geopk16 even with
    !   8-byte numerics.
-   ! On the last two small timesteps (ipe=1,2 or 1,-2) for D-grid, 
-   !   the version of geopk that uses transposes is called regardless, 
+   ! On the last two small timesteps (ipe=1,2 or 1,-2) for D-grid,
+   !   the version of geopk that uses transposes is called regardless,
    !   as some transposed quantities are required for the te_map phase
    !   and for the calculation of omega.
    ! For non-SPMD mode, geopk_[cd]dist are set to false.
@@ -353,7 +357,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    !     WS   03.10.15:   Fixed hack of 00.04.13 for JORD>1 JCD=1, in clean way
    !     WS   03.12.03:   Added grid as argument, some dynamics_vars removed
    !     WS   04.08.25:   Interface simplified with GRID argument
-   !     WS   04.10.07:   Removed dependency on spmd_dyn; info now in GRID 
+   !     WS   04.10.07:   Removed dependency on spmd_dyn; info now in GRID
    !     WS   05.05.24:   Incorporated OFFLINE_DYN; merge of CAM/GEOS5
    !     PW   05.07.26:   Changes for Cray X1
    !     PW   05.10.12:   More changes for Cray X1(E), avoiding array segment copying
@@ -405,7 +409,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
    ifirstxy = grid%ifirstxy
    jfirstxy = grid%jfirstxy
 
-   if (am_correction .or. am_fixer) then 
+   if (am_correction .or. am_fixer) then
       allocate( &
          help(grid%im,grid%jfirst-1:grid%jlast ,grid%kfirst:grid%klast  ), &
          kelp(grid%im,grid%jfirst-1:grid%jlast ,grid%kfirst:grid%klast  ), &
@@ -413,12 +417,12 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          dpo(grid%im,grid%jfirst  :grid%jlast  ,grid%kfirst:grid%klast  ) )
       acap = 1._r8/4._r8 ! effective AM/MoI contribution from polar caps
    endif
-   if (am_press_crrct) then 
+   if (am_press_crrct) then
       allocate( &
          dpr(grid%im,grid%jfirst-1:grid%jlast+1,grid%kfirst:grid%klast  )  )
       xakap = 1._r8/cap3vc(1,jfirst,kfirst)
    endif
-   if (am_correction) then 
+   if (am_correction) then
       allocate( &
          ddpu(grid%im,grid%jfirst  :grid%jlast ,grid%kfirst:grid%klast  ), &
          dpns(grid%jfirst:grid%jlast,grid%kfirst:grid%klast), &
@@ -563,7 +567,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          end if
 
          do k = kfirst, klast
-         
+
             if (ldel2) then
 
                !***********************************
@@ -588,18 +592,18 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                   ! fac must include dt for the momentum equation
                   ! i.e. diffusion coefficient is fac/dt
                   !
-                  ! del2 diffusion coefficient in spectral core is 2.5e5             
+                  ! del2 diffusion coefficient in spectral core is 2.5e5
                   fac =  tau * dt * del2coef
 
                   ! all these coefficients are necessary because of the staggering of the
                   ! wind components
-                  grid%cdxde(j,k) = fac/(ae*ae*grid%cose(j)*grid%cose(j)*grid%dl*grid%dl) 
+                  grid%cdxde(j,k) = fac/(ae*ae*grid%cose(j)*grid%cose(j)*grid%dl*grid%dl)
                   grid%cdyde(j,k) = fac/(ae*ae*grid%cose(j)*grid%dp*grid%dp)
                end do
 
                do j = js2g0, jn2g1
                   fac =  tau * dt * del2coef
-                  grid%cdxdp(j,k) = fac/(ae*ae*grid%cosp(j)*grid%cosp(j)*grid%dl*grid%dl) 
+                  grid%cdxdp(j,k) = fac/(ae*ae*grid%cosp(j)*grid%cosp(j)*grid%dl*grid%dl)
                   grid%cdydp(j,k) = fac/(ae*ae*grid%cosp(j)*grid%dp*grid%dp)
                end do
             end if
@@ -622,13 +626,13 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                   ! Explanation of divergence damping coeff.
                   ! ========================================
                   !
-                  ! Divergence damping is added to the momentum 
+                  ! Divergence damping is added to the momentum
                   ! equations through a term tau*div where
                   !
-                  !       tau = C*L**2/dt 
+                  !       tau = C*L**2/dt
                   !
                   ! where L is the length scale given by
-                  ! 
+                  !
                   !       L**2 = a**2*dl*dp
                   !
                   ! and divergence is given by
@@ -639,7 +643,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                   !
                   !       divx = (1/(a*cos(p)))*du/dl
                   !       divy = (1/(a*cos(p)))*(d(cos(theta)*v)/dp))
-                  ! 
+                  !
                   ! du and (d(cos(theta*v)/dp)) are computed in sw_core
                   !
                   ! The constant terms in divx*tau and divy*tau are
@@ -657,7 +661,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             if (ldiv4) then
 
                ! 4th-order divergence damping
-               tau4 = 0.01_r8 / (abs(dt)) 
+               tau4 = 0.01_r8 / (abs(dt))
 
                !**************************************
                !
@@ -702,7 +706,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                         wk, wk2 )
          end do
          call FVstopclock(grid,'---C_DELP_LOOP')
-        
+
       end if
 
 #if defined( SPMD )
@@ -778,7 +782,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       call FVbarrierclock(grid,'sync_c_core', grid%commyz)
       call FVstartclock(grid,'---C_CORE')
 
-!$omp parallel do private(i, j, k, iord, jord)    
+!$omp parallel do private(i, j, k, iord, jord)
       do  k = kfirst, klast
 
          if ( k <= kmtp ) then
@@ -1065,7 +1069,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             if (am_press_crrct) then
 
                do i = 1, im
-                  ! AM fix: ensure interior pressure torque vanishes 
+                  ! AM fix: ensure interior pressure torque vanishes
                   wk1(i,j) = pxc(i,j,k  )*max(pxc(i,j,k), tiny)**(xakap - 1.0_r8)
                   wk3(i,j) = pxc(i,j,k+1)**xakap
                   p1d(i)   = wk3(i,j) - wk1(i,j)
@@ -1106,7 +1110,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             end do
 
          end do
-         
+
          call pft2d(uc(1,js2g0,k), grid%sc,       &
                     grid%dc, im, jn2g0-js2g0+1,       &
                     wk, wk2 )
@@ -1201,7 +1205,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       if ( mod(iam+1,npr_y) == 0 ) src = -1
       call mp_send3d( grid%commyz, dest, src, im, jm, km,             &
                       1, im, jfirst-2, jlast+2, kfirst, klast,       &
-                      1, im, jfirst, jfirst, kfirst, klast, vc )            
+                      1, im, jfirst, jfirst, kfirst, klast, vc )
       call mp_recv3d( grid%commyz, src, im, jm, km,                   &
                       1, im, jfirst-2, jlast+2, kfirst, klast,       &
                       1, im, jlast+1, jlast+1, kfirst, klast, vc )
@@ -1209,7 +1213,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 
       call mp_send3d( grid%commyz, dest, src, im, jm, km,                      &
                       1, im, jfirst, jlast+1, kfirst, klast,       &
-                      1, im, jfirst, jfirst, kfirst, klast, cy_om )            
+                      1, im, jfirst, jfirst, kfirst, klast, cy_om )
       call mp_recv3d( grid%commyz, src, im, jm, km,                             &
                       1, im, jfirst, jlast+1, kfirst, klast,       &
                       1, im, jlast+1, jlast+1, kfirst, klast, cy_om )
@@ -1220,7 +1224,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       call FVbarrierclock(grid,'sync_d_core', grid%commyz)
       call FVstartclock(grid,'---D_CORE')
 
-!$omp parallel do private(i, j, k, iord, jord) 
+!$omp parallel do private(i, j, k, iord, jord)
       do k = kfirst, klast
 
          if( k <= kmtp ) then
@@ -1240,7 +1244,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          ! Call the vertical independent part of the dynamics on the D-grid
          !-----------------------------------------------------------------
 
-         if (am_correction .or. am_fixer) then 
+         if (am_correction .or. am_fixer) then
             do j = jfirst, jlast
                do i = 1, im
                   kelp(i,j,k) = delp(i,j,k) ! un-updated delp on A grid
@@ -1249,7 +1253,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          end if
 
          ! don't apply correction if order is not 4
-         sw_am_corr = am_correction .and. iord.eq.iord_d .and. jord.eq.jord_d 
+         sw_am_corr = am_correction .and. iord.eq.iord_d .and. jord.eq.jord_d
 
          call d_sw( grid, u(1,jfirst-ng_d,k),      v(1,jfirst-ng_s,k),  &
                     uc(1,jfirst-ng_d,k),    vc(1,jfirst-2,k),           &
@@ -1258,16 +1262,16 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                     cy3(1,jfirst,k),        mfx(1,jfirst,k),            &
                     mfy(1,jfirst,k),                                    &
                     grid%cdx  (js2g0:,k),grid%cdy (js2g0:,k),           &
-                    grid%cdxde (js2g0:,k),grid%cdxdp (js2g0:,k),        & 
-                    grid%cdyde(js2g0:,k) ,grid%cdydp(js2g0:,k),         & 
-                    grid%cdxdiv(:,k),grid%cdydiv(:,k) ,                 & 
-                    grid%cdx4 (js2g0:,k),grid%cdy4(js2g0:,k) ,          & 
-                    grid%cdtau4(js2g0:,k), ldiv2, ldiv4, ldel2,         & 
+                    grid%cdxde (js2g0:,k),grid%cdxdp (js2g0:,k),        &
+                    grid%cdyde(js2g0:,k) ,grid%cdydp(js2g0:,k),         &
+                    grid%cdxdiv(:,k),grid%cdydiv(:,k) ,                 &
+                    grid%cdx4 (js2g0:,k),grid%cdy4(js2g0:,k) ,          &
+                    grid%cdtau4(js2g0:,k), ldiv2, ldiv4, ldel2,         &
                     iord, jord, tiny, sw_am_corr,                       &
                     ddpa(1,jfirst,k), ddu(1,jfirst,k),                  &
                     vf(1,jfirst-2   ,k) )
 
-         if (am_correction .or. am_fixer) then 
+         if (am_correction .or. am_fixer) then
             do j = jfirst, jlast
                do i = 1, im
                   help(i,j,k) = delp(i,j,k) ! updated delp on A grid
@@ -1280,9 +1284,9 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       call FVstopclock(grid,'---D_CORE')
 
       ! AM correction and fixer (main block)
-      if (am_correction .or. am_fixer) then 
- 
-         call FVbarrierclock(grid,'sync_dp4corr_1', grid%commyz) 
+      if (am_correction .or. am_fixer) then
+
+         call FVbarrierclock(grid,'sync_dp4corr_1', grid%commyz)
          call FVstartclock(grid,'---dp4corr_COMM_1')
 
 #if defined( SPMD )
@@ -1293,13 +1297,13 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          if ( mod(iam+1,npr_y) == 0 ) dest = -1
          call mp_send3d( grid%commyz, dest, src, im, jm, km,            &
                          1, im, jfirst-1, jlast, kfirst, klast,         &
-                         1, im, jlast   , jlast, kfirst, klast, help )            
+                         1, im, jlast   , jlast, kfirst, klast, help )
          call mp_recv3d( grid%commyz, src, im, jm, km,                  &
                          1, im, jfirst-1, jlast   , kfirst, klast,      &
                          1, im, jfirst-1, jfirst-1, kfirst, klast, help )
          call mp_send3d( grid%commyz, dest, src, im, jm, km,            &
                          1, im, jfirst-1, jlast, kfirst, klast,         &
-                         1, im, jlast   , jlast, kfirst, klast, kelp )            
+                         1, im, jlast   , jlast, kfirst, klast, kelp )
          call mp_recv3d( grid%commyz, src, im, jm, km,                  &
                          1, im, jfirst-1, jlast   , kfirst, klast,      &
                          1, im, jfirst-1, jfirst-1, kfirst, klast, kelp )
@@ -1307,7 +1311,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
          if (am_correction) then
             call mp_send3d( grid%commyz, dest, src, im, jm, km,         &
                             1, im, jfirst-1, jlast, kfirst, klast,      &
-                            1, im, jlast   , jlast, kfirst, klast, ddpa )            
+                            1, im, jlast   , jlast, kfirst, klast, ddpa )
             call mp_recv3d( grid%commyz, src, im, jm, km,                  &
                             1, im, jfirst-1, jlast   , kfirst, klast,      &
                             1, im, jfirst-1, jfirst-1, kfirst, klast, ddpa )
@@ -1315,10 +1319,10 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
 #endif
          call FVstopclock(grid,'---dp4corr_COMM_1')
 
-         call FVbarrierclock(grid,'sync_dp4corr_2', grid%commyz) 
+         call FVbarrierclock(grid,'sync_dp4corr_2', grid%commyz)
          call FVstartclock(grid,'---dp4corr_COMM_2')
 
-!$omp parallel do private(i, j, k) 
+!$omp parallel do private(i, j, k)
          do k = kfirst, klast
             do j = js2g0, jlast
                do i = 1, im
@@ -1340,8 +1344,8 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             endif
          end do
 
-         if (am_correction) then 
-!$omp parallel do private(i, j, k) 
+         if (am_correction) then
+!$omp parallel do private(i, j, k)
             do k = kfirst, klast
                do j = js2g0, jlast
                   do i = 1, im
@@ -1350,7 +1354,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                end do
             end do
 
-!$omp parallel do private(i, j, k) 
+!$omp parallel do private(i, j, k)
             do k = kfirst, klast
                do j = js2g0, jlast
                   do i = 1, im
@@ -1359,7 +1363,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                end do
             end do
 
-!$omp parallel do private(i, j, k) 
+!$omp parallel do private(i, j, k)
             do k = kfirst, klast
                do j = js2g0, jlast
                   ddus(j,k) = ddu(1,j,k) &
@@ -1373,7 +1377,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                                 + wg_hiord*vf(i,j,k)*(dpn(i,j,k)-dpo(i,j,k))*0.5_r8
                      dpns(j,k) = dpns(j,k) + dpn(i,j,k)
                   end do
-                  ddus(j,k) = ddus(j,k)/dpns(j,k)  
+                  ddus(j,k) = ddus(j,k)/dpns(j,k)
                   ! taper beyond 72S/N
                   tpr = max(abs(-2.5_r8 + ((j-1)-0.5_r8)*(5._r8/(jm-1))),2._r8)
                   tpr = cos(pi*tpr)**2
@@ -1381,7 +1385,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                end do
             end do
 
-!$omp parallel do private(i, j, k) 
+!$omp parallel do private(i, j, k)
             do k = kfirst, klast
                do j = js4g0, jn3g0
                   do i = 1, im !+++++++++++++++++++++++++++++++++++++++++++++
@@ -1389,12 +1393,12 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                   enddo        !+++++++++++++++++++++++++++++++++++++++++++++
                enddo
             enddo
- 
+
          end if ! (am_correction)
- 
+
          if (am_fixer) then
-            if (.not. am_geom_crrct) then 
-!$omp parallel do private(i, j, k) 
+            if (.not. am_geom_crrct) then
+!$omp parallel do private(i, j, k)
                do k = kfirst, klast
                   do j = js2g0, jlast
                      do i = 1, im
@@ -1416,7 +1420,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                   endif
                end do
             endif
-!$omp parallel do private(i, j, k) 
+!$omp parallel do private(i, j, k)
             do k = kfirst, klast
                do j = js2g0, jlast
                   do i = 1, im
@@ -1428,11 +1432,11 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                end do
             end do
          end if  ! (am_fixer)
- 
+
          call FVstopclock(grid,'---dp4corr_COMM_2')
- 
+
       endif ! (am_correction .or. am_fixer)
- 
+
       call FVbarrierclock(grid,'sync_d_geop', grid%commyz)
 
 #if defined( SPMD )
@@ -1554,7 +1558,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                end do
             end do
          end do
- 
+
       end if
 
       call geopk(grid, pexy, delpxy, pkxy, wzxy, hsxy, ptxy, &
@@ -1734,7 +1738,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
       end if
       call FVstopclock(grid,'---PRE_D_PGRAD_COMM_1')
 #endif
- 
+
       if (am_press_crrct) then
          ! AM correction (pressure, prognostic winds): pkc -> ptr
 !$omp parallel do private(i, j, k)
@@ -1814,7 +1818,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                wk3(1,j) = (wz(1,j,k)+wz(im,j,k)) *       &
                        (ptr(1,j,k) - ptr(im,j,k))
                do i=2,im
-                  wk3(i,j) = (wz(i,j,k)+wz(i-1,j,k)) *      & 
+                  wk3(i,j) = (wz(i,j,k)+wz(i-1,j,k)) *      &
                           (ptr(i,j,k) - ptr(i-1,j,k))
 
                enddo
@@ -1824,16 +1828,16 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                wk3(1,j) = (wz(1,j,k)+wz(im,j,k)) *       &
                        (pxc(1,j,k) - pxc(im,j,k))
                do i=2,im
-                  wk3(i,j) = (wz(i,j,k)+wz(i-1,j,k)) *      & 
+                  wk3(i,j) = (wz(i,j,k)+wz(i-1,j,k)) *      &
                           (pxc(i,j,k) - pxc(i-1,j,k))
 
                enddo
             enddo
          end if
 
-         do j=js2g1,jn2g0                               
+         do j=js2g1,jn2g0
             do i=1,im-1
-               wk1(i,j) = wk3(i,j) + wk3(i+1,j)        
+               wk1(i,j) = wk3(i,j) + wk3(i+1,j)
             enddo
             wk1(im,j) = wk3(im,j) + wk3(1,j)      ! wk3 ghosted S
          enddo
@@ -1890,7 +1894,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                wk1(i,j) = pxc(i,j,k) + pxc(i-1,j,k)
             enddo
          enddo
- 
+
          do j=js2g0,jn1g1
             do i=1,im
                pxc(i,j,k) = wk1(i,j) + wk1(i,j-1)
@@ -1931,7 +1935,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                   wk1(i,j) = dpr(i,j,k) + dpr(i-1,j,k)
                end do
             end do
- 
+
             do j = js2g0, jn1g1
                do i = 1, im
                   wk2(i,j) = wk1(i,j) + wk1(i,j-1)
@@ -1945,7 +1949,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                   wk1(i,j) = dpt(i,j,k) + dpt(i-1,j,k)
                end do
             end do
- 
+
             do j = js2g0, jn1g1
                do i = 1, im
                   wk2(i,j) = wk1(i,j) + wk1(i,j-1)
@@ -1968,7 +1972,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
             ! apply cos-weighted avg'ing
             do j = js2g0, jn2g0                  ! Assumes wk2 ghosted on N
                do i = 1, im
-                  wk1(i,j) = vc(i,j,k) + grid%dtdy/(wk(i,j)*cose(j) + wk(i,j+1)*cose(j+1))*cosp(j) * & 
+                  wk1(i,j) = vc(i,j,k) + grid%dtdy/(wk(i,j)*cose(j) + wk(i,j+1)*cose(j+1))*cosp(j) * &
                              (wk2(i,j) - wk2(i,j+1) + wz(i,j,k+1) - wz(i,j,k))
                end do
             end do
@@ -1994,7 +1998,7 @@ subroutine cd_core(grid,   nx,     u,   v,   pt,                  &
                u(i,j,k) = u(i,j,k) + wk3(i,j)
             end do
          end do
- 
+
          if ( jlast == jm ) then
             do i = 1, im
                u(i,jlast,k) = u(i,jlast,k) + wk3(i,jlast)

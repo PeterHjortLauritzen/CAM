@@ -10,6 +10,8 @@ save
 
 public :: &
    radiation_readnl,         &
+   rad_is_active,            &
+   radiation_init,           &
    radiation_do
 
 real(r8), public, protected :: nextsw_cday = -1._r8 ! future radiation calday for surface models
@@ -18,6 +20,15 @@ real(r8), public, protected :: nextsw_cday = -1._r8 ! future radiation calday fo
 contains
 !========================================================================================
 
+function rad_is_active()
+  !-----------------------------------------------------------------------
+  logical :: rad_is_active
+  !-----------------------------------------------------------------------
+  rad_is_active = .false.
+end function rad_is_active
+
+!================================================================================================
+
 subroutine radiation_readnl(nlfile)
 
    ! this stub can be called, but does nothing
@@ -25,6 +36,14 @@ subroutine radiation_readnl(nlfile)
    character(len=*), intent(in) :: nlfile
 
 end subroutine radiation_readnl
+
+!========================================================================================
+
+subroutine radiation_init()
+
+   ! this stub can be called, but does nothing
+
+end subroutine radiation_init
 
 !========================================================================================
 
@@ -44,4 +63,3 @@ end function radiation_do
 !========================================================================================
 
 end module radiation
-

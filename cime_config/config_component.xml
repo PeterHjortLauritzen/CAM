@@ -8,12 +8,12 @@
       CAM
     ===============
    -->
-    <desc atm="CAM70[%LT][%MT][%CCTS1]"                                                                                                 >CAM cam7 physics:</desc>
-    <desc atm="CAM60[%1PCT][%4xCO2][%CCTS1]][%CCTS2][%CFIRE][%CVBSX][%NUDG][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%WXIE][%WXIED][%HEMCO][%GEOSCHEM]">CAM cam6 physics:</desc>
+    <desc atm="CAM70[%LT][%MT][%CCTS1][%MARS]"                                                                                                 >CAM cam7 physics:</desc>
+    <desc atm="CAM60[%1PCT][%4xCO2][%CCTS1]][%CCTS2][%CFIRE][%CVBSX][%NUDG][%PORT][%RCO2][%SCAM][%SDYN][%WCCM][%WCMD][%WCSC][%WCTS][%WXIE][%WXIED][%HEMCO][%GEOSCHEM][%MARS]">CAM cam6 physics:</desc>
     <desc atm="CAM50[%CCTS1][%CLB][%PORT][%RCO2][%MAM7][%SCAM][%SDYN][%WCSC][%WCTS][%GEOSCHEM]"                                                               >CAM cam5 physics:</desc>
-    <desc atm="CAM40[%PORT][%RCO2][%SCAM][%SDYN][%TMOZ][%WX][%WXIE][%WXIED][%WCCM][%WCMD][%GEOSCHEM]"                                                         >CAM cam4 physics:</desc>
-    <desc atm="CAM30"                                                                                                                              >CAM cam3 physics:</desc>
-    <desc atm="CAM[%ADIAB][%DABIP04][%TJ16][%GRAYRAD][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM][%MARS][%SOCR][%EXORT]"                                     >CAM simplified and non-versioned physics :</desc>
+    <desc atm="CAM40[%PORT][%RCO2][%SCAM][%SDYN][%TMOZ][%WX][%WXIE][%WXIED][%WCCM][%WCMD][%GEOSCHEM][%MARS]"                                                         >CAM cam4 physics:</desc>
+    <desc atm="CAM30[%MARS]"                                                                                                                              >CAM cam3 physics:</desc>
+    <desc atm="CAM[%ADIAB][%DABIP04][%TJ16][%GRAYRAD][%HS94][%KESSLER][%RCO2][%SPCAMS][%SPCAMCLBS][%SPCAMM][%SPCAMCLBM][%SIMPLE_MARS][%MARS]"                                     >CAM simplified and non-versioned physics :</desc>
 
   <!--
     ===============
@@ -64,10 +64,8 @@
      CAM-Mars Options
     ===============
    -->
-    <desc option="MARS"         >CAM-MARS</desc>
-    <desc option="SOCR"         >use SOCRATES Radiation library:</desc>
-    <desc option="EXORT"        >use ExoRT Radiation library:</desc>
-
+    <desc option="MARS"         >MARS Planetary configuration</desc>
+    <desc option="SIMPLE_MARS"  >Simple Model Mars physics</desc>
   <!--
     ===============
      WACCM Options
@@ -91,6 +89,7 @@
     <desc option="GRAYRAD"      >CAM moist simple model (Frierson, 2006):</desc>
     <desc option="HS94"         >CAM dry Held-Suarez forcing (Held and Suarez (1994)):</desc>
     <desc option="KESSLER"      >CAM moist dynamical core test with Ullrich et al. (2014) baroclinic wave IC, Kessler physics and terminator chemistry:</desc>
+    <desc option="EXO_MARS"     >SIMPLE MARS CASE CO2/N2 atmosphere with exo-rt radiation:</desc>
 
   <!--
     ===============
@@ -199,9 +198,6 @@
 
       <!-- CAM MARS -->
       <value compset="_CAM.*%MARS">-nlev 49</value>
-      <value compset="_CAM%MARS%HS94">-phys held_suarez</value>
-      <value compset="_CAM.*%SOCR">-rad socrates</value>
-      <value compset="_CAM.*%EXO">-rad exort</value>
 
       <!-- Simple models -->
       <value compset="_CAM%ADIAB">-phys adiabatic</value>
@@ -329,7 +325,6 @@
       <value compset="CAM%GRAYRAD"       >dctest_frierson</value>
       <value compset="CAM%KESSLER"       >dctest_baro_kessler</value>
 
-      <value compset="_CAM"          >mars_cam</value>
       <value compset="%MARS"         >mars_cam</value>
       
       <!-- SCAM defaults to ARM97, all other IOPs are in usermods_dirs -->

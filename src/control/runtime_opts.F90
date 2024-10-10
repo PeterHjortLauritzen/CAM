@@ -93,6 +93,7 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    use nudging,             only: nudging_readnl
 #if ( defined SIMPLE )
    use frierson_cam,        only: frierson_readnl
+   use mars_cam,            only: mars_readnl
 #endif
 
    use dyn_comp,            only: dyn_readnl

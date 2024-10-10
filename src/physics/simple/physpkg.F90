@@ -19,13 +19,16 @@ module physpkg
   use camsrfexch,      only: cam_out_t, cam_in_t, cam_export
 
   ! Note: ideal_phys is true for Held-Suarez (1994) physics
-  use cam_control_mod, only: moist_physics, adiabatic, ideal_phys, kessler_phys, tj2016_phys, frierson_phys
+  use cam_control_mod, only: moist_physics, adiabatic, ideal_phys, kessler_phys, tj2016_phys, frierson_phys, mars_phys
   use phys_control,    only: phys_getopts
   use perf_mod,        only: t_barrierf, t_startf, t_stopf, t_adj_detailf
   use cam_logfile,     only: iulog
   use cam_abortutils,  only: endrun
   use shr_sys_mod,     only: shr_sys_flush
   use dyn_tests_utils, only: vc_dycore
+  use radiation,       only: radiation_init, rad_is_active
+  use chemistry,       only: chem_is_active
+  use scamMod,         only: single_column
 
   implicit none
   private
@@ -73,7 +76,6 @@ contains
     use physconst,          only: mwh2o, cpwv
     use constituents,       only: cnst_add, cnst_chk_dim
     use physics_buffer,     only: pbuf_init_time, dtype_r8, pbuf_add_field, pbuf_cam_snapshot_register
-
     use cam_diagnostics,    only: diag_register
     use chemistry,          only: chem_register
     use tracers,            only: tracers_register
@@ -81,6 +83,15 @@ contains
     use kessler_cam,        only: kessler_register
     use tj2016_cam,         only: thatcher_jablonowski_register
     use frierson_cam,       only: frierson_register
+    use mars_cam,           only: mars_register
+    use radiation,          only: radiation_register
+    use ghg_data,           only: ghg_data_register
+    use co2_cycle,          only: co2_register
+    use prescribed_ghg,     only: prescribed_ghg_register
+    use rad_constituents,   only: rad_cnst_get_info ! Added to query if it is a modal aero sim or not
+    use radheat,            only: radheat_register
+    use dyn_comp,           only: dyn_register
+!!$    use vertical_diffusion, only: vd_register
 
     !---------------------------Local variables-----------------------------
     !
@@ -114,6 +125,26 @@ contains
       call thatcher_jablonowski_register()
     else if (frierson_phys) then
       call frierson_register()
+    else if (mars_phys) then
+       call mars_register()
+       ! register chemical constituents including aerosols ...
+       if (chem_is_active()) then
+          call chem_register()
+       else
+              ! Register CO2 to advect
+          call cnst_add('CO2', 44._r8, 800._r8, 0.97_r8, mm, fixed_ubc=.false., &
+               longname='CO2', readiv=.true., is_convtran1=.true.)
+       end if
+       if (rad_is_active()) then
+          ! co2 constituents
+          call co2_register()
+          ! register various data model gasses with pbuf
+          call prescribed_ghg_register()
+          call ghg_data_register()
+          ! radiation
+          call radiation_register
+          call radheat_register
+       end if
     end if
 
     ! Fields for physics package diagnostics
@@ -137,6 +168,8 @@ contains
 
     ! Register test tracers
     call tracers_register()
+
+    call dyn_register()
 
     ! All tracers registered, check that the dimensions are correct
     call cnst_chk_dim()
@@ -208,6 +241,7 @@ contains
     use nudging,            only: Nudge_Model, nudging_init
     use cam_snapshot,       only: cam_snapshot_init
     use cam_budget,         only: cam_budget_init
+    use rad_constituents,   only: rad_cnst_init
 
     use ccpp_constituent_prop_mod, only: ccpp_const_props_init
 
@@ -258,6 +292,12 @@ contains
 
     if (initial_run) then
       call phys_inidat(cam_out, pbuf2d)
+    end if
+
+    if (rad_is_active()) then
+       ! Initialize rad constituents and their properties
+       call rad_cnst_init()
+       call radiation_init(pbuf2d)
     end if
 
     if (ideal_phys) then
@@ -737,12 +777,15 @@ contains
     use tj2016_cam,        only: thatcher_jablonowski_precip_tend
     use frierson_cam,      only: frierson_condensate_tend
     use frierson_cam,      only: frierson_radiative_tend
+    use mars_cam,          only: mars_condensate_tend
     use dycore,            only: dycore_is
     use cam_snapshot_common,only: cam_snapshot_all_outfld
     use cam_snapshot_common,only: cam_snapshot_ptend_outfld
     use physics_types,     only: dyn_te_idx
     use air_composition, only: thermodynamic_active_species_liq_num,thermodynamic_active_species_liq_idx
     use air_composition, only: thermodynamic_active_species_ice_num,thermodynamic_active_species_ice_idx
+    use radiation,          only: rad_is_active, radiation_tend
+
     ! Arguments
 
     real(r8),                  intent(in)    :: ztodt ! model time increment
@@ -776,7 +819,9 @@ contains
 
     real(r8)                 :: zero(pcols) ! array of zeros
     real(r8)                 :: flx_heat(pcols)
+    real(r8)                 :: net_flx(pcols)
     type(check_tracers_data) :: tracerint   ! energy integrals and cummulative boundary fluxes
+    integer                  :: i
     !-----------------------------------------------------------------------
 
     call t_startf('bc_init')
@@ -961,6 +1006,21 @@ contains
        if (trim(cam_take_snapshot_after) == "frierson_radiative_tend") then
           call cam_snapshot_all_outfld(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf)
        end if
+    else if (mars_phys) then
+       ! Compute the large-scale precipitation
+       !----------------------------------------
+       if (trim(cam_take_snapshot_before) == "mars_condensate_tend") then
+          call cam_snapshot_all_outfld(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf)
+       end if
+       call mars_condensate_tend(state, ptend, ztodt, pbuf)
+       if ( (trim(cam_take_snapshot_after) == "mars_condensate_tend") .and. &
+            (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
+          call cam_snapshot_ptend_outfld(ptend, lchnk)
+       end if
+       call physics_update(state, ptend, ztodt, tend)
+       if (trim(cam_take_snapshot_after) == "mars_condensate_tend") then
+          call cam_snapshot_all_outfld(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf)
+       end if
 
     end if
 
@@ -970,6 +1030,41 @@ contains
     ! changing the total exnergy.
     call check_energy_chng(state, tend, "tphysidl", nstep, ztodt, zero, zero, zero, zero)
 
+    if (rad_is_active()) then
+       !===================================================
+       ! Radiation computations
+       !===================================================
+       call t_startf('radiation')
+
+       if (trim(cam_take_snapshot_before) == "radiation_tend") then
+       ! Compute the large-scale precipitation
+       !----------------------------------------
+          call cam_snapshot_all_outfld(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf)
+       end if
+
+       call radiation_tend( &
+            state, ptend, pbuf, cam_out, cam_in, net_flx)
+
+       ! Set net flux used by spectral dycores
+       do i=1,ncol
+          tend%flx_net(i) = net_flx(i)
+       end do
+
+       if ( (trim(cam_take_snapshot_after) == "radiation_tend") .and.     &
+            (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
+          call cam_snapshot_ptend_outfld(ptend, lchnk)
+       end if
+       call physics_update(state, ptend, ztodt, tend)
+
+       if (trim(cam_take_snapshot_after) == "radiation_tend") then
+          call cam_snapshot_all_outfld(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf)
+       end if
+
+       call check_energy_chng(state, tend, "radheat", nstep, ztodt, zero, zero, zero, net_flx)
+
+       call t_stopf('radiation')
+
+    end if
     if (chem_is_active()) then
       call t_startf('simple_chem')
 
@@ -1021,6 +1116,8 @@ contains
     !--------------------------------------------------------------------------
     use physics_types,       only: physics_state
     use physics_buffer,      only: physics_buffer_desc
+    use prescribed_ghg,      only: prescribed_ghg_adv
+    use iop_forcing,         only: scam_use_iop_srf
     use nudging,             only: Nudge_Model, nudging_timestep_init
 
     implicit none
@@ -1036,6 +1133,18 @@ contains
     ! Update Nudging values, if needed
     !----------------------------------
     if(Nudge_Model) call nudging_timestep_init(phys_state)
+    if (single_column) call scam_use_iop_srf(cam_in)
+
+    ! Prescribed tracers
+    call prescribed_ghg_adv(phys_state, pbuf2d)
+
+!!$    ! Upper atmosphere radiative processes
+!!$    call radheat_timestep_init(phys_state, pbuf2d)
+!!$
+!!$    ! Time interpolate for vertical diffusion upper boundary condition
+!!$    call vertical_diffusion_ts_init(pbuf2d, phys_state)
+
+
 
   end subroutine phys_timestep_init
 

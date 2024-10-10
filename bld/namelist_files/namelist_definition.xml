@@ -1722,6 +1722,13 @@ of N2O if no time varying values are specified.
 Default: set by build-namelist
 </entry>
 
+<entry id="n2vmr" type="real"  category="ghg_cam"
+       group="chem_surfvals_nl" valid_values="" >
+N2 volume mixing ratio.  This is used as the time invariant surface value
+of N2 if no time varying values are specified.
+Default: set by build-namelist
+</entry>
+
 <entry id="ghg_yearstart_data" type="integer"  category="ghg_cam"
        group="chem_surfvals_nl" valid_values="" >
 Data start year.  Use in conjunction
@@ -5736,7 +5743,6 @@ Analogous to rad_diag_1, but for the 10th diagnostic calculation.
 Default: none
 </entry>
 
-
 <entry id="rad_data_output" type="logical"   category="radiation"
        group="rad_data_nl" valid_values="" >
 output data needed for off-line radiation calculations
@@ -5760,6 +5766,210 @@ Default: 'A'
 Switch to turn on Fixed Dynamical Heating in the offline radiation tool (PORT).
 Default: false
 </entry>
+
+<!-- EXORT -->
+
+<entry id="do_exo_rt_spectral" type="logical"  category="radiation"
+       group="radiation_nl" valid_values="" >
+Collect and output spectrally resolved radiative fluxes
+Default: FALSE
+</entry>
+
+<entry id="do_exo_rt_clearsky" type="logical"  category="radiation"
+       group="radiation_nl" valid_values="" >
+Run clearsky radiation
+Default: FALSE
+</entry>
+
+<entry id="do_exo_rt_optimize_bands" type="logical"  category="radiation"
+       group="radiation_nl" valid_values="" >
+Optimize spectral bands
+Default: 
+</entry>
+
+<entry id="do_exo_rt" type="logical"  category="radiation"
+       group="radiation_nl" valid_values="" >
+use exo_rt package
+Default: FALSE
+</entry>
+
+<entry id="do_exo_synchronous" type="logical"  category="radiation"
+       group="radiation_nl" valid_values="" >
+If TRUE synchronous rotation is assumed. The zenith angle is fixed at 180 deg longitude,
+and the Coriolis parameter is set via, exo_sdays (sec) = 86400.0 (sec/Earth day) * exo_ndays (Earth days).
+There is no diurnal cycle. if (do_exo_synchronous = .false.) non-synchronous rotation occurs.  The
+Coriolis parameter is set via exo_sdays (sec), and the diurnal cycle (length of solar day) is then
+set explicitly by exo_ndays (Earth days). Note, that the length of the diurnal period does not equal to the
+sidereal period.
+Default: FALSE
+</entry>
+
+<entry id="do_exo_gw" type="logical"  category="radiation"
+       group="radiation_nl" valid_values="" >
+Enable gravity waves
+Default: FALSE
+</entry>
+
+<entry id="solar_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for solar file for EXORT
+Default: set by build-namelist.
+</entry>
+
+<entry id="cldoptsL_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+cloud liq optics file for EXORT
+Default: set by build-namelist.
+</entry>
+
+<entry id="cldoptsI_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+cloud ice optics file for EXORT
+Default: set by build-namelist.
+</entry>
+
+<entry id="k_h2o_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="k_co2_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="k_o2_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="k_o3_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="k_ch4_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="k_c2h6_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="kh2o_mtckd_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="kn2n2cia_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="kn2h2cia_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="kh2h2cia_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="kco2co2cia_sw_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="kco2co2cia_lw_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="kco2ch4cia_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="kco2h2cia_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="ko2o2cia_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="ko2n2cia_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="ko2co2cia_file" type="char*256" category="radiation"
+       group="radiation_nl" valid_values="" >
+Relative pathname for k coefficients for EXORT.  This data is
+part of the EXORT source, thus this pathname is relative to the root source
+code directory for the CAM component.
+Default: set by build-namelist.
+</entry>
+
+<entry id="exo_rad_step" type="integer" category="radiation"
+       group="radiation_nl" valid_values="" >
+Radiation done every n timesteps
+Default: 3
+</entry>
+
 
 <!-- RRTMGP -->
 
