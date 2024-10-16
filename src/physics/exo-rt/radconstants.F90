@@ -20,9 +20,9 @@ public :: rad_gas_index
 public :: get_lw_spectral_boundaries, get_sw_spectral_boundaries
 
 integer, public, parameter :: gasnamelength = 5
-integer, public, parameter :: nradgas = 2
+integer, public, parameter :: nradgas = 3
 character(len=gasnamelength), public, parameter :: gaslist(nradgas) &
-   = (/'CO2  ','H2O  '/)
+   = (/'CO2  ','H2O  ','N2'/)
 
 !========================================================================================
 contains

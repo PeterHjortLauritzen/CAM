@@ -361,6 +361,10 @@
     <lname>2000_CAM%HS94%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
 
+  <compset>
+    <alias>FMARSEXORT</alias>
+    <lname>2000_CAM%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+  </compset>
 
   <!-- spcam untested compsets -->
 

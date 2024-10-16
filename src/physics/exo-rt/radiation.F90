@@ -352,7 +352,6 @@ subroutine radiation_register
    ! Register radiation fields in the physics buffer
 
    use radiation_data, only: rad_data_register
-   use constituents,    only: cnst_add
 
    integer :: mm         ! dummy index for constituent add
 
@@ -386,14 +385,6 @@ subroutine radiation_register
 
    call rad_data_register()
 
-   call cnst_add('CO2', 44._r8, 800._r8, 1.e-12_r8, mm, fixed_ubc=.false., &
-        longname='CO2', readiv=.true., is_convtran1=.true.)
-
-   call cnst_add('N2', 28._r8, 800._r8, 1.e-12_r8, mm, fixed_ubc=.false., &
-        longname='N2', readiv=.true., is_convtran1=.true.)
-
-   call pbuf_add_field('CO2' , 'global',dtype_r8,(/pcols,pver/), co2_idx) ! shortwave radiative heating rate
-   call pbuf_add_field('N2' , 'global',dtype_r8,(/pcols,pver/), n2_idx) ! longwave  radiative heating rate
 
 end subroutine radiation_register
 
@@ -858,10 +849,11 @@ subroutine radiation_tend( &
     !------------------------------------
     real(r8), pointer, dimension(:,:) :: h2ommr   ! h2o   mass mixing ratio
     real(r8), pointer, dimension(:,:) :: co2mmr   ! co2   mass mixing ratio
+    real(r8), pointer, dimension(:,:) :: n2mmr    ! n2    mass mixing ratio
 !jt    real(r8), pointer, dimension(:,:) :: ch4mmr   ! ch4   mass mixing ratio
     real(r8), dimension(pcols,pver) :: ch4mmr     ! h2    mass mixing ratio
     real(r8), dimension(pcols,pver) :: h2mmr      ! h2    mass mixing ratio
-    real(r8), dimension(pcols,pver) :: n2mmr      ! n2    mass mixing ratio
+!jt    real(r8), dimension(pcols,pver) :: n2mmr      ! n2    mass mixing ratio
     real(r8), dimension(pcols,pver) :: c2h6mmr    ! c2h6   mass mixing ratio
 
     !o2/o3--not sure where these will come from so will need to check!
@@ -915,8 +907,6 @@ subroutine radiation_tend( &
     real(r8), dimension(pcols,pverp) :: lwdown_rad
     real(r8), dimension(pcols,pverp) :: swup_rad
     real(r8), dimension(pcols,pverp) :: swdown_rad
-    !jt ts hack
-    real(r8), dimension(pver) :: hack_ts
 
     !------------------------------------------------------------------------
     !
@@ -1047,16 +1037,17 @@ subroutine radiation_tend( &
 
        ! Native CAM functions; returns pointer to mass mixing ratio for the gas specified
        ! gases that exist in the CESM physics buffer
-       call rad_cnst_get_gas(0,'CO2', state, pbuf,  co2mmr)
-!!$       call rad_cnst_get_gas(0,'CH4', state, pbuf,  ch4mmr)
        call rad_cnst_get_gas(0,'H2O', state, pbuf,  h2ommr) !H2O specific humidity
+       call rad_cnst_get_gas(0,'CO2', state, pbuf,  co2mmr)
+       call rad_cnst_get_gas(0,'N2',  state, pbuf,  n2mmr)
+!!$       call rad_cnst_get_gas(0,'CH4', state, pbuf,  ch4mmr)
 !!$       call rad_cnst_get_gas(0,'O2',  state, pbuf,  o2mmr)  !does CESM have this one?
 !!$       call rad_cnst_get_gas(0,'O3',  state, pbuf,  o3mmr)  !does CESM have this one?
 
        ! well mixed species from exoplanet_mod.F90
        ! not in CESM physics buffer
        ch4mmr(:,:)   = exo_ch4mmr
-       n2mmr(:,:)   = exo_n2mmr
+!       n2mmr(:,:)   = exo_n2mmr
        h2mmr(:,:)   = exo_h2mmr
        c2h6mmr(:,:) = exo_c2h6mmr
        o2mmr(:,:)   = 0._r8   !exo_o2mmr
@@ -1072,7 +1063,6 @@ subroutine radiation_tend( &
           cldfrc_zero(:,:) = 0.0_r8
 
           !jt temporary hack for surface temperature - we need land to build to provide this.
-          hack_ts(:) = 190.0_r8
           do i = 1, ncol
 
              call aerad_driver(h2ommr(i,:), co2mmr(i,:), &
@@ -1080,8 +1070,7 @@ subroutine radiation_tend( &
                   h2mmr(i,:),  n2mmr(i,:), o3mmr(i,:), o2mmr(i,:), &
                   cicewp_zero(i,:), cliqwp_zero(i,:), cldfrc_zero(i,:), &
                   rei(i,:), rel(i,:), &
-!jt                  cam_in%ts(i), state%ps(i), state%pmid(i,:), &
-                  hack_ts(i), state%ps(i), state%pmid(i,:), &
+                  cam_in%ts(i), state%ps(i), state%pmid(i,:), &
                   state%pdel(i,:), state%pdeldry(i,:), state%t(i,:), state%pint(i,:), state%pintdry(i,:), &
                   coszrs(i), ext_msdist, &
                   cam_in%asdir(i), cam_in%aldir(i), &
@@ -1103,11 +1092,6 @@ subroutine radiation_tend( &
              swdown_rad(i,:) = sw_dnflux(:)
 
              if (do_exo_rt_spectral) then
-!!$            lwup_rad_spec(i,:,:)   = lw_upflux_spec(:,:)
-!!$            lwdown_rad_spec(i,:,:) = lw_dnflux_spec(:,:)
-!!$            swup_rad_spec(i,:,:)   = sw_upflux_spec(:,:)
-!!$            swdown_rad_spec(i,:,:) = sw_dnflux_spec(:,:)
-
                 lu(i,:,:)   = lw_upflux_spec(:,:)
                 ld(i,:,:)   = lw_dnflux_spec(:,:)
                 su(i,:,:)   = sw_upflux_spec(:,:)
@@ -1175,8 +1159,7 @@ subroutine radiation_tend( &
                h2mmr(i,:),  n2mmr(i,:), o3mmr(i,:), o2mmr(i,:), &
                cicewp(i,:), cliqwp(i,:), cldfrc(i,:), &
                rei(i,:), rel(i,:), &
-               hack_ts(i), state%ps(i), state%pmid(i,:), &
-!jt               cam_in%ts(i), state%ps(i), state%pmid(i,:), &
+               cam_in%ts(i), state%ps(i), state%pmid(i,:), &
                state%pdel(i,:), state%pdeldry(i,:), state%t(i,:), state%pint(i,:), state%pintdry(i,:), &
                coszrs(i), ext_msdist, &
                cam_in%asdir(i), cam_in%aldir(i), &

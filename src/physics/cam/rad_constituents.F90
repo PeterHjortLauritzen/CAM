@@ -15,7 +15,7 @@ use spmd_utils,     only: masterproc
 use ppgrid,         only: pcols, pver
 use physconst,      only: rga
 use physics_types,  only: physics_state
-use phys_control,   only: use_simple_phys
+use phys_control,   only: use_simple_phys, phys_getopts
 use constituents,   only: cnst_get_ind
 use radconstants,   only: nradgas, rad_gas_index
 use phys_prop,      only: physprop_accum_unique_files, physprop_init, &
@@ -237,6 +237,7 @@ subroutine rad_cnst_readnl(nlfile)
    character(len=2) :: suffix
    character(len=1), pointer   :: ctype(:)
    character(len=*), parameter :: subname = 'rad_cnst_readnl'
+   character(len=16)  :: rad_scheme
 
    namelist /rad_cnst_nl/ mode_defs,     &
                           rad_climate,   &
@@ -258,7 +259,9 @@ subroutine rad_cnst_readnl(nlfile)
 
    !-----------------------------------------------------------------------------
 
-   if (use_simple_phys) return
+   call phys_getopts(radiation_scheme_out=rad_scheme)
+
+   if (use_simple_phys.and.trim(rad_scheme) /= 'exort') return
 
    if (masterproc) then
       unitn = getunit()

@@ -138,7 +138,7 @@ subroutine cam_ctrl_set_physics_type(phys_package)
   kessler_phys = trim(phys_package) == 'kessler'
   tj2016_phys = trim(phys_package) == 'tj2016'
   frierson_phys = trim(phys_package) == 'grayrad'
-  mars_phys = trim(phys_package) == 'mars'
+  mars_phys = trim(phys_package) == 'simple_mars'
 
   simple_phys = adiabatic .or. ideal_phys .or. kessler_phys .or. tj2016_phys .or. frierson_phys .or. mars_phys
 
