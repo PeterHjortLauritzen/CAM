@@ -11,7 +11,7 @@ setenv PBS_ACCOUNT P93300642
 #set src="cam_development"
 
 set src="cam_enth_simple"   #cam_enthalpy"
-set caze=new_enthalpy_flux_method_1
+set caze=new_enthalpy_flux_method_2
 #set caze=cam_enth_simple_ocnfrc_zmconv_ke_1E-5
 #set caze=cam_enth_simple_ocnfrc_efix
 #set caze=cam_enth_simple_ocnfrc_cpstar
@@ -65,9 +65,9 @@ cd $scratch/$USER/$caze
 #
 #
 #
-echo "enthalpy_flux_method = 1"                >> user_nl_cam
+echo "enthalpy_flux_method = 2"                >> user_nl_cam
 echo "mfilt    =       0,       5,     20,      40,      12,       120,      1,   1,12"                >> user_nl_cam
-echo "nhtfrq              =       0,     -24,    -24,      -3,       0,       -2,      0,  -8760,0,0"   >> user_nl_cam
+echo "nhtfrq              =       0,     -24,    -24,      -3,       0,       -2,      0,  -720,0,0"   >> user_nl_cam
 echo "ndens               =       2,       2,      2,       2,       2,       1,      2,   1,1"       >> user_nl_cam
 echo "interpolate_output  =  .true.,  .true., .true., .false., .false., .true.,  .true., .false.,.false."   >> user_nl_cam
 echo "interpolate_nlat    =     192,     192,    192,     192,     192,     192,   192,   192"      >> user_nl_cam
@@ -113,7 +113,7 @@ echo "clubb_c8 = 4.35 "                                                         
 echo "fincl9 =  'enth_prec_ac_hice:A','enth_prec_ac_hliq:A','enth_prec_bc_hice:A','enth_prec_bc_hliq:A','enth_prec_ac_fice:A','enth_prec_ac_fliq:A','enth_prec_bc_fice:A',"  >> user_nl_cam
 echo " 'enth_prec_bc_fliq:A','enth_evap_hevap:A','cpice_srf:A','te_tnd:A','te_lat:A','ls_srf:A','lf_srf:A','dEdt_dme:A','dEdt_physics:A',         " >> user_nl_cam
 echo "'dEdt_cpdycore:A','residual:A','dEdt_enth_fix:A','enth_fix_fct_bc_tot:A','enth_fix_fct_ac_tot:A','enthalpy_heating_fix_bc:A','enthalpy_heating_fix_ac:A',   " >> user_nl_cam
-echo "'dEdt_efix_physics:A','EFIX:A','enth_flux_to_not_ocn:I','enth_flux_to_ocn:I','hsnow_liq_ref:I','hrain_liq_ref:I','hevap_liq_ref:I'"    >> user_nl_cam
+echo "'dEdt_efix_physics:A','EFIX:A','enth_flux_to_not_ocn:A','enth_flux_to_ocn:A','hsnow_liq_ref:A','hrain_liq_ref:A','hevap_liq_ref:A'"    >> user_nl_cam
 echo "avgflag_pertape(9) = 'A'" >> user_nl_cam
 echo "thermo_budget_histfile_num             = 8"    >> user_nl_cam
 echo "thermo_budget_history          = .true."    >> user_nl_cam

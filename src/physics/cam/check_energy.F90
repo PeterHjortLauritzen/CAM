@@ -1033,7 +1033,7 @@ end subroutine check_energy_get_integrals
 
     real(r8), dimension(pcols)      :: dEdt_physics
     real(r8), dimension(pcols)      :: dEdt_dme
-    real(r8), dimension(pcols)      :: dEdt_cpdycore
+    real(r8), dimension(pcols)      :: dEdt_cpdycore, TE_dEdt_cpdycore
     real(r8), dimension(pcols)      :: dEdt_enth_fix, dEdt_efix
     real(r8), dimension(pcols)      :: constant_latent_heat_surface  !xxx diagnostics
     real(r8), dimension(pcols)      :: variable_latent_heat_surface_cpice_term !xxx diagnostics
@@ -1260,19 +1260,12 @@ end subroutine check_energy_get_integrals
             se=se_dme_ref(:ncol))
        dEdt_cpdycore(:ncol) = (se(:ncol)-se_endphys(:ncol))/ztodt
        call outfld ('dEdt_cpdycore'           , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
-       !
-       ! save state for energy fixer
-       !
-       call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
+       TE_dEdt_cpdycore(:ncol) = (te(:ncol)-te_endphys(:ncol))/ztodt
+       call outfld ('TE_dEdt_cpdycore'           , TE_dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
        if (thermo_budget_history) then
           call tot_energy_phys(state, 'phAM')
           call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
        end if
-    if (thermo_budget_history) then
-       call tot_energy_phys(state, 'phAM')
-       call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
-    end if!xxx
-
        if (vc_dycore == vc_height.or.vc_dycore == vc_dry_pressure) then
           !
           ! scale for dycore consistency
@@ -1291,14 +1284,19 @@ end subroutine check_energy_get_integrals
        !
        ! compute total enthalpy flux
        !
-       enthalpy_flux_tot(:ncol) = enthalpy_prec_bc(:ncol,hliq_idx)+enthalpy_prec_bc(:ncol,hice_idx)+&
-            enthalpy_prec_ac(:ncol,hliq_idx)+enthalpy_prec_ac(:ncol,hice_idx)+&
-            enthalpy_evap(:ncol)
+       enthalpy_flux_tot(:ncol) = implied_adjustment(:ncol)!enthalpy_prec_bc(:ncol,hliq_idx)+enthalpy_prec_bc(:ncol,hice_idx)+&
+            !enthalpy_prec_ac(:ncol,hliq_idx)+enthalpy_prec_ac(:ncol,hice_idx)+&
+            !enthalpy_evap(:ncol)
 
        !
        ! make sure energy fixer does not fix enthalpy flux passed to ocean
        !
        state%te_cur(:ncol,dyn_te_idx) = state%te_cur(:ncol,dyn_te_idx)+ztodt*enthalpy_flux_tot(:ncol)*cam_in%ocnfrac(:ncol)
+       !
+       ! save state for energy fixer
+       !
+       call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
+
        !
        ! diagnostics
        !
@@ -1306,13 +1304,14 @@ end subroutine check_energy_get_integrals
        call outfld ('enth_flux_to_ocn' , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
        dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*(1.0_r8-cam_in%ocnfrac(:ncol))
        call outfld ('enth_flux_to_not_ocn' , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
-       call outfld("enth_prec_ac_hliq"  , enthalpy_prec_ac(:,hliq_idx)     , pcols   ,lchnk   )
+
        !
        ! change reference state for ocean
        !
        implied_adjustment(:ncol) = dEdt_cpdycore(:ncol)-(se_dme_ref(:ncol)-se_endphys_ref(:ncol))/ztodt
        enthalpy_prec_ac(:ncol,hice_idx) = 0.0_r8
        enthalpy_prec_ac(:ncol,hliq_idx) = implied_adjustment(:ncol)
+       call outfld("enth_prec_ac_hliq"  , enthalpy_prec_ac(:,hliq_idx)     , pcols   ,lchnk   )
     case DEFAULT
        enthalpy_prec_ac(:ncol,hice_idx) =  -enthalpy_prec_ac(:ncol,fice_idx)*cpice*state%T(:ncol,pver)
        enthalpy_prec_ac(:ncol,hliq_idx) =  -enthalpy_prec_ac(:ncol,fliq_idx)*cpliq*state%T(:ncol,pver)
