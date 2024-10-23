@@ -529,11 +529,11 @@ subroutine cam_export(state,cam_in,cam_out,pbuf)
       call pbuf_set_field(pbuf, enthalpy_prec_bc_idx, enthalpy_prec_bc)
       call pbuf_set_field(pbuf, enthalpy_evap_idx, -cam_out%hevap)!use sign for atmosphere
 
-      tmp(:ncol) = cam_out%hsnow(:ncol)*cam_in%ocnfrac(:ncol)
+      tmp(:ncol) = cam_out%hsnow(:ncol)!*cam_in%ocnfrac(:ncol)
       call outfld("hsnow_liq_ref"  , tmp, pcols   ,lchnk   )!xxx debug
-      tmp(:ncol) = cam_out%hrain(:ncol)*cam_in%ocnfrac(:ncol)
+      tmp(:ncol) = cam_out%hrain(:ncol)!*cam_in%ocnfrac(:ncol)
       call outfld("hrain_liq_ref"  ,  tmp, pcols   ,lchnk   )!xxx debug
-      tmp(:ncol) = cam_out%hevap(:ncol)*cam_in%ocnfrac(:ncol)
+      tmp(:ncol) = cam_out%hevap(:ncol)!*cam_in%ocnfrac(:ncol)
       call outfld("hevap_liq_ref"  , tmp, pcols   ,lchnk   )!xxx debug
    else
       call get_prec_vars(ncol,pbuf,&

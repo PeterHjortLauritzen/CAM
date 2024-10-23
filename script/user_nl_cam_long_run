@@ -60,12 +60,12 @@ thermo_budget_history          = .true.
 avgflag_pertape(8) = 'N'
 
 avgflag_pertape(9) = 'A'
-fincl9 =  'enth_prec_ac_hice:A','enth_prec_ac_hliq:A','enth_prec_bc_hice:A','enth_prec_bc_hliq:A','enth_prec_ac_fice:A','enth_prec_ac_fliq:A','enth_prec_bc_fice:A',
- 'enth_prec_bc_fliq:A','enth_evap_hevap:A','cpice_srf:A','te_tnd:A','te_lat:A','ls_srf:A','lf_srf:A','dEdt_dme:A','dEdt_physics:A',         
-'dEdt_cpdycore:A','residual:A','dEdt_enth_fix:A','enth_fix_fct_bc_tot:A','enth_fix_fct_ac_tot:A','enthalpy_heating_fix_bc:A','enthalpy_heating_fix_ac:A',   
-'dEdt_efix_physics:A','EFIX:A','enth_flux_to_not_ocn:A','enth_flux_to_ocn:A','hsnow_liq_ref:A','hrain_liq_ref:A','hevap_liq_ref:A','OCNFRAC'
+fincl9 =  'enth_prec_ac_hice','enth_prec_ac_hliq','enth_prec_bc_hice','enth_prec_bc_hliq','enth_prec_ac_fice','enth_prec_ac_fliq','enth_prec_bc_fice',
+ 'enth_prec_bc_fliq','enth_evap_hevap','cpice_srf','te_tnd','te_lat','ls_srf','lf_srf','dEdt_dme','dEdt_physics',         
+'dEdt_cpdycore','residual','dEdt_enth_fix','enth_fix_fct_bc_tot','enth_fix_fct_ac_tot','enthalpy_heating_fix_bc','enthalpy_heating_fix_ac',   
+'dEdt_efix_physics','EFIX','enth_flux_to_not_ocn','enth_flux_to_ocn','hsnow_liq_ref','hrain_liq_ref','hevap_liq_ref','OCNFRAC','ICEFRAC','LANDFRAC'
 avgflag_pertape(10) = 'A'
-fincl10 =  'enth_prec_ac_hice:A','enth_prec_ac_hliq:A','enth_prec_bc_hice:A','enth_prec_bc_hliq:A','enth_prec_ac_fice:A','enth_prec_ac_fliq:A','enth_prec_bc_fice:A',
- 'enth_prec_bc_fliq:A','enth_evap_hevap:A','cpice_srf:A','te_tnd:A','te_lat:A','ls_srf:A','lf_srf:A','dEdt_dme:A','dEdt_physics:A',         
-'dEdt_cpdycore:A','residual:A','dEdt_enth_fix:A','enth_fix_fct_bc_tot:A','enth_fix_fct_ac_tot:A','enthalpy_heating_fix_bc:A','enthalpy_heating_fix_ac:A',   
-'dEdt_efix_physics:A','EFIX:A','enth_flux_to_not_ocn:A','enth_flux_to_ocn:A','hsnow_liq_ref:A','hrain_liq_ref:A','hevap_liq_ref:A','OCNFRAC'
+fincl10 =  'enth_prec_ac_hice','enth_prec_ac_hliq','enth_prec_bc_hice','enth_prec_bc_hliq','enth_prec_ac_fice','enth_prec_ac_fliq','enth_prec_bc_fice',
+ 'enth_prec_bc_fliq','enth_evap_hevap','cpice_srf','te_tnd','te_lat','ls_srf','lf_srf','dEdt_dme','dEdt_physics',         
+'dEdt_cpdycore','residual','dEdt_enth_fix','enth_fix_fct_bc_tot','enth_fix_fct_ac_tot','enthalpy_heating_fix_bc','enthalpy_heating_fix_ac',   
+'dEdt_efix_physics','EFIX','enth_flux_to_not_ocn','enth_flux_to_ocn','hsnow_liq_ref','hrain_liq_ref','hevap_liq_ref','OCNFRAC','ICEFRAC','LANDFRAC'
