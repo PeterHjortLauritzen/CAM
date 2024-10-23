@@ -20,9 +20,16 @@ begin
 ;  tidx = 191
 
 
+;
+
+
+
+;  casename = "b.e30_enthalpy_branch.BLT1850.ne30_t232.enthalpy.12"
+;  dir="/glade/derecho/scratch/gmarques/archive/"+casename+"//"
 
   casename = "cam_enth_simple_debug"
   dir="/glade/derecho/scratch/pel/"+casename+"/run/"
+
   fname = casename+".cam.h7a."
   fnameall =  systemfunc("ls "+dir+fname+"*.nc")
   fall = addfiles(fnameall,"r")       ; Open netCDF files.

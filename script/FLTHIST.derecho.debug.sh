@@ -10,8 +10,8 @@ setenv PBS_ACCOUNT P93300642
 #
 #set src="cam_development"
 
-set src="cam_enth_simple"   #cam_enthalpy"
-set caze=cam_enth_simple_debug
+set src="cesm3_0_enthalpy_branch" #"cam_enth_simple"   #cam_enthalpy"
+set caze=cam_enth_simple_dbg
 #set caze=cam_enth_simple_ocnfrc_zmconv_ke_1E-5
 #set caze=cam_enth_simple_ocnfrc_efix
 #set caze=cam_enth_simple_ocnfrc_cpstar
@@ -86,10 +86,10 @@ echo "phys_grid_ctem_za_nlat=90"                                                
 echo "clubb_c8 = 4.35 "                                                                                                                                          >> user_nl_cam
 
 #echo "fincl9 = 'EFIX'"                  >> user_nl_cam
-echo "fincl9 =  'enth_prec_ac_hice:I','enth_prec_ac_hliq:I','enth_prec_bc_hice:I','enth_prec_bc_hliq:I','enth_prec_ac_fice:I','enth_prec_ac_fliq:I','enth_prec_bc_fice:I',"  >> user_nl_cam
-echo " 'enth_prec_bc_fliq:I','enth_evap_hevap:I','cpice_srf:I','te_tnd:I','te_lat:I','ls_srf:I','lf_srf:I','dEdt_dme:I','dEdt_physics:I',         " >> user_nl_cam
-echo "'dEdt_cpdycore:I','residual:I','dEdt_enth_fix:I','enth_fix_fct_bc_tot:I','enth_fix_fct_ac_tot:I','enthalpy_heating_fix_bc:I','enthalpy_heating_fix_ac:I',   " >> user_nl_cam
-echo "'dEdt_efix_physics:I','EFIX:I'"    >> user_nl_cam
+echo "fincl9 =  'enth_prec_ac_hice','enth_prec_ac_hliq','enth_prec_bc_hice','enth_prec_bc_hliq','enth_prec_ac_fice','enth_prec_ac_fliq','enth_prec_bc_fice',"  >> user_nl_cam
+echo " 'enth_prec_bc_fliq','enth_evap_hevap','cpice_srf','te_tnd','te_lat','ls_srf','lf_srf','dEdt_dme','dEdt_physics',         " >> user_nl_cam
+echo "'dEdt_cpdycore','residual','dEdt_enth_fix','enth_fix_fct_bc_tot','enth_fix_fct_ac_tot','enthalpy_heating_fix_bc','enthalpy_heating_fix_ac','OCNFRAC',   " >> user_nl_cam
+echo "'dEdt_efix_physics','EFIX'"    >> user_nl_cam
 echo "avgflag_pertape(9) = 'I'" >> user_nl_cam
 echo "avgflag_pertape(10) = 'I'" >> user_nl_cam
 echo "fincl10= 'dEdt_dycore','dEdt_floating_dyn','dEdt_vert_remap','dEdt_phys_tot_in_dyn','dEdt_del4','dEdt_del4_fric_heat','dEdt_del4_tot','dEdt_del2_sponge','dEdt_del2_del4_tot','dEdt_residual'" >> user_nl_cam
