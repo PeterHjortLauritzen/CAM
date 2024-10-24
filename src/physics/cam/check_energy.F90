@@ -1157,7 +1157,8 @@ end subroutine check_energy_get_integrals
        !
        ! make sure energy fixer does not fix enthalpy flux passed to ocean
        !
-       state%te_cur(:ncol,dyn_te_idx) = state%te_cur(:ncol,dyn_te_idx)+ztodt*enthalpy_flux_tot(:ncol)*cam_in%ocnfrac(:ncol)
+       state%te_cur(:ncol,dyn_te_idx) = state%te_cur(:ncol,dyn_te_idx)+ztodt*enthalpy_flux_tot(:ncol)*&
+            (cam_in%ocnfrac(:ncol)+cam_in%icefrac(:ncol))
        !
        ! save state for energy fixer
        !
@@ -1165,9 +1166,9 @@ end subroutine check_energy_get_integrals
        !
        ! diagnostics
        !
-       dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*cam_in%ocnfrac(:ncol)
+       dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*(cam_in%ocnfrac(:ncol)+cam_in%icefrac(:ncol))
        call outfld ('enth_flux_to_ocn' , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
-       dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*(1.0_r8-cam_in%ocnfrac(:ncol))
+       dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*(1.0_r8-(cam_in%ocnfrac(:ncol)+cam_in%icefrac(:ncol)))
        call outfld ('enth_flux_to_not_ocn' , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
 
        !
@@ -1291,7 +1292,8 @@ end subroutine check_energy_get_integrals
        !
        ! make sure energy fixer does not fix enthalpy flux passed to ocean
        !
-       state%te_cur(:ncol,dyn_te_idx) = state%te_cur(:ncol,dyn_te_idx)+ztodt*enthalpy_flux_tot(:ncol)*cam_in%ocnfrac(:ncol)
+       state%te_cur(:ncol,dyn_te_idx) = state%te_cur(:ncol,dyn_te_idx)+ztodt*enthalpy_flux_tot(:ncol)*&
+            (cam_in%ocnfrac(:ncol)+cam_in%icefrac(:ncol))
        !
        ! save state for energy fixer
        !
@@ -1300,9 +1302,9 @@ end subroutine check_energy_get_integrals
        !
        ! diagnostics
        !
-       dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*cam_in%ocnfrac(:ncol)
+       dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*(cam_in%ocnfrac(:ncol)+cam_in%icefrac(:ncol))
        call outfld ('enth_flux_to_ocn' , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
-       dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*(1.0_r8-cam_in%ocnfrac(:ncol))
+       dEdt_cpdycore(:ncol) = enthalpy_flux_tot(:ncol)*(1.0_r8-(cam_in%ocnfrac(:ncol)+cam_in%icefrac(:ncol)))
        call outfld ('enth_flux_to_not_ocn' , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
 
        !
