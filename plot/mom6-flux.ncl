@@ -2,6 +2,7 @@ load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_code.ncl"
 load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_csm.ncl"
 begin
   option = "nhtfrq1-B-case"
+;  option = "F-case"
 
   output_format="pdf"
 
@@ -11,22 +12,24 @@ begin
 ;
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-;  casename = "b.e30_alpha03c_enthalpy.BLT1850.ne30_t232.enthalpy.09"
-;;  casename = "b.e30_alpha03c_enthalpy.BLT1850.ne30_t232.enthalpy.06"
-;  dir="/glade/derecho/scratch/gmarques/"+casename+"/run/"
-;  fname = casename+".cam.h7i."
-;  fnameall =  systemfunc("ls "+dir+fname+"*.nc")
-;  fall = addfiles(fnameall,"r")       ; Open netCDF files.
-;;;
-;;; if energy diags on file
-;;;
-;  fname_energy = casename+".cam.h8i."
-;  fnameall_energy =  systemfunc("ls "+dir+fname_energy+"*.nc")
-;    print(fnameall_energy)
-;  fall_energy = addfiles(fnameall_energy,"r")       ; Open netCDF files.
-;
-;  tidx = 191
+  if (option .eq. "F-case") then
+    tidx=21
+    tt = "tidx_"+tidx
+    casename = "cam_enth_simple_dbg"
+    dir="/glade/derecho/scratch/pel/"+casename+"/run/"
 
+   fname = casename+".cam.h8a."
+   fnameall =  systemfunc("ls "+dir+fname+"*.nc")
+   fall = addfiles(fnameall,"r")       ; Open netCDF files.
+   print(fnameall)
+   ;
+   ;  if energy diags on file
+   ;
+   fname_energy = casename+".cam.h7a."
+   fnameall_energy =  systemfunc("ls "+dir+fname_energy+"*.nc")
+   print(fnameall_energy)
+   fall_energy = addfiles(fnameall_energy,"r")       ; Open netCDF files.
+  end if
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++
 ;
@@ -35,7 +38,8 @@ begin
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++
   if (option .eq. "nhtfrq1-B-case") then
 ;    tt = "0001-01-03-84600"
-    tt = "0001-01-04-00000"
+;    tt = "0001-01-04-00000"
+    tt = "0001-01-04-01800"
     casename = "b.e30_enthalpy_branch.BLT1850.ne30_t232.enthalpy.12"
     dir="/glade/derecho/scratch/gmarques/"+casename+"/run/"
 
@@ -57,6 +61,7 @@ begin
   end if
 
   OCNFRAC=fall[:]->OCNFRAC
+  ICEFRAC=fall[:]->ICEFRAC
   
   tmp=fall[:]->EFIX
   date=fall[:]->date
@@ -74,7 +79,7 @@ begin
   ncol        = dimsizes(tmp(0,:))
   ncol_p      = ncol
   area        = fall[0]->area
-  area_sphere_ocn = sum(OCNFRAC(0,0:ncol-1)*area(0:ncol-1))
+  area_sphere_ocn = sum((OCNFRAC(0,:)+ICEFRAC(0,:))*area(:))
  
   area_sphere = sum(area(0:ncol-1))
 
@@ -141,7 +146,7 @@ begin
 ; *NEWPAGENEWPAGENEWPAGENEWPAGENEWPAGENEWPAGE
 ; ***********************************************
 ; ***********************************************
-  filePlot = "ocnfrac-flux-to-coupler-from-CAM."+tt
+  filePlot = "flux-to-coupler-from-CAM."+tt
   wks = gsn_open_wks(output_format,filePlot)
   gsn_define_colormap(wks,"NCV_jaisnd");3gauss")      
     
@@ -176,10 +181,10 @@ begin
 ; 
 ; ***********************************************
 
-  fld = hsnow_liq_ref(tidx,0:ncol_p-1)
-  str = "hsnow_liq_ref (OCN only)"
-  fmin = -2.
-  fmax = 2.
+  fld = hsnow_liq_ref(tidx,:)
+  str = "hsnow_liq_ref"
+  fmin = -1.
+  fmax = 1.
 
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
@@ -195,7 +200,7 @@ begin
   res_p@sfYArray            = lat1d
 
   res_p@gsnLeftString        = str
-  global_ave = sum(area*fld)/area_sphere_ocn
+  global_ave = sum(area*fld)/area_sphere
   print(str+" global ave: "+global_ave)
   res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
   plot(0) = gsn_csm_contour_map_ce(wks,fld,res_p)
@@ -204,122 +209,8 @@ begin
 ; 
 ; ***********************************************
 
-  fld = hrain_liq_ref(tidx,0:ncol_p-1)
-  str = "hrain_liq_ref (OCN only)"
-  fmin = -25.
-  fmax = 25.
-
-  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
-  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
-  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
-  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
-
-  min_f = min(fld)
-  max_f = max(fld)
-  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
-  print(str+" min/max: "+min_f+"  "+max_f)
-
-  res_p@sfXArray            = lon1d
-  res_p@sfYArray            = lat1d
-
-  res_p@gsnLeftString        = str
-  global_ave = sum(area*fld)/area_sphere_ocn
-  print(str+" global ave: "+global_ave)
-  res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
-  plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
-
-; ***********************************************
-; 
-; ***********************************************
-
-  fld = hevap_liq_ref(tidx,0:ncol_p-1)
-  str = "hevap_liq_ref (OCN only)"
-  fmin = -25.
-  fmax = 25.
-
-  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
-  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
-  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
-  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
-
-  min_f = min(fld)
-  max_f = max(fld)
-  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
-  print(str+" min/max: "+min_f+"  "+max_f)
-
-  res_p@sfXArray            = lon1d
-  res_p@sfYArray            = lat1d
-
-  res_p@gsnLeftString        = str
-  global_ave = sum(area*fld)/area_sphere_ocn
-  print(str+" global ave: "+global_ave)
-  res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
-  plot(2) = gsn_csm_contour_map_ce(wks,fld,res_p)
-
-; ***********************************************
-; 
-; ***********************************************
-
-  fld = hevap_liq_ref(tidx,0:ncol_p-1)+hrain_liq_ref(tidx,0:ncol_p-1)+hsnow_liq_ref(tidx,0:ncol_p-1)
-  str = "(a)+(b)+(c) (OCN only)"
-  fmin = -25.
-  fmax = 25.
-
-  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
-  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
-  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
-  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
-
-  min_f = min(fld)
-  max_f = max(fld)
-  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
-  print(str+" min/max: "+min_f+"  "+max_f)
-
-  res_p@sfXArray            = lon1d
-  res_p@sfYArray            = lat1d
-
-  res_p@gsnLeftString        = str
-  global_ave = sum(area*fld)/area_sphere_ocn
-  print(str+" global ave: "+global_ave)
-  res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
-  plot(3) = gsn_csm_contour_map_ce(wks,fld,res_p)
-
-
-
-; ***********************************************
-; Plot everything
-; ***********************************************
-  resP                  = True                   ; modify the panel plot
-  resP@gsnFrame         = False                  ; don't advance panel plot
-  resP@gsnPanelFigureStrings = (/"a","b","c","d","e","f","g","h","i","j"/)
-  resP@gsnPanelYWhiteSpacePercent = 4.0
-  resP@gsnPanelXWhiteSpacePercent = 4.0
-
-  resP@txString   = "h-flux to coupler from CAM (means using ocn area only): "+tt
-
-
-  gsn_panel(wks,plot,(/3,2/),resP)               ; now draw as one plot
-
-  txres               = True
-  frame(wks)
-
-
-
-  delete(plot)
-  plot = new(9,graphic)
-; ***********************************************
-; *NEWPAGENEWPAGENEWPAGENEWPAGENEWPAGENEWPAGE
-; *NEWPAGENEWPAGENEWPAGENEWPAGENEWPAGENEWPAGE
-; ***********************************************
-; ***********************************************
-  filePlot = "enthalpy-flux-end-of-CAM-physics."+tt
-  wks = gsn_open_wks(output_format,filePlot)  
-; ***********************************************
-; 
-; ***********************************************
-
-  fld = enth_flux_to_ocn(tidx,0:ncol_p-1)
-  str = "Enthalpy flux over ocean end of CAM"
+  fld = hrain_liq_ref(tidx,:)
+  str = "hrain_liq_ref"
   fmin = -25.
   fmax = 25.
 
@@ -338,16 +229,138 @@ begin
 
   res_p@gsnLeftString        = str
   global_ave = sum(area*fld)/area_sphere
-  global_ave_enth_flux_to_ocn = global_ave
   print(str+" global ave: "+global_ave)
   res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
-  plot(0) = gsn_csm_contour_map_ce(wks,fld,res_p)
+  plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
 ; 
 ; ***********************************************
 
-  fld = enth_flux_to_not_ocn(tidx,0:ncol_p-1)
+  fld = hevap_liq_ref(tidx,:)
+  str = "hevap_liq_ref"
+  fmin = -5.
+  fmax = 5.
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld)
+  max_f = max(fld)
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area*fld)/area_sphere
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
+  plot(2) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+; ***********************************************
+; 
+; ***********************************************
+
+  fld = (hevap_liq_ref(tidx,:)+hrain_liq_ref(tidx,:)+hsnow_liq_ref(tidx,:))
+  str = "(a)+(b)+(c)"
+  fmin = -25.
+  fmax = 25.
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld)
+  max_f = max(fld)
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area*fld)/area_sphere
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
+  plot(3) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+
+
+; ***********************************************
+; Plot everything
+; ***********************************************
+  resP                  = True                   ; modify the panel plot
+  resP@gsnFrame         = False                  ; don't advance panel plot
+  resP@gsnPanelFigureStrings = (/"a","b","c","d","e","f","g","h","i","j"/)
+  resP@gsnPanelYWhiteSpacePercent = 4.0
+  resP@gsnPanelXWhiteSpacePercent = 4.0
+
+  resP@txString   = "h-flux to coupler from CAM: "+tt
+  txres               = True
+  txres@txFontHeightF = 0.012
+  str = "Area sphere = "+area_sphere
+  gsn_text_ndc(wks, str, 0.5, 0.05, txres)
+
+  gsn_panel(wks,plot,(/3,2/),resP)               ; now draw as one plot
+
+
+  frame(wks)
+
+
+
+  delete(plot)
+  plot = new(9,graphic)
+; ***********************************************
+; *NEWPAGENEWPAGENEWPAGENEWPAGENEWPAGENEWPAGE
+; *NEWPAGENEWPAGENEWPAGENEWPAGENEWPAGENEWPAGE
+; ***********************************************
+; ***********************************************
+  filePlot = "enthalpy-flux-end-of-CAM-physics."+tt
+  wks = gsn_open_wks(output_format,filePlot)  
+
+
+; 
+; ***********************************************
+
+  fld = EFIX(tidx,:)
+  str = "Energy fixer"
+  fmin = -25.
+  fmax = 25.
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld)
+  max_f = max(fld)
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  delete(res_p@sfXArray)
+  delete(res_p@sfYArray)
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area*fld)/area_sphere
+  global_ave_efix = global_ave
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
+  plot(0) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+
+
+; ***********************************************
+; 
+; ***********************************************
+
+  fld = enth_flux_to_not_ocn(tidx,:)
   str = "Enthalpy flux over not ocean end of CAM"
   fmin = -25.
   fmax = 25.
@@ -367,7 +380,7 @@ begin
 
   res_p@gsnLeftString        = str
   global_ave = sum(area*fld)/area_sphere
-  global_ave_enth_flux_to_ocn = global_ave
+  global_ave_enth_flux_not_to_ocn = global_ave  
   print(str+" global ave: "+global_ave)
   res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
   plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
@@ -446,36 +459,6 @@ begin
   plot(3) = gsn_csm_contour_map_ce(wks,fldE,res_p)
 
 ; ***********************************************
-; 
-; ***********************************************
-
-  fld = EFIX(tidx,:)
-  str = "Energy fixer"
-  fmin = -25.
-  fmax = 25.
-
-  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
-  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
-  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
-  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
-
-  min_f = min(fld)
-  max_f = max(fld)
-  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
-  print(str+" min/max: "+min_f+"  "+max_f)
-
-  delete(res_p@sfXArray)
-  delete(res_p@sfYArray)
-  res_p@sfXArray            = lon1d
-  res_p@sfYArray            = lat1d
-
-  res_p@gsnLeftString        = str
-  global_ave = sum(area*fld)/area_sphere
-  global_ave_efix = global_ave
-  print(str+" global ave: "+global_ave)
-  res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
-  plot(4) = gsn_csm_contour_map_ce(wks,fld,res_p)
-
 
 
 
@@ -488,14 +471,14 @@ begin
   resP@gsnPanelYWhiteSpacePercent = 4.0
   resP@gsnPanelXWhiteSpacePercent = 4.0
 
-  resP@txString   = "dEdt budget CAM: instantaneous output"
-  gsn_panel(wks,plot,(/3,2/),resP)               ; now draw as one plot
-  txres@txFontHeightF = 0.015
-  str = "- dE/dt EFIX = - flux passed to MOM6 (a) + dE/dt DME (b) + dE/dt dycore (c) + dE/dt coupling errors"
-  gsn_text_ndc(wks, str, 0.5, 0.3, txres)
-  dEdt_coupling_errors = -global_ave_enth_flux_to_ocn+global_ave_TE_dEdt_dme_adjust_dynE+global_ave_dycore+global_ave_efix
-  str = "dE/dt coupling errors ="+dEdt_coupling_errors+" W/m2"
-  gsn_text_ndc(wks, str, 0.5, 0.25, txres)
+  resP@txString   = "Energy fixer budget"
+  gsn_panel(wks,plot,(/2,2/),resP)               ; now draw as one plot
+  txres@txFontHeightF = 0.012
+  str = "EFIX should fix (b)+(c)+(d)+PDC errors+sampling"
+  gsn_text_ndc(wks, str, 0.5, 0.05, txres)
+  dEdt_coupling_errors = global_ave_enth_flux_not_to_ocn + global_ave_TE_dEdt_dme_adjust_dynE+global_ave_dycore ;+global_ave_efix
+  str = "(b)+(c)+(d) ="+dEdt_coupling_errors+" W/m2"
+  gsn_text_ndc(wks, str, 0.5, 0.02, txres)
   txres               = True
   frame(wks)
   delete(plot)
@@ -540,10 +523,10 @@ begin
 ; 
 ; ***********************************************
 
-  fld = hsnow_liq_ref(tidx,0:ncol_p-1)
+  fld = hsnow_liq_ref(tidx,:)*(OCNFRAC(tidx,:))
   str = "hsnow_liq_ref (OCN only)"
-  fmin = -2.
-  fmax = 2.
+  fmin = -1.
+  fmax = 1.
 
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
@@ -555,7 +538,9 @@ begin
   res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
   print(str+" min/max: "+min_f+"  "+max_f)
 
+  delete(res_p@sfXArray)
   res_p@sfXArray            = lon1d
+  delete(res_p@sfYArray)  
   res_p@sfYArray            = lat1d
 
   res_p@gsnLeftString        = str
@@ -568,7 +553,7 @@ begin
 ; 
 ; ***********************************************
 
-  fld = hrain_liq_ref(tidx,0:ncol_p-1)
+  fld = hrain_liq_ref(tidx,:)*(OCNFRAC(tidx,:))
   str = "hrain_liq_ref (OCN only)"
   fmin = -25.
   fmax = 25.
@@ -596,10 +581,10 @@ begin
 ; 
 ; ***********************************************
 
-  fld = hevap_liq_ref(tidx,0:ncol_p-1)
+  fld = hevap_liq_ref(tidx,:)*(OCNFRAC(tidx,:))
   str = "hevap_liq_ref (OCN only)"
-  fmin = -25.
-  fmax = 25.
+  fmin = -5.
+  fmax = 5.
 
   res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
   res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
@@ -624,7 +609,7 @@ begin
 ; 
 ; ***********************************************
 
-  fld = hevap_liq_ref(tidx,0:ncol_p-1)+hrain_liq_ref(tidx,0:ncol_p-1)+hsnow_liq_ref(tidx,0:ncol_p-1)
+  fld = (hevap_liq_ref(tidx,:)+hrain_liq_ref(tidx,:)+hsnow_liq_ref(tidx,:))*(OCNFRAC(tidx,:))
   str = "(a)+(b)+(c) (OCN only)"
   fmin = -25.
   fmax = 25.
@@ -675,7 +660,7 @@ begin
 ; *NEWPAGENEWPAGENEWPAGENEWPAGENEWPAGENEWPAGE
 ; ***********************************************
 ; ***********************************************
-  filePlot = "ocnfrac."+tt
+  filePlot = "frac."+tt
   wks = gsn_open_wks(output_format,filePlot)  
 ; ***********************************************
 ; 
@@ -703,8 +688,37 @@ begin
   global_ave = sum(area*fld)/area_sphere
   global_ave_enth_flux_to_ocn = global_ave
   print(str+" global ave: "+global_ave)
-  res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )+" W/m^2"
+  res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )
   plot(0) = gsn_csm_contour_map_ce(wks,fld,res_p)
+
+; ***********************************************
+; 
+; ***********************************************
+  delete(fld)
+  fld=ICEFRAC(tidx,:)
+  str = "ICEFRAC"
+  fmin = 0.
+  fmax = 1.
+
+  res_p@cnLevelSelectionMode = "ManualLevels"    ; manually set the contour levels with the following 3 resources
+  res_p@cnMinLevelValF  = fmin                        ; set the minimum contour level
+  res_p@cnMaxLevelValF  = fmax                   ; set the maximum contour level
+  res_p@cnLevelSpacingF = (fmax-fmin)/50.0                  ; set the interval between contours
+
+  min_f = min(fld)
+  max_f = max(fld)
+  res_p@lbTitleString    = "global min = "+sprintf("%6.4g",min_f)+"  global  max="+sprintf("%6.4g",max_f)
+  print(str+" min/max: "+min_f+"  "+max_f)
+
+  res_p@sfXArray            = lon1d
+  res_p@sfYArray            = lat1d
+
+  res_p@gsnLeftString        = str
+  global_ave = sum(area*fld)/area_sphere
+  global_ave_enth_flux_to_ocn = global_ave
+  print(str+" global ave: "+global_ave)
+  res_p@gsnRightString        = "mean: "+sprintf("%6.4g", global_ave        )
+  plot(1) = gsn_csm_contour_map_ce(wks,fld,res_p)
 
 ; ***********************************************
 ; Plot everything
@@ -715,8 +729,8 @@ begin
   resP@gsnPanelYWhiteSpacePercent = 4.0
   resP@gsnPanelXWhiteSpacePercent = 4.0
 
-  resP@txString   = "Ocean fraction"
-  gsn_panel(wks,plot,(/1,1/),resP)               ; now draw as one plot
+  resP@txString   = "Ocean and ice fractions"
+  gsn_panel(wks,plot,(/2,1/),resP)               ; now draw as one plot
 
   txres               = True
   frame(wks)
@@ -873,7 +887,7 @@ begin
 ; 
 ; ***********************************************
 
-  fld = EFIX(tidx,0:ncol_p-1)
+  fld = EFIX(tidx,:)
   str = "Energy fixer"
   fmin = -25.
   fmax = 25.
@@ -1074,7 +1088,7 @@ begin
 ; ***********************************************
 ; 
 ; ***********************************************
-;  fld = enth_flux_to_ocn(tidx,0:ncol_p-1)
+;  fld = enth_flux_to_ocn(tidx,:)
 ;  str = "Enthalpy flux to ocean"
 ;  fmin = -25.
 ;  fmax = 25.
