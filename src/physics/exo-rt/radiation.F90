@@ -422,8 +422,10 @@ subroutine radiation_init(pbuf2d)
    integer :: dtime
 
    !-----------------------------------------------------------------------
-   !jt not sure if setting camtop is needed
-   camtop = 1
+   !this is the only value set in initialize_rad_mod_cam:initialize_radbuffer
+   !I am setting this here for now until we get the camtop issue straightened out for MARS pressures
+
+   camtop = 31
 
    ! initialize solar spectrum, clouds, and kcoeff
    call init_solar
@@ -784,6 +786,7 @@ subroutine radiation_tend( &
    type(rad_out_t), pointer :: rd  ! allow rd_out to be optional by allocating a local object
                                    ! if the argument is not present
    logical  :: write_output
+   logical :: active_calls(0:N_DIAG)
 
     real(r8):: T           (state%ncol,pver) ! T temporary
     real(r8):: qv          (state%ncol,pver) ! Q temporary
@@ -907,6 +910,7 @@ subroutine radiation_tend( &
     real(r8), dimension(pcols,pverp) :: lwdown_rad
     real(r8), dimension(pcols,pverp) :: swup_rad
     real(r8), dimension(pcols,pverp) :: swdown_rad
+    integer :: icall                  ! index through climate/diagnostic radiation calls
 
     !------------------------------------------------------------------------
     !
@@ -984,11 +988,16 @@ subroutine radiation_tend( &
     call shr_orb_decl(calday, eccen, mvelpp, lambm0, obliqr, delta, eccf)
     ext_msdist=1.0/eccf
 
+    ! Get the active climate/diagnostic shortwave calculations
+    call rad_cnst_get_call_list(active_calls)
+
     !! Main calculation starts here !!
     !do_exo_rad determines if RT called on a given timesteps
     do_exo_rad = radiation_do('exort')
 
     if (do_exo_rad) then
+       do icall = N_DIAG, 0, -1
+       if (active_calls(icall)) then
        !write(*,*) "inside RT if statement"
 
        !-------for now, set these topography angles to 0 (ie, no topography blocking sun)
@@ -1055,6 +1064,7 @@ subroutine radiation_tend( &
 
        ! Do a parallel clearsky radiative calculation so we can calculate cloud forcings
        ! Setting do_exo_rt_clearsky to true, slows the code dramatically, use wisely and sparingly
+         ! The climate (icall==0) calculation must occur last.
        if (do_exo_rt_clearsky) then
 
           ! set clouds to zero everywhere
@@ -1112,33 +1122,33 @@ subroutine radiation_tend( &
           fln(:,:) = lwup_rad(:,:) - lwdown_rad(:,:)
           fsns(:) = fsn(:,pverp)
           flns(:) = fln(:,pverp)
-          fsnt(:) = fsn(:,1)
-          flnt(:) = fln(:,1)
+          fsnt(:) = fsn(:,camtop)
+          flnt(:) = fln(:,camtop)
           fsds(:) = swdown_rad(:,pverp)
-          qrs(:ncol,:pver) = ftem(:ncol,:pver)
-          qrl(:ncol,:pver) = ftem2(:ncol,:pver)
+          !ftem/sw_dTdt heating rates in K/s convert QRS/QRL to j/kg/s to be carried in physics buffer
+          qrs(:ncol,:pver) = ftem(:ncol,:pver)*cpair
+          qrl(:ncol,:pver) = ftem2(:ncol,:pver)*cpair
 
-          !jt             call outfld('QRSC     ',qrs*SHR_CONST_CDAY  , pcols,lchnk)    ! [K/day]
-!!$          call outfld('QRSC     ',qrs*exo_diurnal  , pcols,lchnk)    ! [K/day]
-!!$          call outfld('FSDSC    ',fsds  ,pcols,lchnk)
-!!$          call outfld('FSNTC    ',fsnt  ,pcols,lchnk)
-!!$          call outfld('FSNSC    ',fsns  ,pcols,lchnk)
-!!$          !jt             call outfld('QRLC     ',qrl*SHR_CONST_CDAY   ,pcols,lchnk)    ! [K/day]
-!!$          call outfld('QRLC     ',qrl*exo_diurnal   ,pcols,lchnk)    ! [K/day]
-!!$          call outfld('FLNTC    ',flnt  ,pcols,lchnk)
-!!$          call outfld('FLUTC    ',lwup_rad(:,2)  ,pcols,lchnk)
-!!$          call outfld('FLNSC    ',flns  ,pcols,lchnk)
-!!$          call outfld('FULC     ',lwup_rad, pcols, lchnk)
-!!$          call outfld('FDLC     ',lwdown_rad, pcols, lchnk)
-!!$          call outfld('FUSC     ',swup_rad, pcols, lchnk)
-!!$          call outfld('FDSC     ',swdown_rad, pcols, lchnk)
-!jt          call outfld('SOLSC    ',cam_out%sols  ,pcols,lchnk)
-!jt          call outfld('SOLLC    ',cam_out%soll  ,pcols,lchnk)
-!jt          call outfld('SOLSDC   ',cam_out%solsd ,pcols,lchnk)
-!jt          call outfld('SOLLDC   ',cam_out%solld ,pcols,lchnk)
+          !QRS/QRL written out in K/s
+          call outfld(trim('QRSC     ')//diag(icall) ,qrs/cpair   , pcols,lchnk)    ! [K/s]
+          call outfld(trim('FSDSC    ')//diag(icall) ,fsds  ,pcols,lchnk)
+          call outfld(trim('FSNTC    ')//diag(icall) ,fsnt  ,pcols,lchnk)
+          call outfld(trim('FSNSC    ')//diag(icall) ,fsns  ,pcols,lchnk)
+          call outfld(trim('QRLC     ')//diag(icall) ,qrl/cpair   ,pcols,lchnk)    ! [K/s]
+          call outfld(trim('FLNTC    ')//diag(icall) ,flnt  ,pcols,lchnk)
+          call outfld(trim('FLUTC    ')//diag(icall) ,lwup_rad(:,camtop)  ,pcols,lchnk)
+          call outfld(trim('FLNSC    ')//diag(icall) ,flns  ,pcols,lchnk)
+          call outfld(trim('FULC     ')//diag(icall) ,lwup_rad, pcols, lchnk)
+          call outfld(trim('FDLC     ')//diag(icall) ,lwdown_rad, pcols, lchnk)
+          call outfld(trim('FUSC     ')//diag(icall) ,swup_rad, pcols, lchnk)
+          call outfld(trim('FDSC     ')//diag(icall) ,swdown_rad, pcols, lchnk)
+!!$          call outfld('SOLSC    ',cam_out%sols  ,pcols,lchnk)
+!!$          call outfld('SOLLC    ',cam_out%soll  ,pcols,lchnk)
+!!$          call outfld('SOLSDC   ',cam_out%solsd ,pcols,lchnk)
+!!$          call outfld('SOLLDC   ',cam_out%solld ,pcols,lchnk)
 
-!!$             call set_diags_clearsky()
-!!$             call radiation_output_clearsky(lchnk, ncol, icall, rd, pbuf, cam_out)
+!jt          call set_diags_clearsky()
+!jt          call radiation_output_clearsky(lchnk, ncol, icall, rd, pbuf, cam_out)
           if (do_exo_rt_spectral) call outfld_spectral_flux_clearsky(lchnk, ld, lu, su, sd)
 
        endif  ! (do_exo_rt_clearsky)
@@ -1146,8 +1156,10 @@ subroutine radiation_tend( &
        ! Do Column Radiative transfer calculation WITH clouds.
 
        ! For now set rel/rei to a reasonable value and init clouds to 0
-          rel=3.0_r8
-          rei=3.0_r8
+!jt          rel=3.0_r8
+!jt          rei=3.0_r8
+          rel=0.0_r8
+          rei=0.0_r8
           cicewp=0._r8
           cliqwp=0._r8
           cldfrc=0._r8
@@ -1206,36 +1218,38 @@ subroutine radiation_tend( &
        fln(:,:) = lwup_rad(:,:) - lwdown_rad(:,:)
        fsns(:) = fsn(:,pverp)
        flns(:) = fln(:,pverp)
-       fsnt(:) = fsn(:,1)
-       flnt(:) = fln(:,1)
+       fsnt(:) = fsn(:,camtop)
+       flnt(:) = fln(:,camtop)
        fsds(:) = swdown_rad(:,pverp)
-       qrs(:ncol,:pver) = ftem(:ncol,:pver)
-       qrl(:ncol,:pver) = ftem2(:ncol,:pver)
+       !ftem/sw_dTdt heating rates in K/s convert to j/kg/s to be carried in physics buffer
+       qrs(:ncol,:pver) = ftem(:ncol,:pver)*cpair
+       qrl(:ncol,:pver) = ftem2(:ncol,:pver)*cpair
 
-       !jt          call outfld('QRS     ',qrs*SHR_CONST_CDAY  , pcols,lchnk)    ! [K/day]
-       call outfld('QRS     ',qrs*exo_diurnal  , pcols,lchnk)    ! [K/day]
-!!$       call outfld('FSDS    ',fsds  ,pcols,lchnk)
+       !QRS/QRL outfielded in K/s
+       call outfld(trim('QRS     ')//diag(icall) ,qrs/cpair  , pcols,lchnk)    ! [K/s]
+       call outfld(trim('FSDS    ')//diag(icall) ,fsds  ,pcols,lchnk)
 !!$       call outfld('FSDTOA  ',fsdtoa  ,pcols,lchnk)
-!!$       call outfld('FSNT    ',fsnt  ,pcols,lchnk)
-!!$       call outfld('FSNS    ',fsns  ,pcols,lchnk)
-!!$       !jt          call outfld('QRL     ',qrl*SHR_CONST_CDAY   ,pcols,lchnk)    ! [K/day]
-       call outfld('QRL     ',qrl*exo_diurnal   ,pcols,lchnk)    ! [K/day]
-!!$       call outfld('FLNT    ',flnt  ,pcols,lchnk)
-!!$       call outfld('FLUT    ',lwup_rad(:,1)  ,pcols,lchnk)   ! was 2
-!!$       call outfld('FLNS    ',flns  ,pcols,lchnk)
-!!$       call outfld('FUL     ',lwup_rad, pcols, lchnk)
-!!$       call outfld('FDL     ',lwdown_rad, pcols, lchnk)
-!!$       call outfld('FUS     ',swup_rad, pcols, lchnk)
-!!$       call outfld('FDS     ',swdown_rad, pcols, lchnk)
-!!$       call outfld('SOLS    ',cam_out%sols  ,pcols,lchnk)
-!!$       call outfld('SOLL    ',cam_out%soll  ,pcols,lchnk)
-!!$       call outfld('SOLSD   ',cam_out%solsd ,pcols,lchnk)
-!!$       call outfld('SOLLD   ',cam_out%solld ,pcols,lchnk)
+       call outfld(trim('FSNT    ')//diag(icall) ,fsnt  ,pcols,lchnk)
+       call outfld(trim('FSNS    ')//diag(icall) ,fsns  ,pcols,lchnk)
+       !QRS/QRL outfielded in K/s
+       call outfld(trim('QRL     ')//diag(icall) ,qrl/cpair   ,pcols,lchnk)    ! [K/s]
+       call outfld(trim('FLNT    ')//diag(icall) ,flnt  ,pcols,lchnk)
+       call outfld(trim('FLUT    ')//diag(icall) ,lwup_rad(:,camtop)  ,pcols,lchnk)   ! was 2
+       call outfld(trim('FLNS    ')//diag(icall) ,flns  ,pcols,lchnk)
+       call outfld(trim('FUL     ')//diag(icall) ,lwup_rad, pcols, lchnk)
+       call outfld(trim('FDL     ')//diag(icall) ,lwdown_rad, pcols, lchnk)
+       call outfld(trim('FUS     ')//diag(icall) ,swup_rad, pcols, lchnk)
+       call outfld(trim('FDS     ')//diag(icall) ,swdown_rad, pcols, lchnk)
+       call outfld(trim('SOLS    ')//diag(icall) ,cam_out%sols  ,pcols,lchnk)
+       call outfld(trim('SOLL    ')//diag(icall) ,cam_out%soll  ,pcols,lchnk)
+       call outfld(trim('SOLSD   ')//diag(icall) ,cam_out%solsd ,pcols,lchnk)
+       call outfld(trim('SOLLD   ')//diag(icall) ,cam_out%solld ,pcols,lchnk)
 
        !jt          call set_diags_fullsky()
        !jt          call radiation_output_fullsky(lchnk, ncol, icall, rd, pbuf, cam_out)
        if (do_exo_rt_spectral) call outfld_spectral_flux_fullsky(lchnk, ld, lu, su, sd)
-
+    end if ! if active_call
+    end do
     else ! if (do_exo_rad) then
 
        ! Radiative flux calculations not done.  The quantity Q*dp is carried by the
@@ -1250,7 +1264,7 @@ subroutine radiation_tend( &
 !!$    call output_rad_data(pbuf, state, cam_in, landm, coszrs(i))
 
     ! Compute net radiative heating tendency
-    call radheat_tend(state, pbuf,  ptend, qrl*cpair, qrs*cpair, fsns, &
+    call radheat_tend(state, pbuf,  ptend, qrl, qrs, fsns, &
          fsnt, flns, flnt, cam_in%asdir, net_flx)
 
     ! Compute heating rate for dtheta/dt

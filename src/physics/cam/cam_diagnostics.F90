@@ -221,7 +221,7 @@ contains
     call register_vector_field('UAP','VAP')
 
     call addfld (apcnst(1), (/ 'lev' /), 'A','kg/kg',         trim(cnst_longname(1))//' (after physics)')
-    if (.not.dycore_is('EUL')) then 
+    if (.not.dycore_is('EUL')) then
       call addfld ('TFIX',    horiz_only,  'A', 'K/s',        'T fixer (T equivalent of Energy correction)')
     end if
     call addfld ('TTEND_TOT', (/ 'lev' /), 'A', 'K/s',        'Total temperature tendency')
@@ -365,7 +365,7 @@ contains
       call add_default ('UAP     '  , history_budget_histfile_num, ' ')
       call add_default ('VAP     '  , history_budget_histfile_num, ' ')
       call add_default (apcnst(1)   , history_budget_histfile_num, ' ')
-      if (.not.dycore_is('EUL')) then 
+      if (.not.dycore_is('EUL')) then
         call add_default ('TFIX    '    , history_budget_histfile_num, ' ')
       end if
     end if
@@ -1335,34 +1335,49 @@ contains
           call pbuf_get_field(pbuf, relhum_idx, ftem_ptr)
           ftem(:ncol,:) = ftem_ptr(:ncol,:)
        else
+#if (defined planet_mars )
+          ftem(:ncol,:) = -999._r8
+#else
           do k = 1, pver
              call qsat(state%t(1:ncol,k), state%pmid(1:ncol,k), tem2(1:ncol,k), ftem(1:ncol,k), ncol)
           end do
           ftem(:ncol,:) = state%q(:ncol,:,ixq)/ftem(:ncol,:)*100._r8
+#endif
        end if
        call outfld ('RELHUM  ',ftem    ,pcols   ,lchnk     )
     end if
 
     if (hist_fld_active('RHW') .or. hist_fld_active('RHI') .or. hist_fld_active('RHCFMIP') ) then
 
+#if (defined planet_mars )
+      ftem(:ncol,:) = -999._r8
+#else
       ! RH w.r.t liquid (water)
       do k = 1, pver
          call qsat_water (state%t(1:ncol,k), state%pmid(1:ncol,k), esl(1:ncol,k), ftem(1:ncol,k), ncol)
       end do
       ftem(:ncol,:) = state%q(:ncol,:,ixq)/ftem(:ncol,:)*100._r8
+#endif
       call outfld ('RHW  ',ftem    ,pcols   ,lchnk     )
 
       ! Convert to RHI (ice)
+#if (defined planet_mars )
+          ftem1(:ncol,:) = -999._r8
+#else
       do k=1,pver
          call svp_ice_vect(state%t(1:ncol,k), esi(1:ncol,k), ncol)
          do i=1,ncol
             ftem1(i,k)=ftem(i,k)*esl(i,k)/esi(i,k)
          end do
       end do
+#endif
       call outfld ('RHI  ',ftem1    ,pcols   ,lchnk     )
 
       ! use temperature to decide if you populate with ftem (liquid, above 0 C) or ftem1 (ice, below 0 C)
 
+#if (defined planet_mars )
+      ftem2(:ncol,:) = -999._r8
+#else
       ftem2(:ncol,:)=ftem(:ncol,:)
 
       do i=1,ncol
@@ -1374,7 +1389,7 @@ contains
           end if
         end do
       end do
-
+#endif
       call outfld ('RHCFMIP  ',ftem2    ,pcols   ,lchnk     )
 
     end if
@@ -1789,13 +1804,14 @@ contains
       call outfld('U10',      cam_in%u10,       pcols, lchnk)
       call outfld('UGUST',    cam_in%ugustOut,  pcols, lchnk)
       call outfld('U10WITHGUSTS',cam_in%u10withGusts, pcols, lchnk)
-
+#if (defined planet_mars )
+      ftem(:ncol) = -999._r8
+#else
       !
       ! Calculate and output reference height RH (RHREFHT)
       call qsat(cam_in%tref(1:ncol), state%ps(1:ncol), tem2(1:ncol), ftem(1:ncol), ncol)
       ftem(:ncol) = cam_in%qref(:ncol)/ftem(:ncol)*100._r8
-
-
+#endif
       call outfld('RHREFHT',   ftem,      pcols, lchnk)
 
 
@@ -2060,7 +2076,7 @@ contains
     ! Total physics tendency for Temperature
     ! (remove global fixer tendency from total for FV and SE dycores)
 
-    if (.not.dycore_is('EUL')) then 
+    if (.not.dycore_is('EUL')) then
       call check_energy_get_integrals( heat_glob_out=heat_glob )
       ftem2(:ncol)  = heat_glob/cpair
       call outfld('TFIX', ftem2, pcols, lchnk   )

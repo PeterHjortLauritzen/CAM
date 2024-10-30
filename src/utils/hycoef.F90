@@ -253,7 +253,8 @@ subroutine hycoef_init(file, psdry)
 #endif
       end do
 
-      write(iulog,9800)plevp,hyai(plevp),hybi(plevp),hyai(plevp)+hybi(plevp)
+!jt      write(iulog,9800)plevp,hyai(plevp),hybi(plevp),hyai(plevp)+hybi(plevp)
+      write(iulog,9800)plevp,hyai(plevp)*ps0,hybi(plevp)*psr,hyai(plevp)*ps0+hybi(plevp)*psr
       write(iulog,9820)
       do k=1,plev
          write(iulog,9830) k, hypi(k)
@@ -263,12 +264,12 @@ subroutine hycoef_init(file, psdry)
     end if
 
 #ifdef planet_mars
-9800 format( 1x, i3, 3p, 3(f10.4) )
-9810 format( 1x, 3x, 3p, 3(f10.4) )
+9800 format( 1x, i3, 3p, 3(f11.4,14x) )
+9810 format( 1x, 3x, 3p, 3(14x,f11.4) )
 #else
 9800 format( 1x, i3, 3p, 3(f10.4,10x) )
 9810 format( 1x, 3x, 3p, 3(10x,f10.4) )
-#endif    
+#endif
 9820 format(1x,'reference pressures (Pa)')
 9830 format(1x,i3,f15.4)
 9840 format(1x,3x,15x,2f15.4)
