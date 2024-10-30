@@ -10,8 +10,9 @@ setenv PBS_ACCOUNT P93300642
 #
 #set src="cam_development"
 
-set src="cesm3_0_enthalpy_branch" #"cam_enth_simple"   #cam_enthalpy"
-set caze=cam_enth_simple_dbg
+#set src="cesm3_0_enthalpy_branch" #"cam_enth_simple"   #cam_enthalpy"
+set src="cam6_4_036"
+set caze=cam6_4_036_dbg #"cam_enth_simple_dbg
 #set caze=cam_enth_simple_ocnfrc_zmconv_ke_1E-5
 #set caze=cam_enth_simple_ocnfrc_efix
 #set caze=cam_enth_simple_ocnfrc_cpstar
@@ -94,5 +95,5 @@ echo "avgflag_pertape(9) = 'I'" >> user_nl_cam
 echo "avgflag_pertape(10) = 'I'" >> user_nl_cam
 echo "fincl10= 'dEdt_dycore','dEdt_floating_dyn','dEdt_vert_remap','dEdt_phys_tot_in_dyn','dEdt_del4','dEdt_del4_fric_heat','dEdt_del4_tot','dEdt_del2_sponge','dEdt_del2_del4_tot','dEdt_residual'" >> user_nl_cam
 
-qcmd -A $proj -- ./case.build 
+#qcmd -A $proj -- ./case.build 
 #./case.submit
