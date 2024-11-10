@@ -50,13 +50,21 @@ contains
     ! Set model constant values
 #ifdef planet_mars
     call held_suarez_1994_mars_init(psurf_ref, errmsg, errflg)
+    ! This field is added by radiation when full physics is used
+    call addfld('QRS-HS', (/ 'lev' /), 'A', 'K/s', &
+         'Temperature tendency associated with the relaxation toward the equilibrium temperature profile')
+    call add_default('QRS-HS', 1, ' ')
 #else
     call held_suarez_1994_init(psurf_ref, errmsg, errflg)
-#endif
     ! This field is added by radiation when full physics is used
     call addfld('QRS', (/ 'lev' /), 'A', 'K/s', &
          'Temperature tendency associated with the relaxation toward the equilibrium temperature profile')
     call add_default('QRS', 1, ' ')
+#endif
+!!$    ! This field is added by radiation when full physics is used
+!!$    call addfld('QRS', (/ 'lev' /), 'A', 'K/s', &
+!!$         'Temperature tendency associated with the relaxation toward the equilibrium temperature profile')
+!!$    call add_default('QRS', 1, ' ')
  end subroutine held_suarez_init
 
   subroutine held_suarez_tend(state, ptend, ztodt)
@@ -76,7 +84,7 @@ contains
     !
     ! Input arguments
     !
-    type(physics_state), intent(inout) :: state
+    type(physics_state), intent(in) :: state
     real(r8),            intent(in)    :: ztodt            ! Two times model timestep (2 delta-t)
                                                            !
                                                            ! Output argument
@@ -140,8 +148,11 @@ contains
     if (pcols > ncol) then
       pmid(ncol+1:,:) = 0.0_r8
     end if
+#ifdef planet_mars
+    call outfld('QRS-HS', pmid, pcols, lchnk)
+#else
     call outfld('QRS', pmid, pcols, lchnk)
-
+#endif
   end subroutine held_suarez_tend
 
 end module held_suarez_cam

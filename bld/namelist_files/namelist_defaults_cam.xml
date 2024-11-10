@@ -501,6 +501,12 @@
 <do_exo_rt rad="exort"> .true. </do_exo_rt>
 <do_exo_gw rad="exort"> .false. </do_exo_gw>
 <do_exo_synchronous rad="exort"> .false. </do_exo_synchronous>
+<do_carma_exort rad="exort"> .false. </do_carma_exort>
+<do_exo_atmconst rad="exort"> .false. </do_exo_atmconst>
+<do_exo_condense_co2 rad="exort"> .false. </do_exo_condense_co2>
+<do_exo_co2cld_rad rad="exort"> .false. </do_exo_co2cld_rad>
+<do_exo_soilcp rad="exort"> .false. </do_exo_soilcp>
+<exo_rad_step rad="exort"> 1 </exo_rad_step>
 
 <!-- CAM-Chem bulk aerosols (different names used in prescribed and prognostic modes) -->
 <!-- Optics for RRTMG -->

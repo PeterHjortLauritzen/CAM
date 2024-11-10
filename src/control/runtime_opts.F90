@@ -202,6 +202,7 @@ subroutine read_namelist(nlfilename, single_column, scmlat, scmlon)
    call nudging_readnl(nlfilename)
 #if ( defined SIMPLE )
    call frierson_readnl(nlfilename)
+   call mars_readnl(nlfilename)
 #endif
 
    call dyn_readnl(nlfilename)

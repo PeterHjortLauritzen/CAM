@@ -1,11 +1,11 @@
 module history_scam
-!----------------------------------------------------------------------- 
-! 
+!-----------------------------------------------------------------------
+!
 ! Purpose: SCAM specific history code.
 !
 ! Public functions/subroutines:
 !   bldfld, h_default
-! 
+!
 ! Author: anonymous from code in cam_history.F90
 !-----------------------------------------------------------------------
    use shr_kind_mod, only: r8 => shr_kind_r8
@@ -19,16 +19,16 @@ PRIVATE
 !#######################################################################
 CONTAINS
    subroutine scm_intht()
-!----------------------------------------------------------------------- 
-! 
-! Purpose: 
+!-----------------------------------------------------------------------
+!
+! Purpose:
 !
 ! add master list fields to scm
-! 
+!
 ! Method: Call a subroutine to add each field
-! 
+!
 ! Author: CCM Core Group
-! 
+!
 !-----------------------------------------------------------------------
       use cam_history, only: addfld, add_default, horiz_only
 !-----------------------------------------------------------------------

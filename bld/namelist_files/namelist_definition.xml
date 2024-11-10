@@ -5810,6 +5810,40 @@ Enable gravity waves
 Default: FALSE
 </entry>
 
+<entry id="do_carma_exort" type="logical"  category="radiation"
+       group="radiation_nl" valid_values="" >
+Set to true only if running with the CARMA microphyiscs package
+and linking aerosol absorption to ExoRT
+Default: FALSE
+</entry>
+
+<entry id="do_exo_atmconst" type="logical"  category="radiation"
+       group="radiation_nl" valid_values="" >
+Read atmospheric constituents from exoplanet mod file
+Default: FALSE
+</entry>
+
+<entry id="do_exo_soilcpt" type="logical"  category="radiation"
+       group="radiation_nl" valid_values="" >
+use soil heat capacity and bulk density set here
+Default: FALSE
+</entry>
+
+<entry id="do_exo_co2cld_rad" type="logical"  category="radiation"
+       group="radiation_nl" valid_values="" >
+include CO2 cloud in radiative transfer calculation
+false implies transparent clouds
+Default: FALSE
+</entry>
+
+<entry id="do_exo_condense_co2" type="logical"  category="radiation"
+       group="radiation_nl" valid_values="" >
+flag to condense co2 on surface and in atmosphere
+Must add an advected constituent at build
+-nadv 4 (Q, CLDLIQ, CLDICE, CLDCO2)
+Default: FALSE
+</entry>
+
 <entry id="solar_file" type="char*256" category="radiation"
        group="radiation_nl" valid_values="" >
 Relative pathname for solar file for EXORT
@@ -5968,6 +6002,12 @@ Default: set by build-namelist.
        group="radiation_nl" valid_values="" >
 Radiation done every n timesteps
 Default: 3
+</entry>
+
+<entry id="exo_rad_camtop" type="integer" category="radiation"
+       group="radiation_nl" valid_values="" >
+Limit the number of levels over which the exo rad is operating.
+Default: 1
 </entry>
 
 
@@ -6147,6 +6187,64 @@ Default: 10800
 <entry id="scm_relax_tau_bot_sec" type="real" category="scam"
        group="scam_nl" valid_values="">
 SCAM relaxation time constant in seconds that will be used at
+bottom of pressure range (i.e., the larger pressure value).
+Default: 10800
+</entry>
+
+<entry id="mars_relaxation" type="logical" category="mars"
+       group="mars_nl" valid_values="">
+Relax state tendencies back to HS solution
+Default: FALSE
+</entry>
+
+<entry id="mars_use_hs_uv" type="logical" category="mars"
+       group="mars_nl" valid_values="">
+Use Held Suarez wind diffusion.
+Default: FALSE
+</entry>
+
+<entry id="mars_relax_fincl" type="char*26(1000)"  category="mars"
+       group="mars_nl" valid_values="" >
+  List of fields that will be relaxed to obs
+Default: none
+</entry>
+
+<entry id="mars_relax_linear" type="logical" category="mars"
+       group="mars_nl" valid_values="">
+Use relaxation. Linearly interpolate the timescale within specified
+pressure range. (bpm)
+Default: FALSE
+</entry>
+
+<entry id="mars_relax_top_p" type="real" category="mars"
+       group="mars_nl" valid_values="">
+Upper most pressure that will be relaxed.
+Default: 1e36
+</entry>
+
+<entry id="mars_relax_bot_p" type="real" category="mars"
+       group="mars_nl" valid_values="">
+Lower most pressure that will be relaxed.
+Default: -1e36
+</entry>
+
+<entry id="mars_relax_tau_sec" type="real" category="mars"
+       group="mars_nl" valid_values="">
+MARS relaxation time constant in seconds
+Default: 10800
+</entry>
+
+<entry id="mars_relax_tau_top_sec" type="real" category="mars"
+       group="mars_nl" valid_values="">
+MARS relaxation time constant in seconds that will be used at
+top of pressure range (i.e., the smaller pressure value). Will
+be used from top of pressure range to model top.
+Default: 10800
+</entry>
+
+<entry id="mars_relax_tau_bot_sec" type="real" category="mars"
+       group="mars_nl" valid_values="">
+MARS relaxation time constant in seconds that will be used at
 bottom of pressure range (i.e., the larger pressure value).
 Default: 10800
 </entry>
