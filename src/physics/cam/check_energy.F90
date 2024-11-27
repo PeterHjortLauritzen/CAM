@@ -1136,13 +1136,11 @@ end subroutine check_energy_get_integrals
           ! else: do nothing for dycores with energy consistent with CAM physics
           !
        end if
-    case(1)
+    case(1,2)
        !
        !**********************************************************************
        !
        ! replicate code in CAM from coupler
-       !
-       ! note liquid reference state which is inconsistent with atmosphere
        !
        !**********************************************************************
        !
@@ -1151,9 +1149,29 @@ end subroutine check_energy_get_integrals
        !
        ! compute total enthalpy flux
        !
-       enthalpy_flux_tot(:ncol) = enthalpy_prec_bc(:ncol,hliq_idx)+enthalpy_prec_bc(:ncol,hice_idx)+&
-                                  enthalpy_prec_ac(:ncol,hliq_idx)+enthalpy_prec_ac(:ncol,hice_idx)+&
-                                  enthalpy_evap(:ncol)
+       if (enthalpy_flux_method==1) then
+          !
+          ! note that this code is using liquid reference state for the energy fixer
+          ! which is inconsistent with atmosphere
+          !
+          enthalpy_flux_tot(:ncol) = enthalpy_prec_bc(:ncol,hliq_idx)+enthalpy_prec_bc(:ncol,hice_idx)+&
+                                     enthalpy_prec_ac(:ncol,hliq_idx)+enthalpy_prec_ac(:ncol,hice_idx)+&
+                                     enthalpy_evap(:ncol)
+       end if
+!       if (enthalpy_flux_method==2) then
+!          !
+!          ! note that this code is using ice reference state consistent with atmosphere
+!          !
+!          enthalpy_flux_tot(:ncol) =
+!
+!       enthalpy_prec_ac(:ncol,hice_idx) =  -enthalpy_prec_ac(:ncol,fice_idx)*cpliq*(cam_in%ts(:ncol)-tmelt)
+!       enthalpy_prec_ac(:ncol,hliq_idx) =  -enthalpy_prec_ac(:ncol,fliq_idx)*cpliq*(cam_in%ts(:ncol)-tmelt)
+!
+!          enthalpy_prec_bc(:ncol,hliq_idx)+enthalpy_prec_bc(:ncol,hice_idx)+&
+!                                     enthalpy_prec_ac(:ncol,hliq_idx)+enthalpy_prec_ac(:ncol,hice_idx)+&
+!                                     enthalpy_evap(:ncol)
+!       end if
+      
        !
        ! make sure energy fixer does not fix enthalpy flux passed to ocean
        !

@@ -2378,7 +2378,7 @@ contains
       call check_energy_chng(state, tend, "nudging", nstep, ztodt, zero, zero, zero, zero)
     endif
 
-    if (enthalpy_flux_method>0) then       
+    if (enthalpy_flux_method>-1) then       !xxx remove when tested
        if (.not.dycore_is('SE')) then
           call endrun("Explicit enthalpy flux functionality only supported for SE dycore")
        end if

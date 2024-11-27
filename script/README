@@ -1,0 +1,3 @@
+add existing user_nl_cam to script with:
+
+sed 's/^/echo "/; s/$/" >> user_nl_cam/' input.txt > output.txt
