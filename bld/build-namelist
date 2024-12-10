@@ -3835,7 +3835,7 @@ if ($chem =~ /_mam(\d)/) {
 # Gravity wave drag settings
 
 # By default, orographic waves are always on
-if (!$simple_phys) {
+if (!$simple_phys or $phys eq 'simple_mars') {
 
     if ($phys =~ /cam6/ or $phys =~ /cam7/) {
 

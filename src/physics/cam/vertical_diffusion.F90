@@ -353,8 +353,14 @@ subroutine vertical_diffusion_init(pbuf2d)
   ! Get indices of cloud liquid and ice within the constituents array !
   ! ----------------------------------------------------------------- !
 
+!!$#if (defined planet_mars )
+!!$  ! These are optional; Mars has no number constituents.
+!!$  call cnst_get_ind( 'CLDLIQ', ixcldliq, abort=.false. )
+!!$  call cnst_get_ind( 'CLDICE', ixcldice, abort=.false. )
+!!$#else
   call cnst_get_ind( 'CLDLIQ', ixcldliq )
   call cnst_get_ind( 'CLDICE', ixcldice )
+!!$#endif
   ! These are optional; with the CAM4 microphysics, there are no number
   ! constituents.
   call cnst_get_ind( 'NUMLIQ', ixnumliq, abort=.false. )
@@ -1147,9 +1153,13 @@ subroutine vertical_diffusion_tend( &
           + q_tmp(:ncol,:,ixcldice)
      slv_prePBL(:ncol,:pver) = sl_prePBL(:ncol,:pver) * ( 1._r8 + zvir*qt_prePBL(:ncol,:pver) )
 
+#ifdef planet_mars
+     ftem(1:ncol,:)=1.0d0
+#else
      do k = 1, pver
         call qsat(state%t(1:ncol,k), state%pmid(1:ncol,k), tem2(1:ncol,k), ftem(1:ncol,k), ncol)
      end do
+#endif
      ftem_prePBL(:ncol,:) = state%q(:ncol,:,1)/ftem(:ncol,:)*100._r8
 
      call outfld( 'qt_pre_PBL   ', qt_prePBL,                 pcols, lchnk )
@@ -1445,9 +1455,13 @@ subroutine vertical_diffusion_tend( &
      u_aft_PBL(:ncol,:pver)   =  state%u(:ncol,:pver)          + ptend%u(:ncol,:pver)            * ztodt
      v_aft_PBL(:ncol,:pver)   =  state%v(:ncol,:pver)          + ptend%v(:ncol,:pver)            * ztodt
 
+#ifdef planet_mars
+     ftem(1:ncol,:)=1.0d0
+#else
      do k = 1, pver
         call qsat(t_aftPBL(1:ncol,k), state%pmid(1:ncol,k), tem2(1:ncol,k), ftem(1:ncol,k), ncol)
      end do
+#endif
      ftem_aftPBL(:ncol,:pver) = qv_aft_PBL(:ncol,:pver) / ftem(:ncol,:pver) * 100._r8
 
      tten(:ncol,:pver)        = ( t_aftPBL(:ncol,:pver)    - state%t(:ncol,:pver) )              * rztodt

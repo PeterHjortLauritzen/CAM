@@ -1006,6 +1006,9 @@ my $pbl_pkg = 'none';
 if ($phys_pkg =~ m/^cam[34]$/) {
     $pbl_pkg = 'hb';
 }
+elsif ($mars) {
+    $pbl_pkg = 'hb';
+}
 elsif ($phys_pkg =~ /cam5/) {
     $pbl_pkg = 'uw';
 }
@@ -1618,9 +1621,10 @@ else {
       $nadv += 2
     }
 
-    # Special case for mars physics, need co2 and n2 on history ic
+    # Special case for mars physics, need co2 and n2 on history ic, added cldliq, cldice to satisfy depend in vdiff
     if ($mars) {
-      $nadv += 2
+#      $nadv += 2
+      $nadv += 4
     }
 
     # Add in specified test tracers.  These may be present with 'simple' (e.g., Held-Suarez) physics.

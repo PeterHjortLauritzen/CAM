@@ -42,6 +42,7 @@ module physpkg
   integer :: dtcore_idx    = 0
 
   integer :: qini_idx      = 0
+  integer :: ast_idx       = 0
   integer :: cldliqini_idx = 0
   integer :: cldiceini_idx = 0
   integer :: totliqini_idx = 0
@@ -80,6 +81,8 @@ contains
     use mars_cam,           only: mars_register
     use radiation,          only: radiation_register
     use dyn_comp,           only: dyn_register
+    use vertical_diffusion, only: vd_register
+    use physics_buffer,     only: dyn_time_lvls
 
     !---------------------------Local variables-----------------------------
     !
@@ -115,11 +118,13 @@ contains
       call frierson_register()
     else if (mars_phys) then
        call mars_register()
+       ! vertical diffusion
+       call vd_register()
     end if
 
     ! Fields for physics package diagnostics
     call pbuf_add_field('QINI',      'physpkg', dtype_r8, (/pcols,pver/), qini_idx)
-
+    call pbuf_add_field('AST',        'global', dtype_r8, (/pcols,pver,dyn_time_lvls/),    ast_idx)
     if (moist_physics) then
       call pbuf_add_field('CLDLIQINI', 'physpkg', dtype_r8, (/pcols,pver/), cldliqini_idx)
       call pbuf_add_field('CLDICEINI', 'physpkg', dtype_r8, (/pcols,pver/), cldiceini_idx)
@@ -197,6 +202,7 @@ contains
     use cam_thermo,         only: cam_thermo_init
 
     use cam_control_mod,    only: initial_run
+    use cam_history,        only: addfld, register_vector_field, add_default
     use check_energy,       only: check_energy_init
     use chemistry,          only: chem_init, chem_is_active
     use cam_diagnostics,    only: diag_init
@@ -212,8 +218,12 @@ contains
     use nudging,            only: Nudge_Model, nudging_init
     use cam_snapshot,       only: cam_snapshot_init
     use cam_budget,         only: cam_budget_init
-
+    use vertical_diffusion, only: vertical_diffusion_init
     use ccpp_constituent_prop_mod, only: ccpp_const_props_init
+    use physconst,          only: rair, cpair, gravit, zvir, &
+                                  karman
+    use pbl_utils,          only: pbl_utils_init
+
 
     ! Input/output arguments
     type(physics_state), pointer       :: phys_state(:)
@@ -225,6 +235,11 @@ contains
 
     ! local variables
     integer :: lchnk
+    logical :: history_budget              ! output tendencies and state variables for
+                                           ! temperature, water vapor, cloud
+                                           ! ice, cloud liquid, U, V
+    integer :: history_budget_histfile_num ! output history file number for budget fields
+    !-----------------------------------------------------------------------
     !-----------------------------------------------------------------------
 
     call physics_type_alloc(phys_state, phys_tend, begchunk, endchunk, pcols)
@@ -274,6 +289,8 @@ contains
       call frierson_init(phys_state,pbuf2d)
     else if (mars_phys) then
       call mars_init(phys_state,pbuf2d)
+      call pbl_utils_init(gravit, karman, cpair, rair, zvir)
+      call vertical_diffusion_init(pbuf2d)
     end if
 
     ! Initialize Nudging Parameters
@@ -298,6 +315,17 @@ contains
     ! Initialize energy budgets
     call cam_budget_init()
 
+    call addfld ( 'UTEND_VDIFF', (/ 'lev' /), 'A', 'm/s2', 'Zonal wind tendency by vert. diffus.')
+    call addfld ( 'VTEND_VDIFF', (/ 'lev' /), 'A', 'm/s2', 'Meridional wind tendency by vert. diffus.')
+    call register_vector_field ( 'UTEND_VDIFF', 'VTEND_VDIFF')
+
+    call phys_getopts(history_budget_out = history_budget, &
+         history_budget_histfile_num_out = history_budget_histfile_num)
+
+    if ( history_budget ) then
+       call add_default ( 'UTEND_VDIFF'   , history_budget_histfile_num, ' ')
+       call add_default ( 'VTEND_VDIFF'   , history_budget_histfile_num, ' ')
+    end if
   end subroutine phys_init
 
   !======================================================================================
@@ -494,6 +522,7 @@ contains
     !   o Moist Held-Suarez configuration: Compute surface fluxes and PBL mixing
     !-----------------------------------------------------------------------
     use physics_buffer,  only: physics_buffer_desc, pbuf_get_field, pbuf_old_tim_idx
+    use physics_buffer,  only: pbuf_get_index
     use physics_types,   only: physics_state, physics_tend, physics_state_check
     use physics_types,   only: physics_dme_adjust, set_dry_to_wet
     use constituents,    only: cnst_get_ind, pcnst
@@ -510,6 +539,10 @@ contains
     use time_manager,    only: get_nstep
     use nudging,         only: Nudge_Model, Nudge_ON, nudging_timestep_tend
     use check_energy,    only: check_energy_chng
+    use vertical_diffusion, only: vertical_diffusion_tend
+    use cam_history,     only: outfld
+    use cam_snapshot,       only: cam_snapshot_all_outfld_tphysac
+    use cam_snapshot_common,only: cam_snapshot_ptend_outfld
 
     ! Arguments
     !
@@ -524,6 +557,7 @@ contains
     !---------------------------Local workspace-----------------------------
 
     integer :: nstep                               ! current timestep number
+    integer :: ifld                                ! temporary for field index
     real(r8):: zero(pcols)                         ! array of zeros
 
     type(physics_ptend)                      :: ptend  ! indivdual parameterization tendencies
@@ -536,6 +570,7 @@ contains
     real(r8), pointer                        :: cldiceini(:,:)
     real(r8), pointer                        :: totliqini(:,:)
     real(r8), pointer                        :: toticeini(:,:)
+    real(r8), pointer                        :: ast(:,:)        ! relative humidity cloud fraction
     integer                                  :: ixcldliq
     integer                                  :: ixcldice
     integer                                  :: k
@@ -547,6 +582,12 @@ contains
     real(r8) :: tmp_pdel  (pcols,pver)       ! tmp space
     real(r8) :: tmp_ps    (pcols)            ! tmp space
     real(r8) :: scaling(pcols,pver)
+
+    real(r8) surfric(pcols)            ! surface friction velocity
+    real(r8) obklen(pcols)             ! Obukhov length
+    real(r8) :: fh2o(pcols)            ! h2o flux to balance source from methane chemistry
+    real(r8) :: flx_heat(pcols)        ! Heat flux for check_energy_chng.
+
     !--------------------------------------------------------------------------
 
     ! get nstep and zero array for energy checker
@@ -565,6 +606,9 @@ contains
     end if
 
     call pbuf_get_field(pbuf, qini_idx, qini)
+    ifld = pbuf_get_index('AST')
+    call pbuf_get_field(pbuf, ifld, ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+
     if (moist_physics) then
       call pbuf_get_field(pbuf, cldliqini_idx, cldliqini)
       call pbuf_get_field(pbuf, cldiceini_idx, cldiceini)
@@ -595,6 +639,51 @@ contains
        call frierson_pbl_tend(state, ptend, ztodt, cam_in)
        call physics_update(state, ptend, ztodt, tend)
     end if
+
+    if (mars_phys) then
+       ! Update surface, PBL
+       !===================================================
+       ! Vertical diffusion/pbl calculation
+       ! Call vertical diffusion code (pbl, free atmosphere and molecular)
+       !===================================================
+
+       call t_startf('vertical_diffusion_tend')
+
+       if (trim(cam_take_snapshot_before) == "vertical_diffusion_section") then
+          call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
+               fh2o, surfric, obklen, flx_heat)
+       end if
+
+       call vertical_diffusion_tend (ztodt ,state , cam_in, &
+            surfric  ,obklen   ,ptend    ,ast    ,pbuf )
+
+       !------------------------------------------
+       ! Call major diffusion for extended model
+       !------------------------------------------
+!!$       if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then
+!!$          call waccmx_phys_mspd_tend (ztodt    ,state    ,ptend)
+!!$       endif
+
+       if ( (trim(cam_take_snapshot_after) == "vertical_diffusion_section") .and. &
+            (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
+          call cam_snapshot_ptend_outfld(ptend, lchnk)
+       end if
+       if ( ptend%lu ) then
+          call outfld( 'UTEND_VDIFF', ptend%u, pcols, lchnk)
+       end if
+       if ( ptend%lv ) then
+          call outfld( 'VTEND_VDIFF', ptend%v, pcols, lchnk)
+       end if
+       call physics_update(state, ptend, ztodt, tend)
+
+       if (trim(cam_take_snapshot_after) == "vertical_diffusion_section") then
+          call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
+               fh2o, surfric, obklen, flx_heat)
+       end if
+
+       call t_stopf ('vertical_diffusion_tend')
+    end if
+
 
     ! Update Nudging values, if needed
     !----------------------------------

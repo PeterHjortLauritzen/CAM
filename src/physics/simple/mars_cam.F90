@@ -122,6 +122,11 @@ module mars_cam
   real(r8), public,protected :: mars_relax_tau_top_sec    = unset_r8
   character(len=26), public,protected  :: mars_relax_fincl(pcnst)
 
+  integer :: &
+         ixcldliq = -1,      &! cloud liquid amount index
+         ixcldice = -1        ! cloud ice amount index
+
+
 contains
   !==============================================================================
   subroutine mars_register()
@@ -143,6 +148,13 @@ contains
     call cnst_add('N2', 28._r8, 800._r8, 1.e-12_r8, mm, fixed_ubc=.false., &
          longname='N2', readiv=.true., is_convtran1=.true.)
 
+    ! Add liquid constituents
+    call cnst_add('CLDLIQ', mwh2o, cpair, 0._r8, ixcldliq,                    &
+         longname='Grid box averaged cloud liquid amount', is_convtran1=.true.)
+    ! Add ice constituents
+   call cnst_add('CLDICE', mwh2o, cpair, 0._r8, ixcldice, &
+      longname='Grid box averaged cloud ice amount', is_convtran1=.true.)
+
   end subroutine mars_register
   !==============================================================================
 
@@ -158,7 +170,6 @@ contains
                              mpi_character
     use radiation,     only: radiation_readnl
     use rad_constituents,    only: rad_cnst_readnl
-
     ! Input Parameters
     !------------------
     character(len=*),intent(in):: nlfile
@@ -259,6 +270,8 @@ contains
     use physics_types, only: physics_state
     use radiation,     only: radiation_init
     use rad_constituents,    only: rad_cnst_init
+    use constituents,  only: apcnst, bpcnst, cnst_name
+
     !
     ! Input Parameters
     !------------------
@@ -285,6 +298,20 @@ contains
     call add_default('TAURELAX', 1, ' ')
 !!$    call add_default('URELAX', 1, ' ')
 !!$    call add_default('VRELAX', 1, ' ')
+
+!  These needed for cldliq/ice diagnostics - added for vdiff
+    call addfld(apcnst(ixcldliq), (/ 'lev' /), 'A', 'kg/kg', trim(cnst_name(ixcldliq))//' after physics'  )
+   call addfld(apcnst(ixcldice), (/ 'lev' /), 'A', 'kg/kg', trim(cnst_name(ixcldice))//' after physics'  )
+   call addfld(bpcnst(ixcldliq), (/ 'lev' /), 'A', 'kg/kg', trim(cnst_name(ixcldliq))//' before physics' )
+   call addfld(bpcnst(ixcldice), (/ 'lev' /), 'A', 'kg/kg', trim(cnst_name(ixcldice))//' before physics' )
+
+   if (ixcldliq > 0) then
+      call addfld (cnst_name(ixcldliq),(/ 'lev' /), 'A', 'kg/kg',' Cloud Liquid '      )
+   end if
+   if (ixcldice > 0) then
+      call addfld (cnst_name(ixcldice),(/ 'lev' /), 'A', 'kg/kg',' Cloud Ice ')
+   end if
+
 
   end subroutine mars_init
   !==============================================================================
