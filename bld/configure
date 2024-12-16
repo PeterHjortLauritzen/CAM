@@ -570,7 +570,7 @@ if (defined $opts{'mars'}) {
 }
 my $mars = $cfg_ref->get('mars');
 
-if ($print>=2) { print "Configuring for CAM-MARS: $mars$eol";}
+if ($print>=2) { print "Configuring CAM for MARS: $mars$eol";}
 
 #-----------------------------------------------------------------------------------------------
 # Chemistry package
@@ -1086,6 +1086,10 @@ if ($phys_pkg =~ m/cam3|cam4|spcam_sam1mom/) {
 elsif ($phys_pkg =~ m/cam5|cam6|cam7|spcam_m2005/) {
     $rad_pkg = 'rrtmg';
 }
+elsif ($phys_pkg eq 'simple_mars') {
+    $rad_pkg = 'exort';
+}
+
 # Allow the user to override the default via the commandline.
 my $use_rrtmgp_gpu = 0;
 if (defined $opts{'rad'}) {
@@ -1098,9 +1102,7 @@ if (defined $opts{'rad'}) {
         $rad_pkg = 'rrtmgp';
     }
 }
-elsif (defined $opts{'mars'}) {
-        $rad_pkg = 'exort';
-}
+
 # consistency checks...
 
 if ($rad_pkg eq 'camrt') {
@@ -1124,15 +1126,8 @@ elsif ($rad_pkg =~ m/rrtmg/) {
         die "configure ERROR: The CARMA microphysics package does not currently work with RRTMGP\n";
     }
 }
-elsif ($rad_pkg eq 'socrates') {
-
-    # The socrates package is being configured for mars
-    if ($print) { print "WARNING: SOCRATES radiation interface is under development and should not be used"; }
-}
-elsif ($rad_pkg eq 'exort') {
-
-    # The exort package is being configured for mars
-    if ($print) { print "WARNING: ExoRT radiation interface is under development and should not be used"; }
+elsif ($mars and $rad_pkg ne 'exort') {
+    die "configure ERROR: The CAM-MARS configuration only works with the ExoRT radiation package\n";
 }
 
 $cfg_ref->set('rad', $rad_pkg);
@@ -1622,7 +1617,7 @@ else {
     }
 
     # Special case for mars physics, need co2 and n2 on history ic, added cldliq, cldice to satisfy depend in vdiff
-    if ($mars) {
+    if ($phys_pkg eq 'simple_mars') {
 #      $nadv += 2
       $nadv += 4
     }

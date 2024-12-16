@@ -1039,9 +1039,9 @@ if ((($chem =~ /ghg_mam4/) or ($chem =~ /waccm_ma/) or ($chem =~ /waccm_sc_mam/)
     $radval .= ",'N:N2O:N2O','N:CH4:CH4','N:CFC11:CFC11','N:CFC12:CFC12'";
 }
 
-# If Mars add set up rad for CO2
+# If Mars add set up rad for CO2 and N2
 if ($cfg->get('mars')) {
-    $radval .= ",'A:CO2:CO2'";
+    $radval .= ",'A:CO2:CO2','A:N2:N2'";
 }
 
 # Aerosol contributions to rad_climate

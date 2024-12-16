@@ -348,12 +348,12 @@
 
   <compset>
     <alias>FMARSADIAB</alias>
-    <lname>2000_CAM%MARS%ADIAB_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+    <lname>2000_CAM%ADIAB%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
 
   <compset>
     <alias>FMARSDABIP04</alias>
-    <lname>2000_CAM%MARS%DABIP04_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+    <lname>2000_CAM%DABIP04%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
 
   <compset>

@@ -1061,43 +1061,59 @@ contains
           call cam_snapshot_all_outfld(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf)
        end if
     else if (mars_phys) then
-       ! Compute the large-scale precipitation
-       !----------------------------------------
-       if (trim(cam_take_snapshot_before) == "mars_condensate_tend") then
+       if (.false.) then
+          ! Compute the large-scale precipitation
+          !----------------------------------------
+          if (trim(cam_take_snapshot_before) == "mars_condensate_tend") then
+             call cam_snapshot_all_outfld(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf)
+          end if
+          call mars_condensate_tend(state, ptend, ztodt, pbuf)
+          if ( (trim(cam_take_snapshot_after) == "mars_condensate_tend") .and. &
+               (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
+             call cam_snapshot_ptend_outfld(ptend, lchnk)
+          end if
+          call physics_update(state, ptend, ztodt, tend)
+          if (trim(cam_take_snapshot_after) == "mars_condensate_tend") then
+             call cam_snapshot_all_outfld(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf)
+          end if
+
+          ! Compute the radiative tendencies
+          !-----------------------------------
+          if (trim(cam_take_snapshot_before) == "mars_radiative_tend") then
+             call cam_snapshot_all_outfld(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf)
+          end if
+          call mars_radiative_tend(state, ptend, pbuf, cam_out, cam_in, net_flx)
+
+          ! Set net flux used by spectral dycores
+          do i=1,ncol
+             tend%flx_net(i) = net_flx(i)
+          end do
+
+          if ( (trim(cam_take_snapshot_after) == "mars_radiative_tend") .and. &
+               (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
+             call cam_snapshot_ptend_outfld(ptend, lchnk)
+          end if
+          call physics_update(state, ptend, ztodt, tend)
+          if (trim(cam_take_snapshot_after) == "mars_radiative_tend") then
+             call cam_snapshot_all_outfld(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf)
+          end if
+       end if
+    else
+       if (trim(cam_take_snapshot_before) == "held_suarez_tend") then
           call cam_snapshot_all_outfld(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf)
        end if
-       call mars_condensate_tend(state, ptend, ztodt, pbuf)
-       if ( (trim(cam_take_snapshot_after) == "mars_condensate_tend") .and. &
+
+       call held_suarez_tend(state, ptend, ztodt)
+       if ( (trim(cam_take_snapshot_after) == "held_suarez_tend") .and.       &
             (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
           call cam_snapshot_ptend_outfld(ptend, lchnk)
        end if
        call physics_update(state, ptend, ztodt, tend)
-       if (trim(cam_take_snapshot_after) == "mars_condensate_tend") then
-          call cam_snapshot_all_outfld(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf)
-       end if
 
-       ! Compute the radiative tendencies
-       !-----------------------------------
-       if (trim(cam_take_snapshot_before) == "mars_radiative_tend") then
-          call cam_snapshot_all_outfld(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf)
-       end if
-       call mars_radiative_tend(state, ptend, pbuf, cam_out, cam_in, net_flx)
-
-       ! Set net flux used by spectral dycores
-       do i=1,ncol
-          tend%flx_net(i) = net_flx(i)
-       end do
-
-       if ( (trim(cam_take_snapshot_after) == "mars_radiative_tend") .and. &
-            (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
-          call cam_snapshot_ptend_outfld(ptend, lchnk)
-       end if
-       call physics_update(state, ptend, ztodt, tend)
-       if (trim(cam_take_snapshot_after) == "mars_radiative_tend") then
+       if (trim(cam_take_snapshot_after) == "held_suarez_tend") then
           call cam_snapshot_all_outfld(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf)
        end if
     end if
-
     ! Can't turn on conservation error messages unless the appropriate heat
     ! surface flux is computed and supplied as an argument to
     ! check_energy_chng to account for how the simplified physics forcings are
