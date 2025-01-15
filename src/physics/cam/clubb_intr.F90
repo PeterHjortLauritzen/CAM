@@ -4701,7 +4701,9 @@ end subroutine clubb_init_cnst
     do i=1,ncol
       do k=1,pver
          !use local exner since state%exner is not a proper exner
-         th(i,k) = state1%t(i,k)*inv_exner_clubb(i,k)
+!+++arh
+         !th(i,k) = state1%t(i,k)*inv_exner_clubb(i,k)
+         th(i,k) = state1%t(i,k)*state1%exner(i,k)
          !thv should have condensate loading to be consistent with earlier def's in this module
          thv(i,k) = th(i,k)*(1.0_r8+zvir*state1%q(i,k,ixq) - state1%q(i,k,ixcldliq))
       enddo
