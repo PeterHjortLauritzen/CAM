@@ -52,6 +52,7 @@ subroutine gw_beres_src(ncol, band, desc, u, v, &
   use gw_utils, only: get_unit_vector, dot_2d, midpoint_interp
   use gw_common, only: GWBand, pver, qbo_hdepth_scaling
 
+
 !------------------------------Arguments--------------------------------
   ! Column dimension.
   integer, intent(in) :: ncol
@@ -111,6 +112,7 @@ subroutine gw_beres_src(ncol, band, desc, u, v, &
   ! Index to shift spectra relative to ground.
   integer :: shift
 
+
   ! Heating rate conversion factor.
   real(r8), parameter :: CF = 20._r8
   ! Averaging length.
@@ -161,7 +163,7 @@ subroutine gw_beres_src(ncol, band, desc, u, v, &
   do k = pver, 1, -1
      do i = 1, ncol
         if (boti(i) == 0) then
-           ! Detect if we are outside the maximum range (where z = 20 km).
+           ! Detect if we are outside the topimum range (where z = 20 km).
            if (zm(i,k) >= 20000._r8) then
               boti(i) = k
               topi(i) = k
@@ -169,17 +171,20 @@ subroutine gw_beres_src(ncol, band, desc, u, v, &
               ! First spot where heating rate is positive.
               if (netdt(i,k) > 0.0_r8) boti(i) = k
            end if
-        else if (topi(i) == 0) then
-           ! Detect if we are outside the maximum range (z = 20 km).
-           if (zm(i,k) >= 20000._r8) then
-              topi(i) = k
-           else
-              ! First spot where heating rate is no longer positive.
-              if (.not. (netdt(i,k) > 0.0_r8)) topi(i) = k
-           end if
         end if
      end do
-     ! When all done, exit.
+     ! When all done, exit
+     if (all(boti /= 0)) exit
+  end do
+
+  do k = 1, pver
+     do i = 1, ncol
+        if (topi(i) == 0) then
+                ! First spot where heating rate is positive.
+              if ((netdt(i,k) > 0.0_r8) .AND. (zm(i,k) <= 20000._r8)) topi(i) = k
+        end if
+     end do
+     ! When all done, exit
      if (all(topi /= 0)) exit
   end do
 
