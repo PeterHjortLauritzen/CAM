@@ -69,8 +69,6 @@ integer :: &
    naai_hom_idx = -1
 
 integer :: &
-!+++arh
-   !ast_idx   = -1
    aist_idx = -1
 
 integer :: &
@@ -362,8 +360,6 @@ subroutine nucleate_ice_cam_init(mincld_in, bulk_scale_in, pbuf2d, aero_props)
         mincld)
 
    ! get indices for fields in the physics buffer
-!+++arh
-   !ast_idx = pbuf_get_index('AST')
    aist_idx = pbuf_get_index('AIST')
 
 end subroutine nucleate_ice_cam_init
@@ -404,8 +400,6 @@ subroutine nucleate_ice_cam_calc( &
    real(r8), pointer :: pmid(:,:)       ! pressure at layer midpoints (pa)
 
    real(r8), pointer :: aer_mmr(:,:)    ! aerosol mass mixing ratio
-!+++arh
-   !real(r8), pointer :: ast(:,:)
    real(r8), pointer :: aist(:,:)
    real(r8) :: icecldf(pcols,pver)  ! ice cloud fraction
    real(r8), pointer :: qsatfac(:,:)      ! Subgrid cloud water saturation scaling factor.
@@ -514,11 +508,7 @@ subroutine nucleate_ice_cam_calc( &
    end if
 
    itim_old = pbuf_old_tim_idx()
-!+++arh
-   !call pbuf_get_field(pbuf, ast_idx, ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
    call pbuf_get_field(pbuf, aist_idx, aist, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
-
-!+++arh   
    !icecldf(:ncol,:pver) = ast(:ncol,:pver)
    icecldf(:ncol,:pver) = aist(:ncol,:pver)
 
