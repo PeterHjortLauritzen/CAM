@@ -5,7 +5,7 @@
 # ./create_clone --clone /glade/p/cesmdata/cseg/runs/cesm2_0/f.cam6_3_119.FLTHIST_ne30.r328.opt.001/ --case /glade/derecho/scratch/pel/cloneA --cime-output-root /glade/derecho/scratch/pel/
 #
 setenv PBS_ACCOUNT P93300642
-set caze="113_enthalpy_flux_method1"
+set caze="113_enthalpy_flux_method2cpdry"
 
 set homedir="/glade/u/home"
 set scratch="/glade/derecho/scratch"
@@ -82,7 +82,7 @@ echo "" >> user_nl_cam
 echo "clubb_c8=  4.95 " >> user_nl_cam
 echo "" >> user_nl_cam
 echo "" >> user_nl_cam
-echo "enthalpy_flux_method = 1" >> user_nl_cam
+echo "enthalpy_flux_method = 3" >> user_nl_cam
 echo "" >> user_nl_cam
 echo "thermo_budget_histfile_num             = 8" >> user_nl_cam
 echo "thermo_budget_history          = .true." >> user_nl_cam

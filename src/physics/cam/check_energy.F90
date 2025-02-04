@@ -1136,7 +1136,7 @@ end subroutine check_energy_get_integrals
           ! else: do nothing for dycores with energy consistent with CAM physics
           !
        end if
-    case(1,2)
+    case(1,2,3)
        !
        !**********************************************************************
        !
@@ -1158,20 +1158,30 @@ end subroutine check_energy_get_integrals
                                      enthalpy_prec_ac(:ncol,hliq_idx)+enthalpy_prec_ac(:ncol,hice_idx)+&
                                      enthalpy_evap(:ncol)
        end if
-!       if (enthalpy_flux_method==2) then
-!          !
-!          ! note that this code is using ice reference state consistent with atmosphere
-!          !
-!          enthalpy_flux_tot(:ncol) =
-!
-!       enthalpy_prec_ac(:ncol,hice_idx) =  -enthalpy_prec_ac(:ncol,fice_idx)*cpliq*(cam_in%ts(:ncol)-tmelt)
-!       enthalpy_prec_ac(:ncol,hliq_idx) =  -enthalpy_prec_ac(:ncol,fliq_idx)*cpliq*(cam_in%ts(:ncol)-tmelt)
-!
-!          enthalpy_prec_bc(:ncol,hliq_idx)+enthalpy_prec_bc(:ncol,hice_idx)+&
-!                                     enthalpy_prec_ac(:ncol,hliq_idx)+enthalpy_prec_ac(:ncol,hice_idx)+&
-!                                     enthalpy_evap(:ncol)
-!       end if
-      
+       if (enthalpy_flux_method==2.or.enthalpy_flux_method==3) then
+          !
+          ! note that this code is using ice reference state consistent with atmosphere
+          !
+          enthalpy_flux_tot(:ncol) =                                     &
+               -enthalpy_prec_ac(:ncol,fice_idx)*cpairv(:ncol,pver,lchnk)*cam_in%ts(:ncol)  &
+               -enthalpy_prec_ac(:ncol,fliq_idx)*cpairv(:ncol,pver,lchnk)*cam_in%ts(:ncol)  &
+               -enthalpy_prec_bc(:ncol,fice_idx)*cpairv(:ncol,pver,lchnk)*cam_in%ts(:ncol)  &
+               -enthalpy_prec_bc(:ncol,fliq_idx)*cpairv(:ncol,pver,lchnk)*cam_in%ts(:ncol)  &
+               +cam_in%cflx(:ncol,1)            *cpairv(:ncol,pver,lchnk)*cam_in%ts(:ncol)
+       end if
+       !
+       ! add heating from evaporation
+       !
+       if (enthalpy_flux_method==3) then          
+          do i=1,ncol
+             if (cam_in%cflx(i,1)>0.0_r8) then
+                state%T(i,pver) = state%T(i,pver)+ztodt*cam_in%cflx(i,1)*(cam_in%ts(i)-state%T(i,pver))*gravit*cpairv(i,pver,lchnk)/cpairv(i,pver,lchnk)
+             end if
+          end do
+          state%te_cur(:ncol,dyn_te_idx) = state%te_cur(:ncol,dyn_te_idx)+ztodt*cam_in%cflx(i,1)*(cam_in%ts(i)-state%T(i,pver))*cpwv/cp_or_cv_dycore(i,pver,lchnk)
+          dEdt_cpdycore(1:ncol) = ztodt*cam_in%cflx(i,1)*(cam_in%ts(i)-state%T(i,pver))*cpwv/cp_or_cv_dycore(i,pver,lchnk)
+          call outfld ('dEdt_temp_diff_evap' , dEdt_cpdycore, pcols, lchnk) !xxx diags will remove
+       end if
        !
        ! make sure energy fixer does not fix enthalpy flux passed to ocean
        !
@@ -1235,7 +1245,7 @@ end subroutine check_energy_get_integrals
           tend%dtdt(:ncol,:)                = scale_cpdry_cpdycore(:ncol,:)*tend%dtdt(:ncol,:)
        end if
        call outfld("enth_prec_ac_hliq"  , enthalpy_prec_ac(:,hliq_idx)     , pcols   ,lchnk   )
-    case(2)
+    case(4)
        !
        ! compute dycore energy
        !

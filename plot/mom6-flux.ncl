@@ -1,4 +1,4 @@
-load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_code.ncl"
+cd /load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_code.ncl"
 load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_csm.ncl"
 begin
   option = "nhtfrq1-B-case"
@@ -59,6 +59,15 @@ begin
    fall_energy = addfiles(fnameall_energy,"r")       ; Open netCDF files.
    tidx = 0
   end if
+
+  if (option .eq. "long-B-case") then
+Control
+/glade/campaign/cesm/cesmdata/cseg/runs/cesm2_0/b.e30_alpha03d.BLT1850.ne30_t232_wgx3.112_enthalpy
+
+Enthalpy via CAM
+/glade/p/cesmdata/cseg/runs/cesm2_0/b.e30_enthalpy_branch.BLT1850.ne30_t232_wgx3.113
+
+
 
   OCNFRAC=fall[:]->OCNFRAC
   ICEFRAC=fall[:]->ICEFRAC
