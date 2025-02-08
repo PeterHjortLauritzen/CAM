@@ -17,14 +17,6 @@
       <option name="wallclock">00:10:00</option>
     </options>
   </test>
-  <test compset="FC2000climo_GC" grid="f09_f09_mg17" name="ERP_Ln9" testmods="cam/outfrq9s">
-    <machines>
-      <machine name="derecho" compiler="intel" category="geoschem"/>
-    </machines>
-    <options>
-      <option name="wallclock">00:10:00</option>
-    </options>
-  </test>
   <test compset="F2000climo" grid="f09_f09_mg17" name="ERP_D_Ln9" testmods="cam/outfrq9s">
     <machines>
       <machine name="izumi"    compiler="nag" category="aux_cam_one"/>
@@ -42,22 +34,6 @@
       <option name="wallclock">00:10:00</option>
     </options>
   </test>
-  <test compset="FC2010climo_GC" grid="f09_f09_mg17" name="ERP_Ln9" testmods="cam/outfrq9s">
-    <machines>
-      <machine name="derecho" compiler="intel" category="geoschem"/>
-    </machines>
-    <options>
-      <option name="wallclock">00:10:00</option>
-    </options>
-  </test>
-  <test compset="F2000climo" grid="f10_f10_mg37" name="SMS_Lm13" testmods="cam/outfrq1m" supported="false">
-    <machines>
-      <machine name="derecho" compiler="intel" category="aux_cam"/>
-    </machines>
-    <options>
-       <option name="wallclock">03:00:00</option>
-    </options>
-  </test>
   <test compset="F2000climo" grid="f09_f09_mg17" name="PFS">
     <machines>
       <machine name="derecho" compiler="gnu" category="prebeta"/>
@@ -73,7 +49,7 @@
       <machine name="derecho" compiler="intel" category="prealpha"/>
     </machines>
     <options>
-      <option name="wallclock">00:10:00</option>
+      <option name="wallclock">00:20:00</option>
     </options>
   </test>
 
@@ -83,7 +59,7 @@
       <machine name="derecho" compiler="intel" category="prealpha"/>
     </machines>
     <options>
-      <option name="wallclock">00:10:00</option>
+      <option name="wallclock">00:20:00</option>
     </options>
   </test>
 
@@ -185,7 +161,6 @@
     <machines>
       <machine name="derecho" compiler="intel" category="aux_cime_baselines"/>
       <machine name="derecho" compiler="intel" category="prealpha"/>
-      <machine name="derecho" compiler="intel" category="aux_cam"/>
     </machines>
     <options>
       <option name="wallclock">00:10:00</option>
@@ -215,13 +190,42 @@
       <option name="wallclock">00:10:00</option>
     </options>
   </test>
-  <test compset="QPC6" grid="ne3pg3_ne3pg3_mg37" name="ERP_D_Ln9" testmods="cam/outfrq9s_rrtmgp">
+  <test compset="QPLT" grid="ne3pg3_ne3pg3_mg37" name="ERP_D_Ln9" testmods="cam/outfrq9s">
     <machines>
       <machine name="izumi" compiler="gnu" category="aux_cam"/>
     </machines>
     <options>
       <option name="wallclock">00:10:00</option>
-      <option name="comment" >CAM6 aquaplanet w/ RRTMGP</option>
+      <option name="comment" >CAM7-LT aquaplanet</option>
+    </options>
+  </test>
+  <test compset="QPLT" grid="ne30pg3_ne30pg3_mg17" name="ERP_D_Ln9" testmods="cam/outfrq3s_cosp">
+    <machines>
+      <machine name="derecho" compiler="intel" category="aux_cam"/>
+      <machine name="derecho" compiler="intel" category="prealpha"/>
+    </machines>
+    <options>
+      <option name="wallclock">00:10:00</option>
+      <option name="comment" >CAM7-LT aquaplanet w/ COSP</option>
+    </options>
+  </test>
+  <test compset="QPMT" grid="ne3pg3_ne3pg3_mg37" name="ERP_D_Ln9" testmods="cam/outfrq9s">
+    <machines>
+      <machine name="izumi" compiler="gnu" category="aux_cam"/>
+    </machines>
+    <options>
+      <option name="wallclock">00:20:00</option>
+      <option name="comment" >CAM7-MT aquaplanet</option>
+    </options>
+  </test>
+  <test compset="QPMT" grid="ne30pg3_ne30pg3_mg17" name="ERP_D_Ln9" testmods="cam/outfrq9s">
+    <machines>
+      <machine name="derecho" compiler="intel" category="aux_cam"/>
+      <machine name="derecho" compiler="intel" category="prealpha"/>
+    </machines>
+    <options>
+      <option name="wallclock">00:20:00</option>
+      <option name="comment" >CAM7-MT aquaplanet</option>
     </options>
   </test>
   <test compset="QPRCEMIP" grid="ne30_ne30_mg17" name="ERP_Ln9" testmods="cam/outfrq9s">
@@ -606,6 +610,15 @@
   <test compset="F2000climo" grid="f10_f10_mg37" name="ERS_D_Ln9" testmods="cam/carma_dust">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+      <machine name="izumi" compiler="gnu" category="carma"/>
+    </machines>
+    <options>
+      <option name="comment" >CARMA dust test</option>
+      <option name="wallclock">00:30:00</option>
+    </options>
+  </test>
+  <test compset="F2000climo" grid="f19_f19_mg17" name="ERS_D_Ln9" testmods="cam/carma_dust">
+    <machines>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -626,7 +639,16 @@
   <test compset="QPC5" grid="f10_f10_mg37" name="ERC_D_Ln9" testmods="cam/carma_sea_salt">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+      <machine name="izumi" compiler="gnu" category="carma"/>
       <machine name="izumi" compiler="nag" category="aux_cam"/>
+    </machines>
+    <options>
+      <option name="comment" >CARMA sea salt test</option>
+      <option name="wallclock">00:30:00</option>
+    </options>
+  </test>
+  <test compset="QPC5" grid="f45_f45_mg37" name="ERC_D_Ln9" testmods="cam/carma_sea_salt">
+    <machines>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -638,7 +660,15 @@
   <test compset="QPWmaC6" grid="f10_f10_mg37" name="ERS_D_Ln9" testmods="cam/carma_meteor_smoke">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
-      <machine name="derecho" compiler="intel" category="carma"/>
+    </machines>
+    <options>
+      <option name="comment" >CARMA test of aerosol from meteor smoke</option>
+      <option name="wallclock">00:30:00</option>
+    </options>
+  </test>
+  <test compset="QPWmaC6" grid="f45_f45_mg37" name="ERS_D_Ln9" testmods="cam/carma_meteor_smoke">
+    <machines>
+      <machine name="izumi" compiler="nag" category="carma"/>
     </machines>
     <options>
       <option name="comment" >CARMA test of aerosol from meteor smoke</option>
@@ -649,6 +679,15 @@
   <test compset="QPWmaC6" grid="f10_f10_mg37" name="ERS_D_Ln9" testmods="cam/carma_meteor_impact">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+      <machine name="izumi" compiler="gnu" category="carma"/>
+    </machines>
+    <options>
+      <option name="comment" >CARMA test of aerosols from meteor impact</option>
+      <option name="wallclock">00:30:00</option>
+    </options>
+  </test>
+  <test compset="QPWmaC6" grid="f45_f45_mg37" name="ERS_D_Ln9" testmods="cam/carma_meteor_impact">
+    <machines>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -660,6 +699,15 @@
   <test compset="QPWmaC6" grid="f10_f10_mg37" name="ERS_D_Ln9" testmods="cam/carma_pmc">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+      <machine name="izumi" compiler="gnu" category="carma"/>
+    </machines>
+    <options>
+      <option name="comment" >CARMA Test of Polar Mesospheric Clouds (pmc)</option>
+      <option name="wallclock">00:30:00</option>
+    </options>
+  </test>
+  <test compset="QPWmaC6" grid="f45_f45_mg37" name="ERS_D_Ln9" testmods="cam/carma_pmc">
+    <machines>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -671,6 +719,14 @@
   <test compset="QPC5" grid="f10_f10_mg37" name="ERS_D_Ln9" testmods="cam/carma_test_radiative">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+    </machines>
+    <options>
+      <option name="comment" >CARMA radiation test</option>
+      <option name="wallclock">00:30:00</option>
+    </options>
+  </test>
+  <test compset="QPC5" grid="f45_f45_mg37" name="ERS_D_Ln9" testmods="cam/carma_test_radiative">
+    <machines>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -679,9 +735,17 @@
     </options>
   </test>
 <!--              carma test_tracers      -->
-  <test compset="QPC5" grid="f10_f10_mg37" name="ERS_D_Ln9" testmods="cam/carma_test_tracers">
+  <test compset="QPC5" grid="f10_f10_mg37" name="ERC_D_Ln9" testmods="cam/carma_test_tracers">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+    </machines>
+    <options>
+      <option name="comment" >CARMA tracers test</option>
+      <option name="wallclock">00:30:00</option>
+    </options>
+  </test>
+  <test compset="QPC5" grid="f45_f45_mg37" name="ERC_D_Ln9" testmods="cam/carma_test_tracers">
+    <machines>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -693,6 +757,14 @@
   <test compset="QPC5" grid="f10_f10_mg37" name="ERC_D_Ln9" testmods="cam/carma_test_tracers2">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+    </machines>
+    <options>
+      <option name="comment" >CARMA tracers2 test</option>
+      <option name="wallclock">00:30:00</option>
+    </options>
+  </test>
+  <test compset="QPC5" grid="f45_f45_mg37" name="ERC_D_Ln9" testmods="cam/carma_test_tracers2">
+    <machines>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -704,6 +776,14 @@
   <test compset="QPC5" grid="f10_f10_mg37" name="ERC_D_Ln9" testmods="cam/carma_test_passive">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+    </machines>
+    <options>
+      <option name="comment" >CARMA passive test</option>
+      <option name="wallclock">00:30:00</option>
+    </options>
+  </test>
+  <test compset="QPC5" grid="f45_f45_mg37" name="ERC_D_Ln9" testmods="cam/carma_test_passive">
+    <machines>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -715,6 +795,15 @@
   <test compset="QPC5" grid="f10_f10_mg37" name="ERC_D_Ln9" testmods="cam/carma_test_swelling">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+      <machine name="izumi" compiler="gnu" category="carma"/>
+    </machines>
+    <options>
+      <option name="comment" >CARMA particle swelling test</option>
+      <option name="wallclock">00:30:00</option>
+    </options>
+  </test>
+  <test compset="QPC5" grid="f45_f45_mg37" name="ERC_D_Ln9" testmods="cam/carma_test_swelling">
+    <machines>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -762,6 +851,14 @@
   <test compset="FW4ma2000" grid="f10_f10_mg37" name="SMS_D_Ln9" testmods="cam/carma_sulfate">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+   </machines>
+    <options>
+      <option name="comment" >CARMA pure sulfate test</option>
+      <option name="wallclock">00:30:00</option>
+    </options>
+  </test>
+  <test compset="FW4ma2000" grid="f45_f45_mg37" name="SMS_D_Ln9" testmods="cam/carma_sulfate">
+    <machines>
       <machine name="derecho" compiler="intel" category="carma"/>
    </machines>
     <options>
@@ -773,6 +870,14 @@
   <test compset="FW4ma2000" grid="f10_f10_mg37" name="ERS_D_Ln9" testmods="cam/carma_mixed_sulfate">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+   </machines>
+    <options>
+      <option name="comment" >CARMA mixed sulfate test</option>
+      <option name="wallclock">00:30:00</option>
+    </options>
+  </test>
+  <test compset="FW4ma2000" grid="f45_f45_mg37" name="ERS_D_Ln9" testmods="cam/carma_mixed_sulfate">
+    <machines>
       <machine name="derecho" compiler="intel" category="carma"/>
    </machines>
     <options>
@@ -781,9 +886,17 @@
     </options>
   </test>
 <!--              carma test_growth       -->
-  <test compset="QPC5" grid="f10_f10_mg37" name="ERC_D_Ln9" testmods="cam/carma_test_growth">
+  <test compset="QPC5" grid="f10_f10_mg37" name="ERS_D_Ln9" testmods="cam/carma_test_growth">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+    </machines>
+    <options>
+      <option name="comment" >CARMA particle growth test</option>
+      <option name="wallclock">00:30:00</option>
+    </options>
+  </test>
+  <test compset="QPC5" grid="f45_f45_mg37" name="ERS_D_Ln9" testmods="cam/carma_test_growth">
+    <machines>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -791,18 +904,10 @@
       <option name="wallclock">00:30:00</option>
     </options>
   </test>
-  <test compset="F2000climo" grid="ne5pg3_ne5pg3_mg37" name="ERC_D_Ln9" testmods="cam/carma_dust">
-    <machines>
-      <machine name="izumi" compiler="nag" category="carma"/>
-    </machines>
-    <options>
-      <option name="comment" >Low-res unstructured grid CARMA dust test</option>
-      <option name="wallclock">00:30:00</option>
-    </options>
-  </test>
   <test compset="QPC5" grid="ne5_ne5_mg37" name="SMS_D_Ln9" testmods="cam/carma_sea_salt">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+      <machine name="izumi" compiler="gnu" category="carma"/>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -823,6 +928,7 @@
   <test compset="QPC5" grid="ne5_ne5_mg37" name="SMS_D_Ln9" testmods="cam/carma_test_passive">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+      <machine name="izumi" compiler="gnu" category="carma"/>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -833,6 +939,7 @@
   <test compset="QPC5" grid="ne5_ne5_mg37" name="SMS_D_Ln9" testmods="cam/carma_test_swelling">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+      <machine name="izumi" compiler="gnu" category="carma"/>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -853,6 +960,7 @@
   <test compset="QPC5" grid="ne5_ne5_mg37" name="SMS_D_Ln9" testmods="cam/carma_test_radiative">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+      <machine name="izumi" compiler="gnu" category="carma"/>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -863,6 +971,7 @@
   <test compset="QPC5" grid="ne5_ne5_mg37" name="ERC_D_Ln9" testmods="cam/carma_test_tracers">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+      <machine name="izumi" compiler="gnu" category="carma"/>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -883,6 +992,7 @@
   <test compset="QPWmaC6" grid="ne5pg3_ne5pg3_mg37" name="SMS_D_Ln9" testmods="cam/carma_meteor_smoke">
     <machines>
       <machine name="izumi" compiler="nag" category="carma"/>
+      <machine name="izumi" compiler="gnu" category="carma"/>
       <machine name="derecho" compiler="intel" category="carma"/>
     </machines>
     <options>
@@ -956,9 +1066,16 @@
       <option name="wallclock">00:20:00</option>
     </options>
   </test>
+  <test compset="QPWmaC6" grid="f45_f45_mg37" name="ERP_Ln9_P24x2" testmods="cam/outfrq9s_mee_fluxes" supported="false">
+    <machines>
+      <machine name="izumi" compiler="gnu" category="aux_cam"/>
+    </machines>
+    <options>
+      <option name="wallclock">00:20:00</option>
+    </options>
+  </test>
   <test compset="QPWmaC6" grid="f45_f45_mg37" name="ERP_Ln9_P24x3" testmods="cam/outfrq9s_mee_fluxes" supported="false">
     <machines>
-      <machine name="derecho" compiler="intel" category="aux_cam"/>
       <machine name="derecho" compiler="intel" category="waccm"/>
     </machines>
     <options>
@@ -1394,9 +1511,9 @@
     </options>
   </test>
 
-  <test compset="F2000climo" grid="mpasa480_mpasa480" name="ERS_Ln9_P36x1" testmods="cam/outfrq9s_mpasa480">
+  <test compset="F2000climo" grid="mpasa480_mpasa480" name="ERS_Ln9_P24x1" testmods="cam/outfrq9s_mpasa480">
     <machines>
-      <machine name="derecho" compiler="intel" category="aux_cam"/>
+      <machine name="izumi" compiler="gnu" category="aux_cam"/>
     </machines>
     <options>
       <option name="wallclock">00:45:00</option>
@@ -1506,7 +1623,7 @@
 <!--                    (unsupported)                         -->
 <!--              @@@@@@@@@@@@@@@@@@@@@@@@@@@                 -->
 
-  <test compset="F2000dev" grid="ne30pg3_ne30pg3_mg17" name="ERS_Ln9_G4-a100-openacc" testmods="cam/outfrq9s_mg3_default">
+  <test compset="F2000dev" grid="ne30pg3_ne30pg3_mg17" name="ERS_Ln9" testmods="cam/outfrq9s_gpu_default">
     <machines>
       <machine name="derecho" compiler="nvhpc" category="derecho_gpu"/>
       <machine name="derecho" compiler="nvhpc" category="aux_cam"/>
@@ -1515,7 +1632,7 @@
       <option name="wallclock">00:30:00</option>
     </options>
   </test>
-  <test compset="F2000dev" grid="ne30pg3_ne30pg3_mg17" name="ERS_Ln9_G4-a100-openacc" testmods="cam/outfrq9s_mg3_pcols760">
+  <test compset="F2000dev" grid="ne30pg3_ne30pg3_mg17" name="ERS_Ln9" testmods="cam/outfrq9s_gpu_pcols760">
     <machines>
       <machine name="derecho" compiler="nvhpc" category="derecho_gpu"/>
       <machine name="derecho" compiler="nvhpc" category="prealpha"/>
@@ -1787,13 +1904,13 @@
       <option name="comment">CAM7 low top ~40 km</option>
     </options>
   </test>
-  <test compset="FLTHIST" grid="ne30pg3_ne30pg3_mg17" name="ERP_D_Ln9" testmods="cam/outfrq9s_rrtmgp">
+  <test compset="FLTHIST" grid="ne3pg3_ne3pg3_mg37" name="ERP_D_Ln9" testmods="cam/outfrq9s">
     <machines>
-      <machine name="derecho" compiler="intel" category="aux_cam"/>
+      <machine name="izumi" compiler="gnu" category="aux_cam"/>
     </machines>
     <options>
       <option name="wallclock">00:30:00</option>
-      <option name="comment">CAM7 low top ~40 km w/ RRTMGP</option>
+      <option name="comment">CAM7 low top ~40 km</option>
     </options>
   </test>
   <test compset="FMTHIST" grid="ne30pg3_ne30pg3_mg17" name="SMS_D_Ln9" testmods="cam/outfrq9s">
@@ -1803,15 +1920,6 @@
     <options>
       <option name="wallclock">00:20:00</option>
       <option name="comment">CAM7 mid top ~80 km</option>
-    </options>
-  </test>
-  <test compset="FMTHIST" grid="ne30pg3_ne30pg3_mg17" name="SMS_D_Ln9" testmods="cam/outfrq9s_rrtmgp">
-    <machines>
-      <machine name="derecho" compiler="intel" category="prealpha"/>
-    </machines>
-    <options>
-      <option name="wallclock">00:20:00</option>
-      <option name="comment">CAM7 mid top ~80 km w/ RRTMGP</option>
     </options>
   </test>
   <test compset="FMTHIST" grid="ne30pg3_ne30pg3_mg17" name="ERP_D_Ln9" testmods="cam/outfrq9s">
@@ -1890,6 +1998,14 @@
       <option name="wallclock">00:20:00</option>
     </options>
   </test>
+  <test compset="FC2010climo_GC" grid="f09_f09_mg17" name="ERP_Ln9" testmods="cam/outfrq9s">
+    <machines>
+      <machine name="derecho" compiler="intel" category="geoschem"/>
+    </machines>
+    <options>
+      <option name="wallclock">00:20:00</option>
+    </options>
+  </test>
   <test compset="FC2000climo" grid="f09_f09_mg17" name="ERP_Ln9" testmods="cam/outfrq9s_wetdep">
     <machines>
       <machine name="derecho" compiler="intel" category="camchem"/>
@@ -1900,7 +2016,12 @@
       <machine name="derecho" compiler="intel" category="camchem"/>
     </machines>
   </test>
-  <test compset="FCHIST" grid="ne30_ne30_mg17" name="SMS_Ld1" testmods="cam/outfrq1d">
+  <test compset="FC2000climo_GC" grid="f09_f09_mg17" name="ERP_Ln9" testmods="cam/outfrq9s">
+    <machines>
+      <machine name="derecho" compiler="intel" category="geoschem"/>
+    </machines>
+  </test>
+  <test compset="FCHIST" grid="ne30pg3_ne30pg3_mg17" name="SMS_Ld1" testmods="cam/outfrq1d">
     <machines>
       <machine name="derecho" compiler="intel" category="prebeta"/>
       <machine name="derecho" compiler="intel" category="camchem"/>
@@ -1915,7 +2036,7 @@
       <option name="wallclock">00:30:00</option>
     </options>
   </test>
-  <test compset="FCts4MTHIST" grid="ne3pg3_ne3pg3_mg37" name="SMS_D_Ln9" testmods="cam/outfrq9s">
+  <test compset="FHISTC_MTt4s" grid="ne3pg3_ne3pg3_mg37" name="SMS_D_Ln9" testmods="cam/outfrq9s">
     <machines>
       <machine name="izumi" compiler="nag" category="camchem"/>
     </machines>
@@ -1924,7 +2045,7 @@
       <option name="comment" >Medium-top CAM-Chem with simpler climate chemistry</option>
     </options>
   </test>
-  <test compset="FCMTHIST" grid="ne3pg3_ne3pg3_mg37" name="SMS_D_Ln9" testmods="cam/outfrq9s">
+  <test compset="FHISTC_MTt1s" grid="ne3pg3_ne3pg3_mg37" name="SMS_D_Ln9" testmods="cam/outfrq9s">
     <machines>
       <machine name="izumi" compiler="nag" category="camchem"/>
       <machine name="izumi" compiler="gnu" category="camchem"/>
@@ -2034,15 +2155,7 @@
       <machine name="izumi" compiler="nag" category="aux_cam"/>
     </machines>
   </test>
-  <!--  DART -->
-  <test compset="FHS94" grid="f45_f45_mg37" name="DAE" testmods="cam/dae">
-    <machines>
-      <machine name="izumi" compiler="nag" category="aux_cam"/>
-    </machines>
-    <options>
-      <option name="wallclock"> 00:20:00 </option>
-    </options>
-  </test>
+
 <!-- SPCAM testing -->
   <test compset="FSPCAMS" grid="C48_C48_mg17" name="ERS_Ln9" testmods="cam/outfrq9s">
     <machines>
@@ -2263,7 +2376,7 @@
       <option name="wallclock">00:10:00</option>
     </options>
   </test>
-  <test compset="FCLTHIST" grid="ne30pg3_ne30pg3_mg17" name="SMS_D_Ln9_P1280x1" testmods="cam/outfrq9s_Leung_dust">
+  <test compset="FHISTC_MTt1s" grid="ne30pg3_ne30pg3_mg17" name="SMS_D_Ln9_P1280x1" testmods="cam/outfrq9s_Leung_dust">
     <machines>
       <machine name="derecho" compiler="intel" category="aux_cam"/>
       <machine name="derecho" compiler="intel" category="camchem"/>
@@ -2273,7 +2386,7 @@
       <option name="comment" >Low-top CAM-Chem with MAM5 aerosols and cam7 physics</option>
     </options>
   </test>
-  <test compset="FCMTHIST" grid="ne30pg3_ne30pg3_mg17" name="SMS_D_Ln9" testmods="cam/outfrq9s">
+  <test compset="FHISTC_MTt1s" grid="ne30pg3_ne30pg3_mg17" name="SMS_D_Ln9" testmods="cam/outfrq9s">
     <machines>
       <machine name="derecho" compiler="intel" category="camchem"/>
     </machines>
@@ -2282,7 +2395,7 @@
       <option name="comment" >Medium-top CAM-Chem with MAM5 aerosols and cam7 physics</option>
     </options>
   </test>
-  <test compset="FCts4MTHIST" grid="ne30pg3_ne30pg3_mg17" name="SMS_D_Ln9" testmods="cam/outfrq9s">
+  <test compset="FHISTC_MTt4s" grid="ne30pg3_ne30pg3_mg17" name="SMS_D_Ln9" testmods="cam/outfrq9s">
     <machines>
       <machine name="derecho" compiler="intel" category="camchem"/>
     </machines>
@@ -2291,7 +2404,7 @@
       <option name="comment" >Medium-top CAM-Chem with simpler climate chemistry</option>
     </options>
   </test>
-  <test compset="FCts4MTHIST" grid="ne30pg3_ne30pg3_mg17" name="ERP_Ld3" testmods="cam/outfrq1d_aoa">
+  <test compset="FHISTC_MTt4s" grid="ne30pg3_ne30pg3_mg17" name="ERP_Ld3" testmods="cam/outfrq1d_aoa">
     <machines>
       <machine name="derecho" compiler="intel" category="camchem"/>
       <machine name="derecho" compiler="intel" category="aux_cam"/>
@@ -2759,16 +2872,6 @@
     </machines>
     <options>
       <option name="wallclock">00:10:00</option>
-    </options>
-  </test>
-  <test compset="F1850" grid="f10_f10_mg37" name="ERS_Ld3" testmods="cam/outfrq1d_14dec_ghg_cam7">
-    <machines>
-      <machine name="derecho" compiler="intel" category="aux_cam"/>
-      <machine name="derecho" compiler="intel" category="ghg_cam"/>
-    </machines>
-    <options>
-      <option name="wallclock">00:10:00</option>
-      <option name="comment">Checks that exact restarts occur when crossing the December 16th date boundary with WACCM-SC chemistry in low top configuration</option>
     </options>
   </test>
   <test compset="FWsc2000climo" grid="f10_f10_mg37" name="ERP_Ld3" testmods="cam/outfrq1d_14dec">
