@@ -25,6 +25,8 @@ module air_composition
    ! get_mbarv: molecular weight of dry air
    public :: get_mbarv
 
+   integer, public :: enthalpy_flux_method=0
+
    private :: air_species_info
 
    integer,  parameter :: unseti = -HUGE(1)
@@ -140,7 +142,7 @@ CONTAINS
    subroutine air_composition_readnl(nlfile)
       use namelist_utils, only: find_group_name
       use spmd_utils,     only: masterproc, mpicom, masterprocid
-      use spmd_utils,     only: mpi_character
+      use spmd_utils,     only: mpi_character, mpi_integer
       use cam_logfile,    only: iulog
 
       ! Dummy argument: filepath for file containing namelist input
@@ -154,7 +156,7 @@ CONTAINS
       character(len=lsize)        :: bline
 
       ! Variable components of dry air and water species in air
-      namelist /air_composition_nl/ dry_air_species, water_species_in_air
+      namelist /air_composition_nl/ dry_air_species, water_species_in_air, enthalpy_flux_method
       !-----------------------------------------------------------------------
 
       banner = repeat('*', lsize)
@@ -175,7 +177,9 @@ CONTAINS
          end if
          close(unitn)
       end if
-
+      call mpi_bcast(enthalpy_flux_method, 1, mpi_integer, masterprocid, mpicom, ierr)
+      if (ierr /= 0) call endrun(subname//": FATAL: mpi_bcast: enthalpy_flux_method")
+ 
       call mpi_bcast(dry_air_species, len(dry_air_species)*num_names_max,     &
            mpi_character, masterprocid, mpicom, ierr)
       if (ierr /= 0) call endrun(subname//": FATAL: mpi_bcast: dry_air_species")
@@ -203,7 +207,7 @@ CONTAINS
       if (masterproc) then
          write(iulog, *) banner
          write(iulog, *) bline
-
+         write(iulog, *) "enthalpy_flux_method = ",enthalpy_flux_method
          if (dry_air_species_num == 0) then
             write(iulog, *) " Thermodynamic properties of dry air are ",      &
                  "fixed at troposphere values"
