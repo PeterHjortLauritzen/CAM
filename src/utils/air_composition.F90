@@ -26,6 +26,14 @@ module air_composition
    public :: get_mbarv
 
    integer, public :: enthalpy_flux_method=0
+   !
+   ! for book keeping of enthalpy variables in physics buffer
+   !
+   integer, parameter, public :: num_enthalpy_vars = 4  ! index for enthalpy flux associated with liquid precipitation
+   integer, parameter, public :: hliq_idx = 1  ! index for enthalpy flux associated with liquid precipitation
+   integer, parameter, public :: hice_idx = 2  ! index for enthalpy flux associated with frozen precipiation
+   integer, parameter, public :: fliq_idx = 3  ! index for flux of liquid precipitation!xxx needed
+   integer, parameter, public :: fice_idx = 4  ! index for flux of frozen precipitation!xxx needed
 
    private :: air_species_info
 

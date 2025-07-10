@@ -54,7 +54,7 @@ module check_energy
                                             ! name is retained for FV3 compatibility
 
   public :: check_energy_cam_fix            ! add heating rate required for global mean total energy conservation
-
+  public :: set_enthalpy_flux               ! computations related to updating pressure
   ! Private module data
   logical  :: print_energy_errors = .false.
 
@@ -920,4 +920,88 @@ end subroutine check_energy_readnl
     )
 
   end subroutine check_energy_cam_fix
+
+  subroutine set_enthalpy_flux(ncol, lchnk, enthalpy_flux_method, state, cam_in, pbuf, enthalpy_flux_tot)
+    use physconst,       only: cpair, cpliq
+    use cam_abortutils,  only: endrun
+    use physics_buffer,  only: pbuf_get_index, physics_buffer_desc, pbuf_set_field, pbuf_get_field
+    use air_composition, only: hliq_idx, hice_idx, fliq_idx, fice_idx, num_enthalpy_vars!xxx if the f- variables needed
+    use air_composition, only: cpairv
+    use camsrfexch,      only: cam_out_t, cam_in_t, get_prec_vars
+    use cam_history,     only: outfld, hist_fld_active
+    integer,             intent(in)    :: ncol, lchnk, enthalpy_flux_method
+    type(physics_state), intent(inout) :: state
+    type(cam_in_t),      intent(inout) :: cam_in
+    type(physics_buffer_desc), pointer :: pbuf(:)
+    real(r8),            intent(out)   :: enthalpy_flux_tot(pcols)
+
+    ! Local variables
+    character(len=*), parameter :: sub = 'set_enthalpy_flux'
+    integer:: enthalpy_prec_bc_idx, enthalpy_prec_ac_idx, enthalpy_evap_idx
+    real(r8), dimension(:,:), pointer            :: enthalpy_prec_bc
+    real(r8), dimension(pcols,num_enthalpy_vars) :: enthalpy_prec_ac
+    real(r8), dimension(:)  , pointer            :: enthalpy_evap
+    integer                                      :: i
+    real(r8), dimension(pcols)                   :: fliq_tot, fice_tot, tmp
+    real(r8), dimension(ncol)                    :: hsnow_ice_ref, hrain_ice_ref, hevap_ice_ref
+
+    if (enthalpy_flux_method>0) then
+       !
+       ! compute precipitation fluxes
+       !
+       enthalpy_prec_bc_idx = pbuf_get_index('ENTHALPY_PREC_BC', errcode=i)
+       enthalpy_prec_ac_idx = pbuf_get_index('ENTHALPY_PREC_AC', errcode=i)
+       enthalpy_evap_idx    = pbuf_get_index('ENTHALPY_EVAP'   , errcode=i)
+       if (enthalpy_prec_bc_idx==0.or.enthalpy_prec_ac_idx==0.or.enthalpy_evap_idx==0) then
+          call endrun("pbufs for enthalpy flux not allocated")
+       end if
+       call pbuf_get_field(pbuf, enthalpy_prec_bc_idx, enthalpy_prec_bc)
+       call pbuf_get_field(pbuf, enthalpy_evap_idx   , enthalpy_evap   )
+       !
+       !------------------------------------------------------------------
+       !
+       ! compute precipitation fluxes and set associated physics buffers
+       !
+       !------------------------------------------------------------------
+       !
+       call get_prec_vars(ncol,pbuf,fliq=fliq_tot,fice=fice_tot)
+       !
+       ! fliq_tot holds liquid precipitation from tphysbc and tphysac; idem for ice
+       !
+       enthalpy_prec_ac(:ncol,fice_idx) = fice_tot(:ncol)-enthalpy_prec_bc(:ncol,fice_idx)
+       enthalpy_prec_ac(:ncol,fliq_idx) = fliq_tot(:ncol)-enthalpy_prec_bc(:ncol,fliq_idx)
+    end if
+    if (enthalpy_flux_method==0) then
+       enthalpy_flux_tot(:ncol) = 0._r8
+    else if (enthalpy_flux_method==1) then
+       hsnow_ice_ref = -enthalpy_prec_ac(:ncol,fice_idx)*cpairv(:ncol,pver,lchnk)*cam_in%ts(:ncol)&
+                              -enthalpy_prec_bc(:ncol,fice_idx)*cpairv(:ncol,pver,lchnk)*cam_in%ts(:ncol)
+       hrain_ice_ref  = -enthalpy_prec_ac(:ncol,fliq_idx)*cpairv(:ncol,pver,lchnk)*cam_in%ts(:ncol)&
+                              -enthalpy_prec_bc(:ncol,fliq_idx)*cpairv(:ncol,pver,lchnk)*cam_in%ts(:ncol)
+       hevap_ice_ref =  cam_in%cflx(:ncol,1)            *cpairv(:ncol,pver,lchnk)*cam_in%ts(:ncol)
+
+       enthalpy_flux_tot(:ncol) = hsnow_ice_ref+hrain_ice_ref+hevap_ice_ref
+    else
+       call endrun(sub//': FATAL: enthalpy_flux_method not supported')
+    end if
+
+    if (enthalpy_flux_method>0) then
+       !
+       ! Enthalpy flux adjustment for CAM when MOM6 is receiving the enthalpy flux.
+       ! Not fixed by energy fixer because MOM6 is receiving the flux
+       !
+       if (hist_fld_active("hsnow_ice_ref")) then
+          tmp(:ncol) = hsnow_ice_ref(:ncol)*(cam_in%ocnfrac(:ncol)+cam_in%icefrac(:ncol))
+          call outfld("hsnow_ice_ref"  , tmp, pcols   ,lchnk   )
+       end if
+       if (hist_fld_active("hrain_ice_ref")) then
+          tmp(:ncol) = hrain_ice_ref*(cam_in%ocnfrac(:ncol)+cam_in%icefrac(:ncol))
+          call outfld("hrain_ice_ref"  , tmp, pcols   ,lchnk   )
+       end if
+       if (hist_fld_active("hevap_ice_ref")) then
+          tmp(:ncol) = hevap_ice_ref*(cam_in%ocnfrac(:ncol)+cam_in%icefrac(:ncol))
+          call outfld("hevap_ice_ref"  , tmp, pcols   ,lchnk   )
+       end if
+     end if
+   end subroutine set_enthalpy_flux
 end module check_energy

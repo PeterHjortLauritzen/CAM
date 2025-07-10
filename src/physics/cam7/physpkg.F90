@@ -77,6 +77,10 @@ module physpkg
   integer ::  totliqini_idx      = 0
   integer ::  toticeini_idx      = 0
 
+  integer ::  enthalpy_prec_bc_idx = 0
+  integer ::  enthalpy_prec_ac_idx = 0
+  integer ::  enthalpy_evap_idx    = 0
+
   integer ::  prec_str_idx       = 0
   integer ::  snow_str_idx       = 0
   integer ::  prec_sed_idx       = 0
@@ -156,7 +160,7 @@ contains
     use hemco_interface,    only: HCOI_Chunk_Init
     use surface_emissions_mod, only: surface_emissions_reg
     use elevated_emissions_mod, only: elevated_emissions_reg
-
+    use air_composition,        only: enthalpy_flux_method, num_enthalpy_vars
     !---------------------------Local variables-----------------------------
     !
     integer  :: m        ! loop index
@@ -207,6 +211,12 @@ contains
     call pbuf_add_field('CLDICEINI', 'physpkg', dtype_r8, (/pcols,pver/), cldiceini_idx)
     call pbuf_add_field('TOTLIQINI', 'physpkg', dtype_r8, (/pcols,pver/), totliqini_idx)
     call pbuf_add_field('TOTICEINI', 'physpkg', dtype_r8, (/pcols,pver/), toticeini_idx)
+
+    if (enthalpy_flux_method>0) then
+       call pbuf_add_field('ENTHALPY_PREC_BC','physpkg', dtype_r8, (/pcols,num_enthalpy_vars/), enthalpy_prec_bc_idx)
+       call pbuf_add_field('ENTHALPY_PREC_AC','global' , dtype_r8, (/pcols,num_enthalpy_vars/), enthalpy_prec_ac_idx)
+       call pbuf_add_field('ENTHALPY_EVAP'   ,'physpkg', dtype_r8, (/pcols/),                   enthalpy_evap_idx)
+    end if
 
     ! check energy package
     call check_energy_register
@@ -1373,7 +1383,7 @@ contains
     use physconst,          only: rhoh2o
     use aero_model,         only: aero_model_drydep
     use check_energy,       only: check_energy_timestep_init, check_energy_cam_chng
-    use check_energy,       only: tot_energy_phys
+    use check_energy,       only: tot_energy_phys, set_enthalpy_flux
     use check_energy,       only: check_tracers_data, check_tracers_init, check_tracers_chng
     use time_manager,       only: get_nstep
     use cam_abortutils,     only: endrun
@@ -1420,6 +1430,7 @@ contains
     use cam_budget,         only: thermo_budget_history
     use dyn_tests_utils,    only: vc_dycore, vc_height, vc_dry_pressure
     use air_composition,    only: cpairv, cp_or_cv_dycore
+    use air_composition,    only: enthalpy_flux_method
     !
     ! Arguments
     !
@@ -1530,6 +1541,7 @@ contains
     character(len=512) errmsg
     integer errflg
 
+    real(r8) :: enthalpy_flux_tot(pcols) !total enthalpy flux sent to ocean
     !-----------------------------------------------------------------------
     lchnk = state%lchnk
     ncol  = state%ncol
@@ -2403,12 +2415,17 @@ contains
       call physics_update(state,ptend,ztodt,tend)
       call check_energy_cam_chng(state, tend, "nudging", nstep, ztodt, zero, zero, zero, zero)
     endif
-
     !-------------- Energy budget checks vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
     ! Save total energy for global fixer in next timestep
     !
     ! This call must be after the last parameterization and call to physics_update
     !
+    call set_enthalpy_flux(ncol,lchnk,enthalpy_flux_method, state, cam_in, pbuf, enthalpy_flux_tot)
+    !
+    ! make sure energy fixer does not fix enthalpy flux passed to ocean
+    !
+    state%te_cur(:ncol,dyn_te_idx) = state%te_cur(:ncol,dyn_te_idx)+ztodt*enthalpy_flux_tot(:ncol)*&
+         (cam_in%ocnfrac(:ncol)+cam_in%icefrac(:ncol))
     call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
     !
     ! FV: convert dry-type mixing ratios to moist here because physics_dme_adjust
@@ -2485,7 +2502,6 @@ contains
       !
     end if
 
-
     ! store T, U, and V in buffer for use in computing dynamics T-tendency in next timestep
     do k = 1,pver
        dtcore(:ncol,k) = state%t(:ncol,k)
@@ -2550,7 +2566,7 @@ contains
     !
     !-----------------------------------------------------------------------
 
-    use physics_buffer,  only: physics_buffer_desc, pbuf_get_field
+    use physics_buffer,  only: physics_buffer_desc, pbuf_get_field, pbuf_set_field
     use physics_buffer,  only: pbuf_get_index, pbuf_old_tim_idx
     use physics_buffer,  only: col_type_subcol, dyn_time_lvls
 
@@ -2576,7 +2592,6 @@ contains
     use perf_mod
     use mo_gas_phase_chemdr,only: map2chm
     use clybry_fam,         only: clybry_fam_adj
-    use cam_abortutils,  only: endrun
     use subcol_utils,    only: is_subcol_on
     use qneg_module,     only: qneg3
     use cam_snapshot,    only: cam_snapshot_all_outfld_tphysbc
@@ -2584,6 +2599,7 @@ contains
     use dyn_tests_utils, only: vc_dycore
     use surface_emissions_mod,only: surface_emissions_set
     use elevated_emissions_mod,only: elevated_emissions_set
+    use air_composition,       only: enthalpy_flux_method
 
     ! Arguments
 
@@ -2927,6 +2943,13 @@ contains
       snow_sed = 0._r8
       prec_str = 0._r8
       snow_str = 0._r8
+      !
+      ! In first time-step tphysac variables need to be zero'd out
+      !
+      if (enthalpy_flux_method>0) then
+        ifld = pbuf_get_index('ENTHALPY_PREC_AC', errcode=i)
+        if (ifld>0) call pbuf_set_field(pbuf, ifld, 0._r8)
+     end if
 
       if (is_subcol_on()) then
         prec_str_sc = 0._r8
@@ -2956,7 +2979,7 @@ contains
     call t_startf('cam_export')
     call pbuf_get_field(pbuf, psl_idx, psl)
     call cpslec(ncol, state%pmid, state%phis, state%ps, state%t, psl, gravit, rair)
-    call cam_export (state,cam_out,pbuf)
+    call cam_export (state,cam_out,pbuf,cam_in=cam_in)
     call t_stopf('cam_export')
 
     ! Write export state to history file

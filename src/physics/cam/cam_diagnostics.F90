@@ -422,7 +422,7 @@ contains
     use cam_history,        only: addfld, add_default, horiz_only
     use constituent_burden, only: constituent_burden_init
     use physics_buffer,     only: pbuf_set_field
-
+    use air_composition,    only: enthalpy_flux_method
     type(physics_buffer_desc), pointer, intent(in) :: pbuf2d(:,:)
 
     integer :: m
@@ -721,6 +721,23 @@ contains
       call pbuf_set_field(pbuf2d, trefmnav_idx,  1.0e36_r8)
     end if
 
+    !
+    ! enthalpy flux variables
+    !
+    if (enthalpy_flux_method>0) then
+       !
+       ! MOM6 sign convention: +ve out of ocean and -ve into ocean
+       !
+       call addfld('hsnow_liq_ref' , horiz_only, 'A', 'W/m2', 'Frozen enthalpy flux to MOM6 using liquid reference')
+       call addfld('hrain_liq_ref' , horiz_only, 'A', 'W/m2', 'Liquid enthalpy flux to MOM6 using liquid reference')
+       call addfld('hevap_liq_ref' , horiz_only, 'A', 'W/m2', 'Evaporation enthalpy flux to MOM6 using liquid reference')
+       !
+       ! CAM convention: use cpdry and +ve into atmosphere and -ve out of atmosphere
+       !
+       call addfld('hsnow_ice_ref' , horiz_only, 'A', 'W/m2', 'Frozen enthalpy flux in CAM using ice reference and cpdry')
+       call addfld('hrain_ice_ref' , horiz_only, 'A', 'W/m2', 'Liquid enthalpy flux in CAM using ice reference and cpdry')
+       call addfld('hevap_ice_ref' , horiz_only, 'A', 'W/m2', 'Evaporation enthalpy in CAM using ice reference and cpdry')
+    end if
   end subroutine diag_init_moist
 
   subroutine diag_init(pbuf2d)

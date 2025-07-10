@@ -82,6 +82,10 @@ module physpkg
   integer ::  totliqini_idx      = 0
   integer ::  toticeini_idx      = 0
 
+  integer ::  enthalpy_prec_bc_idx = 0
+  integer ::  enthalpy_prec_ac_idx = 0
+  integer ::  enthalpy_evap_idx    = 0
+
   integer ::  prec_str_idx       = 0
   integer ::  snow_str_idx       = 0
   integer ::  prec_sed_idx       = 0
@@ -162,6 +166,7 @@ contains
     use upper_bc,           only: ubc_fixed_conc
     use surface_emissions_mod, only: surface_emissions_reg
     use elevated_emissions_mod, only: elevated_emissions_reg
+    use air_composition,        only: enthalpy_flux_method, num_enthalpy_vars
 
     !---------------------------Local variables-----------------------------
     !
@@ -215,6 +220,11 @@ contains
     call pbuf_add_field('CLDICEINI', 'physpkg', dtype_r8, (/pcols,pver/), cldiceini_idx)
     call pbuf_add_field('TOTLIQINI', 'physpkg', dtype_r8, (/pcols,pver/), totliqini_idx)
     call pbuf_add_field('TOTICEINI', 'physpkg', dtype_r8, (/pcols,pver/), toticeini_idx)
+    if (enthalpy_flux_method>0) then
+       call pbuf_add_field('ENTHALPY_PREC_BC','physpkg', dtype_r8, (/pcols,num_enthalpy_vars/), enthalpy_prec_bc_idx)
+       call pbuf_add_field('ENTHALPY_PREC_AC','global' , dtype_r8, (/pcols,num_enthalpy_vars/), enthalpy_prec_ac_idx)
+       call pbuf_add_field('ENTHALPY_EVAP'   ,'physpkg', dtype_r8, (/pcols/),                   enthalpy_evap_idx)
+    end if
 
     ! check energy package
     call check_energy_register
@@ -706,7 +716,7 @@ contains
     !
     !-----------------------------------------------------------------------
 
-    use physics_buffer,     only: physics_buffer_desc, pbuf_initialize, pbuf_get_index
+    use physics_buffer,     only: physics_buffer_desc, pbuf_initialize, pbuf_get_index, pbuf_set_field
     use physconst,          only: rair, cpair, gravit, zvir, karman
     use cam_thermo,         only: cam_thermo_init
     use ref_pres,           only: pref_edge, pref_mid
@@ -775,6 +785,7 @@ contains
     use elevated_emissions_mod, only: elevated_emissions_init
 
     use ccpp_constituent_prop_mod, only: ccpp_const_props_init
+    use air_composition,       only: enthalpy_flux_method
 
     ! Input/output arguments
     type(physics_state), pointer       :: phys_state(:)
@@ -795,7 +806,7 @@ contains
 
     ! Needed for rayleigh friction
     character(len=512) errmsg
-    integer errflg
+    integer errflg, ifld
 
     !-----------------------------------------------------------------------
 
@@ -1052,7 +1063,13 @@ contains
     dvcore_idx = pbuf_get_index('DVCORE')
     dtcore_idx = pbuf_get_index('DTCORE')
     dqcore_idx = pbuf_get_index('DQCORE')
-
+    !
+    ! In first time-step tphysac variables need to be zero'd out
+    !
+    if (enthalpy_flux_method>0) then
+       ifld = pbuf_get_index('ENTHALPY_PREC_AC', errcode=ierr)
+       if (ifld>0) call pbuf_set_field(pbuf2d, ifld, 0._r8)
+    end if
   end subroutine phys_init
 
   !
@@ -1383,7 +1400,7 @@ contains
     use carma_flags_mod,    only: carma_do_aerosol, carma_do_emission
     use check_energy,       only: tot_energy_phys
     use check_energy,       only: check_tracers_data, check_tracers_init, check_tracers_chng
-    use check_energy,       only: check_energy_cam_chng
+    use check_energy,       only: check_energy_cam_chng, set_enthalpy_flux
     use time_manager,       only: get_nstep
     use cam_abortutils,     only: endrun
     use dycore,             only: dycore_is
@@ -1407,6 +1424,7 @@ contains
     use cam_budget,         only: thermo_budget_history
     use dyn_tests_utils,    only: vc_dycore, vc_height, vc_dry_pressure
     use air_composition,    only: cpairv, cp_or_cv_dycore
+    use air_composition,    only: enthalpy_flux_method
     !
     ! Arguments
     !
@@ -1468,6 +1486,7 @@ contains
     character(len=512) errmsg
     integer errflg
 
+    real(r8) :: enthalpy_flux_tot(pcols) !total enthalpy flux sent to ocean
     !-----------------------------------------------------------------------
     carma_diags_obj => carma_diags_t()
     if (.not.associated(carma_diags_obj)) then
@@ -1927,6 +1946,12 @@ contains
     !
     ! This call must be after the last parameterization and call to physics_update
     !
+    call set_enthalpy_flux(ncol,lchnk,enthalpy_flux_method, state, cam_in, pbuf, enthalpy_flux_tot)
+    !
+    ! make sure energy fixer does not fix enthalpy flux passed to ocean
+    !
+    state%te_cur(:ncol,dyn_te_idx) = state%te_cur(:ncol,dyn_te_idx)+ztodt*enthalpy_flux_tot(:ncol)*&
+         (cam_in%ocnfrac(:ncol)+cam_in%icefrac(:ncol))
     call pbuf_set_field(pbuf, teout_idx, state%te_cur(:,dyn_te_idx), (/1,itim_old/),(/pcols,1/))
 
     if (shallow_scheme .eq. 'UNICON') then
@@ -2094,7 +2119,7 @@ contains
     !
     !-----------------------------------------------------------------------
 
-    use physics_buffer,  only: physics_buffer_desc, pbuf_get_field
+    use physics_buffer,  only: physics_buffer_desc, pbuf_get_field, pbuf_set_field
     use physics_buffer,  only: pbuf_get_index, pbuf_old_tim_idx
     use physics_buffer,  only: col_type_subcol, dyn_time_lvls
     use shr_kind_mod,    only: r8 => shr_kind_r8
@@ -2121,7 +2146,7 @@ contains
     use check_energy,    only: check_energy_timestep_init, check_energy_cam_chng
     use check_energy,    only: check_energy_cam_fix
     use check_energy,    only: check_tracers_data, check_tracers_init, check_tracers_chng
-    use check_energy,    only: tot_energy_phys
+    use check_energy,    only: tot_energy_phys, set_enthalpy_flux
     use dycore,          only: dycore_is
     use aero_model,      only: aero_model_wetdep
     use aero_wetdep_cam, only: wetdep_lq
@@ -3024,7 +3049,7 @@ contains
 
     ! Save atmospheric fields to force surface models
     call t_startf('cam_export')
-    call cam_export (state,cam_out,pbuf)
+    call cam_export (state,cam_out,pbuf,cam_in=cam_in)
     call t_stopf('cam_export')
 
     ! Write export state to history file
