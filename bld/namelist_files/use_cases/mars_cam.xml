@@ -25,8 +25,6 @@
 <mwdry                    >43.34</mwdry>
 <cpair                    >735.0</cpair>
 
-<use_topo_file            >.false.</use_topo_file>
-<analytic_ic_type         >'us_standard_atmosphere'</analytic_ic_type>
 <ext_frc_specifier        > ""    </ext_frc_specifier>
 <srf_emis_specifier       > ""    </srf_emis_specifier>
 <tracer_cnst_specifier    > ""    </tracer_cnst_specifier>

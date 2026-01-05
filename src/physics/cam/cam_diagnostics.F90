@@ -1823,9 +1823,11 @@ contains
       !
       ! Ouput ocn and ice fractions
       !
+#ifndef planet_mars
       call outfld('LANDFRAC', cam_in%landfrac, pcols, lchnk)
       call outfld('ICEFRAC',  cam_in%icefrac,  pcols, lchnk)
       call outfld('OCNFRAC',  cam_in%ocnfrac,  pcols, lchnk)
+#endif
       !
       ! Compute daily minimum and maximum of TREF
       !

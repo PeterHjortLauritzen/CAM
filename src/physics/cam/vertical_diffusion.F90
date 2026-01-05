@@ -303,6 +303,20 @@ subroutine vertical_diffusion_init(pbuf2d)
   !
   ! add sponge layer vertical diffusion
   !
+#ifdef planet_mars
+  allocate(kvm_sponge(6), stat=ierr)
+  if( ierr /= 0 ) then
+     write(iulog,*) 'vertical_diffusion_init:  kvm_sponge allocation error = ',ierr
+     call endrun('vertical_diffusion_init: failed to allocate kvm_sponge array')
+  end if
+
+  kvm_sponge(1) = 2E6_r8
+  kvm_sponge(2) = 2E6_r8
+  kvm_sponge(3) = 1.5E6_r8
+  kvm_sponge(4) = 1.0E6_r8
+  kvm_sponge(5) = 0.5E6_r8
+  kvm_sponge(6) = 0.1E6_r8
+#else
   if (ptop_ref>1e-1_r8.and.ptop_ref<100.0_r8) then
      !
      ! CAM7 FMT (but not CAM6 top (~225 Pa) or CAM7 low top or lower)
@@ -332,6 +346,7 @@ subroutine vertical_diffusion_init(pbuf2d)
      kvm_sponge(5) = 0.5E6_r8
      kvm_sponge(6) = 0.1E6_r8
   end if
+#endif
 
   if (masterproc) then
      write(iulog,*)'Initializing vertical diffusion (vertical_diffusion_init)'
@@ -424,7 +439,17 @@ subroutine vertical_diffusion_init(pbuf2d)
      if( masterproc ) write(iulog,fmt='(a,i3,5x,a,i3)') 'NBOT_MOLEC =', nbot_molec
   end if
 
+#ifdef planet_mars
   ! ---------------------------------- !
+  ! Initialize eddy diffusivity module !
+  ! ---------------------------------- !
+
+  ! ntop_eddy must be 1 or <= nbot_molec
+  ! Currently, it is always 1 except for WACCM-X.
+  ntop_eddy  = press_lim_idx(ntop_eddy_pres, top=.true.)
+  nbot_eddy  = pver
+#else
+    ! ---------------------------------- !
   ! Initialize eddy diffusivity module !
   ! ---------------------------------- !
 
@@ -436,7 +461,7 @@ subroutine vertical_diffusion_init(pbuf2d)
      ntop_eddy = 1
   end if
   nbot_eddy  = pver
-
+#endif
   if (masterproc) write(iulog, fmt='(a,i3,5x,a,i3)') 'NTOP_EDDY  =', ntop_eddy, 'NBOT_EDDY  =', nbot_eddy
 
   call phys_getopts(do_hb_above_clubb_out=do_hb_above_clubb)
@@ -1027,6 +1052,25 @@ subroutine vertical_diffusion_tend( &
   ! Get potential temperature.
   th(:ncol,:pver) = state%t(:ncol,:pver) * state%exner(:ncol,:pver)
 
+#ifdef planet_mars
+      call compute_hb_free_atm_diff( ncol          , &
+           th        , state%t  , state%q , state%zm           , &
+           state%pmid, state%u  , state%v , tautotx  , tautoty , &
+           cam_in%shf, cam_in%cflx(:,1), obklen  , ustar       , &
+           kvm       , kvh      , kvq     , cgh      , cgs     , &
+           ri        )
+
+!!$      do i=1,ncol
+!!$        do k=clubbtop(i),pverp
+!!$          kvm(i,k) = 0.0_r8
+!!$          kvh(i,k) = 0.0_r8
+!!$          kvq(i,k) = 0.0_r8
+!!$          cgs(i,k) = 0.0_r8
+!!$          cgh(i,k) = 0.0_r8
+!!$        end do
+!!$      end do
+
+#else
   select case (eddy_scheme)
   case ( 'diag_TKE', 'SPCAM_m2005' )
 
@@ -1111,7 +1155,7 @@ subroutine vertical_diffusion_tend( &
       cgs = 0._r8
     end if
   end select
-
+#endif
   call outfld( 'ustar',   ustar(:), pcols, lchnk )
   call outfld( 'obklen', obklen(:), pcols, lchnk )
   !
