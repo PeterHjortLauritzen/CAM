@@ -70,6 +70,11 @@ module aerosol_properties_mod
      procedure(aero_min_mass_mean_rad), deferred :: min_mass_mean_rad
      procedure(aero_optics_params), deferred :: optics_params
      procedure(aero_bin_name), deferred :: bin_name
+     procedure(aero_scav_diam), deferred :: scav_diam
+     procedure(aero_resuspension_resize), deferred :: resuspension_resize
+     procedure(aero_rebin_bulk_fluxes), deferred :: rebin_bulk_fluxes
+     procedure(aero_hydrophilic), deferred :: hydrophilic
+     procedure(aero_id_query), deferred :: model_is
 
      procedure :: final=>aero_props_final
   end type aerosol_properties
@@ -91,12 +96,13 @@ module aerosol_properties_mod
      !  density
      !  hygroscopicity
      !  species type
+     !  species name
      !  short wave species refractive indices
      !  long wave species refractive indices
      !  species morphology
      !------------------------------------------------------------------------
      subroutine aero_props_get(self, bin_ndx, species_ndx, list_ndx, density, hygro, &
-                               spectype, specmorph, refindex_sw, refindex_lw)
+          spectype, specname, specmorph, refindex_sw, refindex_lw)
        import :: aerosol_properties, r8
        class(aerosol_properties), intent(in) :: self
        integer, intent(in) :: bin_ndx             ! bin index
@@ -105,6 +111,7 @@ module aerosol_properties_mod
        real(r8), optional, intent(out) :: density ! density (kg/m3)
        real(r8), optional, intent(out) :: hygro   ! hygroscopicity
        character(len=*), optional, intent(out) :: spectype  ! species type
+       character(len=*), optional, intent(out) :: specname  ! species name
        character(len=*), optional, intent(out) :: specmorph ! species morphology
        complex(r8), pointer, optional, intent(out) :: refindex_sw(:) ! short wave species refractive indices
        complex(r8), pointer, optional, intent(out) :: refindex_lw(:) ! long wave species refractive indices
@@ -118,7 +125,10 @@ module aerosol_properties_mod
           refrtabsw, refitabsw, refrtablw, refitablw, ncoef, prefr, prefi, sw_hygro_ext_wtp, &
           sw_hygro_ssa_wtp, sw_hygro_asm_wtp, lw_hygro_ext_wtp, wgtpct, nwtp, &
           sw_hygro_coreshell_ext, sw_hygro_coreshell_ssa, sw_hygro_coreshell_asm, lw_hygro_coreshell_ext, &
-          corefrac, bcdust, kap, relh, nfrac, nbcdust, nkap, nrelh )
+          corefrac, bcdust, kap, relh, nfrac, nbcdust, nkap, nrelh, &
+          sw_hygroscopic_ext, sw_hygroscopic_ssa, sw_hygroscopic_asm, lw_hygroscopic_ext, &
+          sw_insoluble_ext, sw_insoluble_ssa, sw_insoluble_asm, lw_insoluble_ext, &
+          r_sw_ext, r_sw_scat, r_sw_ascat, r_mu, r_lw_abs )
 
        import :: aerosol_properties, r8
 
@@ -162,6 +172,25 @@ module aerosol_properties_mod
        integer,   optional, intent(out) :: nbcdust     ! bc/(bc + dust) fraction dimension size
        integer,   optional, intent(out) :: nkap        ! hygroscopicity dimension size
        integer,   optional, intent(out) :: nrelh       ! relative humidity dimension size
+
+       ! hygroscopic
+       real(r8),  optional, pointer :: sw_hygroscopic_ext(:,:) ! short wave extinction table
+       real(r8),  optional, pointer :: sw_hygroscopic_ssa(:,:) ! short wave single-scatter albedo table
+       real(r8),  optional, pointer :: sw_hygroscopic_asm(:,:) ! short wave asymmetry table
+       real(r8),  optional, pointer :: lw_hygroscopic_ext(:,:) ! long wave absorption table
+
+       ! non-hygroscopic (insoluble)
+       real(r8),  optional, pointer :: sw_insoluble_ext(:) ! short wave extinction table
+       real(r8),  optional, pointer :: sw_insoluble_ssa(:) ! short wave single-scatter albedo table
+       real(r8),  optional, pointer :: sw_insoluble_asm(:) ! short wave asymmetry table
+       real(r8),  optional, pointer :: lw_insoluble_ext(:) ! long wave absorption table
+
+       ! volcanic radius
+       real(r8),  optional, pointer :: r_sw_ext(:,:)
+       real(r8),  optional, pointer :: r_sw_scat (:,:)
+       real(r8),  optional, pointer :: r_sw_ascat(:,:)
+       real(r8),  optional, pointer :: r_mu(:)
+       real(r8),  optional, pointer :: r_lw_abs(:,:)
 
      end subroutine aero_optics_params
 
@@ -369,14 +398,73 @@ module aerosol_properties_mod
      ! returns name for a given radiation list number and aerosol bin
      !------------------------------------------------------------------------------
      function aero_bin_name(self, list_ndx,  bin_ndx) result(name)
-       import :: aerosol_properties, r8
+       import :: aerosol_properties, r8, aero_name_len
        class(aerosol_properties), intent(in) :: self
        integer, intent(in) :: list_ndx ! radiation list number
        integer, intent(in) :: bin_ndx  ! bin number
 
-       character(len=32) name
+       character(len=aero_name_len) :: name
 
      end function aero_bin_name
+
+     !------------------------------------------------------------------------------
+     ! returns scavenging diameter for a given aerosol bin number
+     !------------------------------------------------------------------------------
+     function aero_scav_diam(self, bin_ndx) result(diam)
+       import :: aerosol_properties, r8
+       class(aerosol_properties), intent(in) :: self
+       integer, intent(in) :: bin_ndx  ! bin number
+
+       real(r8) :: diam
+
+     end function aero_scav_diam
+
+     !------------------------------------------------------------------------------
+     ! adjust aerosol concentration tendencies to create larger sizes of aerosols
+     ! during resuspension
+     !------------------------------------------------------------------------------
+     subroutine aero_resuspension_resize(self, dcondt)
+       import :: aerosol_properties, r8
+
+       class(aerosol_properties), intent(in) :: self
+       real(r8), intent(inout) :: dcondt(:)
+
+     end subroutine aero_resuspension_resize
+
+     !------------------------------------------------------------------------------
+     ! returns bulk deposition fluxes of the specified species type
+     ! rebinned to specified diameter limits
+     !------------------------------------------------------------------------------
+     subroutine aero_rebin_bulk_fluxes(self, bulk_type, dep_fluxes, diam_edges, bulk_fluxes, &
+                                       error_code, error_string)
+       import :: aerosol_properties, r8
+       class(aerosol_properties), intent(in) :: self
+       character(len=*),intent(in) :: bulk_type       ! aerosol type to rebin
+       real(r8), intent(in) :: dep_fluxes(:)          ! kg/m2
+       real(r8), intent(in) :: diam_edges(:)          ! meters
+       real(r8), intent(out) :: bulk_fluxes(:)        ! kg/m2
+       integer,  intent(out) :: error_code            ! error code (0 if no error)
+       character(len=*), intent(out) :: error_string  ! error string
+
+     end subroutine aero_rebin_bulk_fluxes
+
+     !------------------------------------------------------------------------------
+     ! Returns TRUE if bin is hydrophilic, otherwise FALSE
+     !------------------------------------------------------------------------------
+     logical function aero_hydrophilic(self, bin_ndx)
+       import :: aerosol_properties
+       class(aerosol_properties), intent(in) :: self
+       integer, intent(in) :: bin_ndx ! bin number
+     end function aero_hydrophilic
+
+     !------------------------------------------------------------------------------
+     ! Returns TRUE if the aerosol model matches the query, otherwise FALSE
+     !------------------------------------------------------------------------------
+     logical function aero_id_query(self, query)
+       import :: aerosol_properties
+       class(aerosol_properties), intent(in) :: self
+       character(len=*),          intent(in) :: query
+    end function aero_id_query
 
   end interface
 

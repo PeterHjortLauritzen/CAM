@@ -70,6 +70,7 @@ module physconst
    real(r8), public, parameter :: scon = 441.1_r8                    ! Solar constant (W m-2)  ! Ancient Mars (75%)
 #else
    real(r8), public, parameter :: pstd        = shr_const_pstd       ! Standard pressure (Pascals)
+   real(r8), public, protected :: pref        = 1.0e5_r8             ! Reference surface pressure (Pascals)
    real(r8), public, parameter :: tref        = 288._r8              ! Reference temperature (K)
    real(r8), public, parameter :: lapse_rate  = 0.0065_r8            ! reference lapse rate (K m-1)
 !!jt   real(r8), public, protected :: scon        = shr_cost_scon        ! solar constant ! W m-2

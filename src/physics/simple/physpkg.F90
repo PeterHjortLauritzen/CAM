@@ -219,6 +219,9 @@ contains
     use cam_snapshot,       only: cam_snapshot_init
     use cam_budget,         only: cam_budget_init
     use vertical_diffusion, only: vertical_diffusion_init
+    use constituents,       only: cnst_get_ind
+
+
     use ccpp_constituent_prop_mod, only: ccpp_const_props_init
     use physconst,          only: rair, cpair, gravit, zvir, &
                                   karman
@@ -234,12 +237,11 @@ contains
     type(cam_out_t),intent(inout)      :: cam_out(begchunk:endchunk)
 
     ! local variables
-    integer :: lchnk
     logical :: history_budget              ! output tendencies and state variables for
                                            ! temperature, water vapor, cloud
                                            ! ice, cloud liquid, U, V
     integer :: history_budget_histfile_num ! output history file number for budget fields
-    !-----------------------------------------------------------------------
+    integer :: lchnk, ixq
     !-----------------------------------------------------------------------
 
     call physics_type_alloc(phys_state, phys_tend, begchunk, endchunk, pcols)
@@ -289,7 +291,6 @@ contains
       call frierson_init(phys_state,pbuf2d)
     else if (mars_phys) then
       call mars_init(phys_state,pbuf2d)
-      call pbl_utils_init(gravit, karman, cpair, rair, zvir)
       call vertical_diffusion_init(pbuf2d)
     end if
 
@@ -304,7 +305,8 @@ contains
 
     ! Initialize CAM CCPP constituent properties array
     ! for use in CCPP-ized physics schemes:
-    call ccpp_const_props_init()
+    call cnst_get_ind('Q', ixq)
+    call ccpp_const_props_init(ixq)
 
     ! Initialize qneg3 and qneg4
     call qneg_init()
@@ -650,16 +652,16 @@ contains
        call t_startf('vertical_diffusion_tend')
 
        if (trim(cam_take_snapshot_before) == "vertical_diffusion_section") then
-          call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
-               fh2o, surfric, obklen, flx_heat)
+       call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
+                    fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
        end if
 
        call vertical_diffusion_tend (ztodt ,state , cam_in, &
             surfric  ,obklen   ,ptend    ,ast    ,pbuf )
 
-       !------------------------------------------
-       ! Call major diffusion for extended model
-       !------------------------------------------
+!!$       !------------------------------------------
+!!$       ! Call major diffusion for extended model
+!!$       !------------------------------------------
 !!$       if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then
 !!$          call waccmx_phys_mspd_tend (ztodt    ,state    ,ptend)
 !!$       endif
@@ -678,7 +680,7 @@ contains
 
        if (trim(cam_take_snapshot_after) == "vertical_diffusion_section") then
           call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
-               fh2o, surfric, obklen, flx_heat)
+               fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
        end if
 
        call t_stopf ('vertical_diffusion_tend')
@@ -690,7 +692,7 @@ contains
     if (Nudge_Model .and. Nudge_ON) then
       call nudging_timestep_tend(state,ptend)
       call physics_update(state, ptend, ztodt, tend)
-      call check_energy_chng(state, tend, "nudging", nstep, ztodt, zero, zero, zero, zero)
+      call check_energy_cam_chng(state, tend, "nudging", nstep, ztodt, zero, zero, zero, zero)
     endif
 
     call tot_energy_phys(state, 'phAP')
@@ -708,7 +710,7 @@ contains
          to_dry_factor=state%pdel(:ncol,:)/state%pdeldry(:ncol,:))
 
     if (moist_physics) then
-      ! Scale dry mass and energy (does nothing if dycore is EUL or SLD)
+      ! Scale dry mass and energy
       call cnst_get_ind('CLDLIQ', ixcldliq, abort=.false.)
       call cnst_get_ind('CLDICE', ixcldice, abort=.false.)
       tmp_q     (:ncol,:pver) = state%q(:ncol,:pver,1)
@@ -823,7 +825,8 @@ contains
     use cam_diagnostics,   only: diag_conv_tend_ini, diag_conv, diag_export
     use cam_history,       only: outfld
     use time_manager,      only: get_nstep
-    use check_energy,      only: check_energy_chng, check_energy_fix, check_energy_timestep_init
+    use check_energy,      only: check_energy_cam_chng, check_energy_cam_fix
+    use check_energy,      only: check_energy_timestep_init
     use check_energy,      only: check_tracers_data, check_tracers_init, check_tracers_chng
     use check_energy,      only: tot_energy_phys
     use chemistry,         only: chem_is_active, chem_timestep_tend
@@ -929,10 +932,10 @@ contains
 
     call t_startf('energy_fixer')
 
-    if (adiabatic .and. (.not. dycore_is('EUL'))) then
-      call check_energy_fix(state, ptend, nstep, flx_heat)
+    if (adiabatic) then
+      call check_energy_cam_fix(state, ptend, nstep, flx_heat)
       call physics_update(state, ptend, ztodt, tend)
-      call check_energy_chng(state, tend, "chkengyfix", nstep, ztodt, zero, zero, zero, flx_heat)
+      call check_energy_cam_chng(state, tend, "chkengyfix", nstep, ztodt, zero, zero, zero, flx_heat)
       call outfld( 'EFIX', flx_heat    , pcols, lchnk   )
     end if
 
@@ -1118,7 +1121,7 @@ contains
     ! surface flux is computed and supplied as an argument to
     ! check_energy_chng to account for how the simplified physics forcings are
     ! changing the total exnergy.
-    call check_energy_chng(state, tend, "tphysidl", nstep, ztodt, zero, zero, zero, zero)
+    call check_energy_cam_chng(state, tend, "tphysidl", nstep, ztodt, zero, zero, zero, zero)
 
     if (chem_is_active()) then
       call t_startf('simple_chem')

@@ -14,10 +14,12 @@
    use physconst,         only : cpair, zvir
    use ppgrid,            only : pver, pcols, pverp
    use zm_conv_evap,      only : zm_conv_evap_run
-   use zm_conv_intr,      only : zmconv_ke, zmconv_ke_lnd,  zmconv_org
+   use zm_conv_intr,      only : zmconv_ke, zmconv_ke_lnd
    use cam_history,       only : outfld, addfld, horiz_only
    use cam_logfile,       only : iulog
    use phys_control,      only : phys_getopts
+   use cloud_fraction_fice,  only: cloud_fraction_fice_run
+   use ref_pres,          only: trop_cloud_top_lev
 
    implicit none
    private
@@ -32,7 +34,6 @@
    ! The following namelist variable controls which shallow convection package is used.
    !        'Hack'   = Hack shallow convection (default)
    !        'UW'     = UW shallow convection by Sungsu Park and Christopher S. Bretherton
-   !        'UNICON' = General Convection Model by Sungsu Park
    !        'off'    = No shallow convection
 
    character(len=16) :: shallow_scheme      ! Default set in phys_control.F90, use namelist to change
@@ -84,12 +85,8 @@
 
   use physics_buffer, only : pbuf_add_field, dtype_r8, dyn_time_lvls
   use phys_control, only: use_gw_convect_sh
-  use unicon_cam,     only: unicon_cam_register
 
   call phys_getopts( shallow_scheme_out = shallow_scheme, microp_scheme_out = microp_scheme)
-
-  ! SPCAM registers its own fields
-  if (shallow_scheme == 'SPCAM') return
 
   call pbuf_add_field('ICWMRSH',    'physpkg' ,dtype_r8,(/pcols,pver/),       icwmrsh_idx )
   call pbuf_add_field('RPRDSH',     'physpkg' ,dtype_r8,(/pcols,pver/),       rprdsh_idx )
@@ -103,11 +100,9 @@
   ! Updraft mass flux by shallow convection [ kg/s/m2 ]
   call pbuf_add_field('CMFMC_SH',   'physpkg' ,dtype_r8,(/pcols,pverp/),      cmfmc_sh_idx )
 
-  if (shallow_scheme .eq. 'UW' .or. shallow_scheme .eq. 'UNICON') then
-     call pbuf_add_field('shfrc', 'physpkg', dtype_r8, (/pcols,pver/), shfrc_idx)
-  end if
   if( shallow_scheme .eq. 'UW' ) then
-      call pbuf_add_field('SH_E_ED_RATIO', 'physpkg', dtype_r8, (/pcols,pver/), sh_e_ed_ratio_idx)
+     call pbuf_add_field('shfrc', 'physpkg', dtype_r8, (/pcols,pver/), shfrc_idx)
+     call pbuf_add_field('SH_E_ED_RATIO', 'physpkg', dtype_r8, (/pcols,pver/), sh_e_ed_ratio_idx)
   endif
 
 ! shallow interface gbm flux_convective_cloud_rain+snow (kg/m2/s)
@@ -127,10 +122,6 @@
      call pbuf_add_field('TTEND_SH','physpkg',dtype_r8,(/pcols,pver/),ttend_sh_idx)
   end if
 
-  if (shallow_scheme .eq. 'UNICON') then
-     call unicon_cam_register()
-  end if
-
   end subroutine convect_shallow_register
 
   !=============================================================================== !
@@ -148,7 +139,6 @@
   use ppgrid,            only : pcols, pver
   use hk_conv,           only : mfinti
   use uwshcu,            only : init_uwshcu
-  use unicon_cam,        only : unicon_cam_init
   use physconst,         only : rair, gravit, latvap, rhoh2o, zvir, &
                                 cappa, latice, mwdry, mwh2o
   use pmgrid,            only : plev, plevp
@@ -161,12 +151,8 @@
   real(r8),                  intent(in) :: pref_edge(plevp)  ! Reference pressures at interfaces
   type(physics_buffer_desc), pointer    :: pbuf2d(:,:)
 
-  integer limcnv                                   ! Top interface level limit for convection
   integer k
   character(len=16)          :: eddy_scheme
-
-  ! SPCAM does its own convection
-  if (shallow_scheme == 'SPCAM') return
 
   ! ------------------------------------------------- !
   ! Variables for detailed abalysis of UW-ShCu scheme !
@@ -215,6 +201,7 @@
   call addfld( 'CMFMC',      (/ 'ilev' /), 'A', 'kg/m2/s',  'Moist convection (deep+shallow) mass flux'                 )
   call addfld( 'CMFSL',      (/ 'ilev' /), 'A', 'W/m2',     'Moist shallow convection liquid water static energy flux'  )
   call addfld( 'CMFLQ',      (/ 'ilev' /), 'A', 'W/m2',     'Moist shallow convection total water flux'                 )
+  call addfld ('DQP',        (/ 'lev' /),  'A', 'kg/kg/s',  'Specific humidity tendency due to precipitation'           )
   call addfld( 'CBMF',       horiz_only,   'A', 'kg/m2/s',  'Cloud base mass flux'                                      )
   call addfld( 'CLDTOP',     horiz_only,   'I', '1',        'Vertical index of cloud top'                               )
   call addfld( 'CLDBOT',     horiz_only,   'I', '1',        'Vertical index of cloud base'                              )
@@ -249,7 +236,7 @@
       call add_default( 'CMFDICE  ', history_budget_histfile_num, ' ' )
       call add_default( 'CMFDT   ', history_budget_histfile_num, ' ' )
       call add_default( 'CMFDQ   ', history_budget_histfile_num, ' ' )
-      if( cam_physpkg_is('cam3') .or. cam_physpkg_is('cam4') ) then
+      if( cam_physpkg_is('cam4') ) then
          call add_default( 'EVAPQCM  ', history_budget_histfile_num, ' ' )
          call add_default( 'EVAPTCM  ', history_budget_histfile_num, ' ' )
       end if
@@ -269,26 +256,8 @@
      qpert_idx = pbuf_get_index('qpert')
 
      if( masterproc ) write(iulog,*) 'convect_shallow_init: Hack shallow convection'
-   ! Limit shallow convection to regions below 40 mb
-   ! Note this calculation is repeated in the deep convection interface
-     if( pref_edge(1) >= 4.e3_r8 ) then
-         limcnv = 1
-     else
-         do k = 1, plev
-            if( pref_edge(k) < 4.e3_r8 .and. pref_edge(k+1) >= 4.e3_r8 ) then
-                limcnv = k
-                goto 10
-            end if
-         end do
-         limcnv = plevp
-     end if
-10   continue
 
-     if( masterproc ) then
-         write(iulog,*) 'MFINTI: Convection will be capped at intfc ', limcnv, ' which is ', pref_edge(limcnv), ' pascals'
-     end if
-
-     call mfinti( rair, cpair, gravit, latvap, rhoh2o, limcnv) ! Get args from inti.F90
+     call mfinti( rair, cpair, gravit, latvap, rhoh2o, pref_edge) ! Get args from inti.F90
 
   case('UW') ! Park and Bretherton shallow convection scheme
 
@@ -300,16 +269,6 @@
      call init_uwshcu( r8, latvap, cpair, latice, zvir, rair, gravit, mwh2o/mwdry )
 
      tke_idx = pbuf_get_index('tke')
-
-  case('UNICON') ! Sungsu Park's General Convection Model
-
-     if ( masterproc ) write(iulog,*) 'convect_shallow_init: General Convection Model by Sungsu Park'
-     if ( eddy_scheme .ne. 'diag_TKE' ) then
-          write(iulog,*)  eddy_scheme
-          write(iulog,*) 'ERROR: shallow convection scheme ',shallow_scheme,' is incompatible with eddy scheme ', eddy_scheme
-          call endrun( 'convect_shallow_init: shallow_scheme and eddy_scheme are incompatible' )
-     endif
-     call unicon_cam_init(pbuf2d)
 
   end select
 
@@ -332,7 +291,7 @@
      implicit none
      logical :: convect_shallow_use_shfrc     ! Return value
 
-     if (shallow_scheme .eq. 'UW' .or. shallow_scheme .eq. 'UNICON') then
+     if (shallow_scheme .eq. 'UW') then
           convect_shallow_use_shfrc = .true.
      else
 	  convect_shallow_use_shfrc = .false.
@@ -360,9 +319,8 @@
    use camsrfexch,      only : cam_in_t
 
    use constituents,    only : pcnst, cnst_get_ind, cnst_get_type_byind
-   use hk_conv,         only : cmfmca
+   use hk_conv,         only : cmfmca_cam
    use uwshcu,          only : compute_uwshcu_inv
-   use unicon_cam,      only : unicon_out_t, unicon_cam_tend
 
    use time_manager,    only : get_nstep
    use wv_saturation,   only : qsat
@@ -414,7 +372,7 @@
    real(r8) :: tpert(pcols)                                              ! PBL perturbation theta
 
    real(r8), pointer   :: pblh(:)                                        ! PBL height [ m ]
-   real(r8), pointer   :: qpert(:,:)                                     ! PBL perturbation specific humidity
+   real(r8), pointer   :: qpert(:)                                       ! PBL perturbation specific humidity
 
    ! Temperature tendency from shallow convection (pbuf pointer).
    real(r8), pointer, dimension(:,:) :: ttend_sh
@@ -472,9 +430,18 @@
    real(r8), pointer, dimension(:,:) :: cmfmc2              ! (pcols,pverp) Updraft mass flux by shallow convection [ kg/s/m2 ]
    real(r8), pointer, dimension(:,:) :: sh_e_ed_ratio       ! (pcols,pver) fer/(fer+fdr) from uwschu
 
+   real(r8), dimension(pcols,pver) :: fsnow_conv
+   real(r8), dimension(pcols,pver) :: fice
+
    logical                           :: lq(pcnst)
 
-   type(unicon_out_t) :: unicon_out
+   character(len=40) :: scheme_name
+   character(len=16) :: macrop_scheme
+   character(len=512):: errmsg
+   integer           :: errflg
+   integer :: top_lev
+
+
 
    ! ----------------------- !
    ! Main Computation Begins !
@@ -559,9 +526,8 @@
       call physics_ptend_init( ptend_loc, state%psetcols, 'cmfmca', ls=.true., lq=lq  ) ! Initialize local ptend type
 
       call pbuf_get_field(pbuf, qpert_idx, qpert)
-      qpert(:ncol,2:pcnst) = 0._r8
 
-      call cmfmca( lchnk        ,  ncol         ,                                               &
+      call cmfmca_cam( lchnk        ,  ncol         ,                                               &
                    nstep        ,  ztodt        ,  state%pmid ,  state%pdel  ,                  &
                    state%rpdel  ,  state%zm     ,  tpert      ,  qpert       ,  state%phis  ,   &
                    pblh         ,  state%t      ,  state%q    ,  ptend_loc%s ,  ptend_loc%q ,   &
@@ -647,40 +613,15 @@
 
       call outfld( 'PRECSH' , precc  , pcols, lchnk )
 
-
-   case('UNICON')
-
-      icwmr = 0.0_r8
-
-      call unicon_cam_tend(ztodt, state, cam_in, &
-                           pbuf, ptend_loc, unicon_out)
-
-      cmfmc2(:ncol,:) = unicon_out%cmfmc(:ncol,:)
-      qc2(:ncol,:)    = unicon_out%rqc(:ncol,:)
-      rliq2(:ncol)    = unicon_out%rliq(:ncol)
-      cnt2(:ncol)     = unicon_out%cnt(:ncol)
-      cnb2(:ncol)     = unicon_out%cnb(:ncol)
-
-      ! ------------------------------------------------- !
-      ! Convective fluxes of 'sl' and 'qt' in energy unit !
-      ! ------------------------------------------------- !
-
-      cmfsl(:ncol,:) = unicon_out%slflx(:ncol,:)
-      cmflq(:ncol,:) = unicon_out%qtflx(:ncol,:) * latvap
-
-      call outfld( 'PRECSH' , precc  , pcols, lchnk )
-
    end select
 
    ! --------------------------------------------------------!
    ! Calculate fractional occurance of shallow convection    !
    ! --------------------------------------------------------!
 
- ! Modification : I should check whether below computation of freqsh is correct.
-
    freqsh(:) = 0._r8
    do i = 1, ncol
-      if( maxval(cmfmc2(i,:pver)) <= 0._r8 ) then
+      if (maxval(cmfmc2(i,:pver)) > 0._r8) then
           freqsh(i) = 1._r8
       end if
    end do
@@ -871,16 +812,25 @@
     tend_s_snwprd(:,:) = 0._r8
     tend_s_snwevmlt(:,:) = 0._r8
     snow(:) = 0._r8
+    fice(:,:) = 0._r8
+    fsnow_conv(:,:) = 0._r8
     !REMOVECAM_END
+
+    top_lev = 1
+    call phys_getopts (macrop_scheme_out  = macrop_scheme)
+    if ( .not. (macrop_scheme == "rk")) top_lev = trop_cloud_top_lev
+
+    call cloud_fraction_fice_run(ncol, state1%t(1:ncol,:), tmelt, top_lev, pver, fice(1:ncol,:), fsnow_conv(1:ncol,:), errmsg, errflg)
 
     call zm_conv_evap_run(state1%ncol, pver, pverp, &
          gravit, latice, latvap, tmelt, &
-         cpair, zmconv_ke, zmconv_ke_lnd, zmconv_org, &
+         cpair, zmconv_ke, zmconv_ke_lnd, &
          state1%t(:ncol,:),state1%pmid(:ncol,:),state1%pdel(:ncol,:),state1%q(:ncol,:pver,1), &
          landfracdum(:ncol), &
          ptend_loc%s(:ncol,:), tend_s_snwprd(:ncol,:), tend_s_snwevmlt(:ncol,:), ptend_loc%q(:ncol,:pver,1), &
          rprdsh(:ncol,:), cld(:ncol,:), ztodt, &
-         precc(:ncol), snow(:ncol), ntprprd(:ncol,:), ntsnprd(:ncol,:), flxprec(:ncol,:), flxsnow(:ncol,:) )
+         precc(:ncol), snow(:ncol), ntprprd(:ncol,:), ntsnprd(:ncol,:), fsnow_conv(:ncol,:), flxprec(:ncol,:), flxsnow(:ncol,:),&
+         scheme_name, errmsg, errflg)
 
    ! ---------------------------------------------- !
    ! record history variables from zm_conv_evap_run !
