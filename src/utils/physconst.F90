@@ -63,6 +63,7 @@ module physconst
    real(r8), public, parameter :: pi          = shr_const_pi         ! 3.14...
 #ifdef planet_mars
    real(r8), public, parameter :: pstd        = 6.1E2_r8             ! Standard pressure (Pascals)
+   real(r8), public, parameter :: pref        = 6.1E2_r8             ! Reference pressure (Pascals)
 !!jt   real(r8), public, parameter :: pstd        = exo_pstd             ! Standard pressure (Pascals)
    real(r8), public, parameter :: tref        = 160._r8              ! Reference temperature
    real(r8), public, parameter :: lapse_rate  = 0.0025_r8            ! reference lapse rate [K/m]

@@ -227,7 +227,6 @@ contains
                                   karman
     use pbl_utils,          only: pbl_utils_init
 
-
     ! Input/output arguments
     type(physics_state), pointer       :: phys_state(:)
     type(physics_tend ), pointer       :: phys_tend(:)
@@ -291,6 +290,7 @@ contains
       call frierson_init(phys_state,pbuf2d)
     else if (mars_phys) then
       call mars_init(phys_state,pbuf2d)
+      call pbl_utils_init(gravit, karman, cpair, rair, zvir)
       call vertical_diffusion_init(pbuf2d)
     end if
 
@@ -540,7 +540,7 @@ contains
     use air_composition, only: cpairv, cp_or_cv_dycore
     use time_manager,    only: get_nstep
     use nudging,         only: Nudge_Model, Nudge_ON, nudging_timestep_tend
-    use check_energy,    only: check_energy_chng
+    use check_energy,    only: check_energy_cam_chng
     use vertical_diffusion, only: vertical_diffusion_tend
     use cam_history,     only: outfld
     use cam_snapshot,       only: cam_snapshot_all_outfld_tphysac
@@ -589,6 +589,7 @@ contains
     real(r8) obklen(pcols)             ! Obukhov length
     real(r8) :: fh2o(pcols)            ! h2o flux to balance source from methane chemistry
     real(r8) :: flx_heat(pcols)        ! Heat flux for check_energy_chng.
+    real(r8) :: net_flx(pcols)
 
     !--------------------------------------------------------------------------
 
@@ -643,7 +644,7 @@ contains
     end if
 
     if (mars_phys) then
-       ! Update surface, PBL
+
        !===================================================
        ! Vertical diffusion/pbl calculation
        ! Call vertical diffusion code (pbl, free atmosphere and molecular)
@@ -653,7 +654,8 @@ contains
 
        if (trim(cam_take_snapshot_before) == "vertical_diffusion_section") then
        call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
-                    fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
+                    fh2o, surfric, obklen, flx_heat)
+
        end if
 
        call vertical_diffusion_tend (ztodt ,state , cam_in, &
@@ -679,8 +681,8 @@ contains
        call physics_update(state, ptend, ztodt, tend)
 
        if (trim(cam_take_snapshot_after) == "vertical_diffusion_section") then
-          call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
-               fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
+       call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
+                    fh2o, surfric, obklen, flx_heat)
        end if
 
        call t_stopf ('vertical_diffusion_tend')

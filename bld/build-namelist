@@ -741,11 +741,6 @@ elsif ($rad_pkg =~ m/rrtmgp/) {
 
     add_default($nl, 'p_top_for_equil_rad');
 }
-if (not $waccm_phys) {
-    add_default($nl, 'qrsmlt_scaling');
-    add_default($nl, 'p_top_for_radmrg');
-    add_default($nl, 'p_bot_for_radmrg');
-}
 elsif ($rad_pkg =~ m/exort/) {
     # Dataset for exort k coefficient files are checked out of an external repo into
     # the source code directory.  The paths to this data are relative
@@ -858,6 +853,11 @@ elsif ($rad_pkg =~ m/exort/) {
     add_default($nl, 'do_exo_rt');
     add_default($nl, 'do_exo_synchronous');
     add_default($nl, 'do_exo_gw');
+}
+if (not $waccm_phys) {
+    add_default($nl, 'qrsmlt_scaling');
+    add_default($nl, 'p_top_for_radmrg');
+    add_default($nl, 'p_bot_for_radmrg');
 }
 
 # Solar irradiance

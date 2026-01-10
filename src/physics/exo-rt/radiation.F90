@@ -1208,7 +1208,7 @@ subroutine radiation_tend( &
 
     ! Compute net radiative heating tendency
     call radheat_tend(state, pbuf,  ptend, qrl, qrs, fsns, &
-         fsnt, flns, flnt, cam_in%asdir, net_flx)
+         fsnt, flns, flnt, cam_in%asdir, coszrs, net_flx)
 
     ! Compute heating rate for dtheta/dt
     do k=1,pver

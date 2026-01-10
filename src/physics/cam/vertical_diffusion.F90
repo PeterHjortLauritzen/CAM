@@ -1106,7 +1106,7 @@ subroutine vertical_diffusion_tend( &
   call pbuf_get_field(pbuf, tke_idx,  tke)
 
 #ifdef planet_mars
-  
+
   !REMOVECAM - no longer need this when CAM is retired and pcols no longer exists
   thv(:,:) = 0._r8
   ustar(:) = 0._r8
@@ -1148,14 +1148,14 @@ subroutine vertical_diffusion_tend( &
        ri        = ri(:ncol,:pver),          &
        errmsg    = errmsg,                   &
        errflg    = errflg)
-  
+
   if(errflg /= 0) then
      call endrun('hb_pbl_independent_coefficients_run: ' // errmsg)
   endif
-  
-  call pbuf_get_field(pbuf, clubbtop_idx, clubbtop)
-  clubbtop_r = real(clubbtop, r8)
-  
+
+!jt  call pbuf_get_field(pbuf, clubbtop_idx, clubbtop)
+!jt  clubbtop_r = real(clubbtop, r8)
+  clubbtop_r = real(pverp+1, r8)
   !REMOVECAM - no longer need this when CAM is retired and pcols no longer exists
   kvm(:,:) = 0._r8
   kvh(:,:) = 0._r8
@@ -1180,7 +1180,7 @@ subroutine vertical_diffusion_tend( &
        cgs       = cgs(:ncol,:pverp),                         &
        errmsg    = errmsg,                                    &
        errflg    = errflg)
-  
+
   if(errflg /= 0) then
      call endrun('hb_diff_free_atm_exchange_coefficients_run: ' // errmsg)
   endif
@@ -1190,7 +1190,7 @@ subroutine vertical_diffusion_tend( &
 #else
   select case (eddy_scheme)
   case ( 'diag_TKE' )
-     
+
      ! Get potential temperature.
      th(:ncol,:pver) = state%t(:ncol,:pver) * state%exner(:ncol,:pver)
 
