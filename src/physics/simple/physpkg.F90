@@ -225,7 +225,6 @@ contains
     use ccpp_constituent_prop_mod, only: ccpp_const_props_init
     use physconst,          only: rair, cpair, gravit, zvir, &
                                   karman
-    use pbl_utils,          only: pbl_utils_init
 
     ! Input/output arguments
     type(physics_state), pointer       :: phys_state(:)
@@ -290,7 +289,6 @@ contains
       call frierson_init(phys_state,pbuf2d)
     else if (mars_phys) then
       call mars_init(phys_state,pbuf2d)
-      call pbl_utils_init(gravit, karman, cpair, rair, zvir)
       call vertical_diffusion_init(pbuf2d)
     end if
 
