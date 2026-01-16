@@ -1064,7 +1064,7 @@ contains
           call cam_snapshot_all_outfld(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf)
        end if
     else if (mars_phys) then
-       if (.false.) then
+       if (.true.) then
           ! Compute the large-scale precipitation
           !----------------------------------------
           if (trim(cam_take_snapshot_before) == "mars_condensate_tend") then

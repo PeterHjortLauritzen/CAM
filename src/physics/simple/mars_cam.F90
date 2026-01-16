@@ -137,10 +137,12 @@ contains
     use constituents,   only: cnst_add
     use physics_buffer, only: pbuf_add_field, dtype_r8
     use radiation,      only: radiation_register
+    use radheat,        only: radheat_register
 
     integer                :: mm
 
     call radiation_register()
+    call radheat_register
 
     call cnst_add('CO2', 44._r8, 800._r8, 1.e-12_r8, mm, fixed_ubc=.false., &
          longname='CO2', readiv=.true., is_convtran1=.true.)
@@ -269,7 +271,9 @@ contains
     !=====================================================================
     use physics_types, only: physics_state
     use radiation,     only: radiation_init
+    use radheat,     only: radheat_init
     use rad_constituents,    only: rad_cnst_init
+    use ref_pres,           only: pref_mid
     use constituents,  only: apcnst, bpcnst, cnst_name
 
     !
@@ -288,6 +292,7 @@ contains
 
     !initialize radiation scheme
     call radiation_init(pbuf2d)
+    call radheat_init(pref_mid)
     call rad_cnst_init()
 
     call addfld ('SRELAX',   (/ 'lev' /), 'A', 'J/kg/s','static energy relaxation amount')

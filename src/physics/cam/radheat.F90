@@ -311,6 +311,16 @@ end subroutine radheat_readnl
 
    xommr(:pcols,:pver) = 0._r8
 
+#if (defined planet_mars )
+   xo2mmr(:pcols,:pver) = 0._r8
+   xo3mmr(:pcols,:pver) = 0._r8
+
+   call rad_cnst_get_gas(icall,'N2   ', state, pbuf, gas_mmr)
+   xn2mmr(:pcols,:pver) = gas_mmr(:pcols,:pver)
+   nullify(gas_mmr)
+   qrs_mrg=qrs
+   qrl_mrg=qrl
+#else
    call rad_cnst_get_gas(icall,'O2   ', state, pbuf, gas_mmr)
    xo2mmr(:pcols,:pver) = gas_mmr(:pcols,:pver)
    nullify(gas_mmr)
@@ -334,6 +344,7 @@ end subroutine radheat_readnl
    call merge_qrx (ncol, qrl, qrl_mlt, qrl_mrg)
    !  Merge cam short wave heating for lower atmosphere with M/LT (nlte) heating
    call merge_qrx (ncol, qrs, qrs_mlt, qrs_mrg)
+#endif
 
     qout(:ncol,:) = qrs_mrg(:ncol,:)/cpair
     call outfld ('QRS_TOT', qout, pcols, lchnk)
