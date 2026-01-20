@@ -539,11 +539,16 @@ subroutine mars_surface_init(cam_in,state)
   ! Local values
   !--------------
   cam_in%ts(:)= state%t(:,pver)
+  !asdir, asdif (Visible)	0.15 to 0.20	Mars is dark in the visible (absorbs blue/green).
+  !aldir, aldif (Near-IR)	0.30 to 0.40	Mars is bright in the infrared (reflects heat).
+  !Broadband Average	~0.25	Matches global observation.
+  ! Visible Band (Darker)
+  cam_in%asdir(:) = 0.17_r8
+  cam_in%asdif(:) = 0.17_r8
 
-  cam_in%asdir(:)=.5_r8
-  cam_in%asdif(:)=.5_r8
-  cam_in%aldir(:)=.5_r8
-  cam_in%aldif(:)=.5_r8
+  ! Near-IR Band (Brighter)
+  cam_in%aldir(:) = 0.35_r8
+  cam_in%aldif(:) = 0.35_r8
 
 end subroutine mars_surface_init
 !=======================================================================

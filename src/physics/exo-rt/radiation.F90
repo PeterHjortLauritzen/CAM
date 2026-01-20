@@ -1125,17 +1125,19 @@ subroutine radiation_tend( &
 
              endif  ! (do_exo_rt_clearsky)
 
-             rel=0.0_r8
-             rei=0.0_r8
-             cicewp=0._r8
-             cliqwp=0._r8
-             cldfrc=0._r8
-
+             ! rel=0.0_r8
+             ! rei=0.0_r8
+             ! cicewp=0._r8
+             ! cliqwp=0._r8
+             ! cldfrc=0._r8
+             !When we have some cloud physics lwp will need to be correct.
+             !CICEWP, CLIQWP are in kg/m². aerad_driver and calc_cldopd  expect g/m²
+             !calc_cldopd uses rho_liq in g/m³, requiring mass in g/m² thus multiply cloud paths by 1000.0
              do i = 1, ncol
                 call aerad_driver(h2ommr(i,:), co2mmr(i,:), &
                      ch4mmr(i,:), c2h6mmr(i,:), &
                      h2mmr(i,:),  n2mmr(i,:), o3mmr(i,:), o2mmr(i,:), &
-                     cicewp(i,:), cliqwp(i,:), cldfrc(i,:), &
+                     cicewp(i,:)*10000.0_r8, cliqwp(i,:)*10000.0_r8, cldfrc(i,:), &
                      rei(i,:), rel(i,:), &
                      cam_in%ts(i), state%ps(i), state%pmid(i,:), &
                      state%pdel(i,:), state%pdeldry(i,:), state%t(i,:), state%pint(i,:), state%pintdry(i,:), &
@@ -1198,9 +1200,10 @@ subroutine radiation_tend( &
        ! Radiative flux calculations not done.  The quantity Q*dp is carried by the
        ! physics buffer across timesteps.  It must be converted to Q (dry static energy
        ! tendency) before being passed to radheat_tend.
-       qrs(:ncol,:) = qrs(:ncol,:) / state%pdel(:ncol,:)
-       qrl(:ncol,:) = qrl(:ncol,:) / state%pdel(:ncol,:)
-
+       if (conserve_energy) then
+          qrs(:ncol,:) = qrs(:ncol,:) / state%pdel(:ncol,:)
+          qrl(:ncol,:) = qrl(:ncol,:) / state%pdel(:ncol,:)
+       end if
     end if   ! (do_exo_rad)
 
 !!$    ! output rad inputs and resulting heating rates
