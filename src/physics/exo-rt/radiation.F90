@@ -1125,11 +1125,6 @@ subroutine radiation_tend( &
 
              endif  ! (do_exo_rt_clearsky)
 
-             ! rel=0.0_r8
-             ! rei=0.0_r8
-             ! cicewp=0._r8
-             ! cliqwp=0._r8
-             ! cldfrc=0._r8
              !When we have some cloud physics lwp will need to be correct.
              !CICEWP, CLIQWP are in kg/m². aerad_driver and calc_cldopd  expect g/m²
              !calc_cldopd uses rho_liq in g/m³, requiring mass in g/m² thus multiply cloud paths by 1000.0
@@ -2886,6 +2881,7 @@ subroutine init_kcoeff
     use cam_pio_utils, only: cam_pio_openfile
     use pio,  only: pio_inq_varid, pio_get_var, pio_closefile, pio_nowrite,  &
                     file_desc_t, var_desc_t, pio_inq_dimid, pio_inquire_dimension
+    use radgrid, only: solarflux, S0
     implicit none
     include 'netcdf.inc'
 
@@ -2913,10 +2909,11 @@ subroutine init_kcoeff
     call pio_closefile(ncid)
 
 
-#if ( defined SPMD )
-    call mpibcast(S0, 1, mpir8, 0, mpicom)
-    call mpibcast(solarflux, ntot_wavlnrng, mpir8, 0, mpicom)
-#endif
+!!$#if ( defined SPMD )
+!!$    call mpibcast(S0, 1, mpir8, 0, mpicom)
+!!$    call mpibcast(solarflux, ntot_wavlnrng, mpir8, 0, mpicom)
+!!$#endif
+! Check what we are leaving in the global variable
 
   end subroutine init_solar
 

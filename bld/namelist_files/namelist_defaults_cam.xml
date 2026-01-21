@@ -465,8 +465,8 @@
 
 <!-- single gas k-coefficients for ExoRT -->
 <solar_file rad="exort">src/physics/exo-rt/ext/data/solar/G2V_SUN_n68.nc</solar_file>
-<cldoptsL_file rad="exort">src/physics/exo-rt/ext/data/cloud/cloudoptics_h2o_liquid_mie_n84.nc</cldoptsL_file>
-<cldoptsI_file rad="exort">src/physics/exo-rt/ext/data/cloud/cloudoptics_h2o_ice_mie_n84.nc</cldoptsI_file>
+<cldoptsL_file rad="exort">src/physics/exo-rt/ext/data/cloud/cloudoptics_h2o_liquid_mie_n68.nc</cldoptsL_file>
+<cldoptsI_file rad="exort">src/physics/exo-rt/ext/data/cloud/cloudoptics_h2o_ice_mie_n68.nc</cldoptsI_file>
 <k_h2o_file  rad="exort">src/physics/exo-rt/ext/data/kdist/n68h2o/hitran2016/n68_8gpt_h2o_hitran16_Nnu1e4_c25_voigt_noplinth_q0_grrtm.nc</k_h2o_file>
 <k_co2_file  rad="exort">src/physics/exo-rt/ext/data/kdist/n68co2/hitran2016/n68_8gpt_co2_hitran16_Nnu1e4_c500_subL_q1_grrtm.nc</k_co2_file>
 <k_o2_file  rad="exort">src/physics/exo-rt/ext/data/kdist/n68o2/n68_8gpt_o2_hitran20_Nnu1e4_c25_voigt_q0_grrtm.nc</k_o2_file>
