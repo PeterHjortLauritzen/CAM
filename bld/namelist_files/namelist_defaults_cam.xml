@@ -253,7 +253,8 @@
 <!-- <ncdata dyn="se" hgrid="ne16np4"  nlev="49"  mars="1"  >atm/cam/inic/se/init.HS.no-topo.nc</ncdata> -->
 <ncdata dyn="se" hgrid="ne16np4"  nlev="49"  mars="1"  >atm/cam/inic/se/init.HS.no-topo_241016.nc</ncdata>
 <ncdata dyn="se" hgrid="ne3np4"  nlev="49"  mars="1"   >atm/cam/inic/se/CAM_Mars_ne3np4.HS.no-topo_241016.nc</ncdata>
-
+<ncdata dyn="se" hgrid="ne16np4"  nlev="30"  mars="1"   >atm/cam/inic/se/init.HS.L30.init.HS.no-topo_241016.nc</ncdata>
+<ncdata dyn="se" hgrid="ne3np4"  nlev="30"  mars="1"   >atm/cam/inic/se/cami_mars_ne3np4_L30_no-topo.260121.nc</ncdata>
 <!-- FV3 Initial Conditions -->
 <ncdata hgrid="C24"  nlev="26"                  >atm/cam/inic/fv3/cami_0000-01-01_C24_L26_c200625.nc</ncdata>
 <ncdata hgrid="C24"  nlev="30"                  >atm/cam/inic/fv3/cami-mam3_0000-01-01_C24_L30_c200625.nc</ncdata>
@@ -305,9 +306,11 @@
 <bnd_topo hgrid="C384" >atm/cam/topo/fv3_C384_nc3000_Co015_Fi001_MulG_PF_nullRR_Nsw011_c200625.nc</bnd_topo>
 
 <bnd_topo hgrid="ne3np4"          >atm/cam/topo/se/ne3np4_gmted2010_modis_bedmachine_nc0540_Laplace1000_noleak_20230717.nc</bnd_topo>
+<bnd_topo hgrid="ne3np4" mars="1" >atm/cam/topo/se/ne16np4_gmted2010_modis_bedmachine_nc3000_Laplace0200_20241212.nc:r.remap_to_ne3np4.nc</bnd_topo>
 <bnd_topo hgrid="ne5np4"          >atm/cam/topo/se/ne5np4_nc3000_Co360_Fi001_MulG_PF_nullRR_Nsw064_20170515.nc</bnd_topo>
 <bnd_topo hgrid="ne16np4"         >atm/cam/topo/se/ne16np4_nc3000_Co120_Fi001_PF_nullRR_Nsw084_20171012.nc</bnd_topo>
 <bnd_topo hgrid="ne16np4" phys="simple_mars" >atm/cam/topo/se/ne16np4_gmted2010_modis_bedmachine_nc3000_Laplace0200_20241212.nc</bnd_topo>
+<bnd_topo hgrid="ne16np4" mars="1" >atm/cam/topo/se/ne16np4_gmted2010_modis_bedmachine_nc3000_Laplace0200_20241212.nc</bnd_topo>
 <bnd_topo hgrid="ne30np4"         >atm/cam/topo/se/ne30np4_gmted2010_modis_bedmachine_nc3000_Laplace0100_noleak_greenlndantarcsgh30fac2.50_20250822.nc</bnd_topo>
 <bnd_topo hgrid="ne60np4"         >atm/cam/topo/se/ne60np4_nc3000_Co030_Fi001_PF_nullRR_Nsw021_20171012.nc</bnd_topo>
 <bnd_topo hgrid="ne120np4"        >atm/cam/topo/se/ne120np4_nc3000_Co015_Fi001_PF_nullRR_Nsw010_20171011.nc</bnd_topo>

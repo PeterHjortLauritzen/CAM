@@ -4,14 +4,16 @@ module restart_physics
   use spmd_utils,     only: masterproc
   use constituents,   only: pcnst
 
-  use cam_abortutils, only: endrun
-  use camsrfexch,     only: cam_in_t, cam_out_t
-  use cam_logfile,    only: iulog
-  use pio,            only: file_desc_t, io_desc_t, var_desc_t,               &
-                            pio_double, pio_int, pio_noerr,                   &
-                            pio_seterrorhandling, pio_bcast_error,            &
-                            pio_inq_varid, pio_def_var, pio_def_dim,          &
-                            pio_put_var, pio_get_var
+  use ioFileMod
+  use cam_abortutils,     only: endrun
+  use camsrfexch,         only: cam_in_t, cam_out_t
+  use cam_logfile,        only: iulog
+  use pio,                only: file_desc_t, io_desc_t, var_desc_t, &
+       pio_double, pio_int, pio_noerr, &
+       pio_seterrorhandling, pio_bcast_error, &
+       pio_inq_varid, &
+       pio_def_var, pio_def_dim, &
+       pio_put_var, pio_get_var
 
   use cam_control_mod, only: frierson_phys, mars_phys
   use frierson_cam,    only: frierson_restart_init, frierson_restart_write, frierson_restart_read
@@ -38,16 +40,20 @@ CONTAINS
     use physics_buffer,      only: pbuf_init_restart, physics_buffer_desc
     use cam_grid_support,    only: cam_grid_write_attr, cam_grid_id
     use cam_grid_support,    only: cam_grid_header_info_t
+    use cam_pio_utils,       only: cam_pio_def_dim
+    use subcol_utils,        only: is_subcol_on
+    use subcol,              only: subcol_init_restart
+!    use carma_intr,          only: carma_restart_init
 
     type(file_desc_t), intent(inout)   :: file
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
-    integer                            :: grid_id
-    integer                            :: hdimcnt, ierr, i
-    integer                            :: dimids(4)
-    integer, allocatable               :: hdimids(:)
-    type(cam_grid_header_info_t)       :: info
-    character(len=4)                   :: num
+    integer                      :: grid_id
+    integer                      :: hdimcnt, ierr, i
+    integer                      :: dimids(4)
+    integer, allocatable         :: hdimids(:)
+    type(cam_grid_header_info_t) :: info
+    character(len=4)             :: num
 
     call pio_seterrorhandling(File, PIO_BCAST_ERROR)
     ! Probably should have the grid write this out.
@@ -98,7 +104,7 @@ CONTAINS
     if (frierson_phys) then
        call frierson_restart_write(File)
     else if (mars_phys) then
-       call mars_restart_write(File)
+       call mars_restart_write(File, cam_in, cam_out)
     end if
 
   end subroutine write_restart_physics
@@ -115,6 +121,10 @@ CONTAINS
     use cam_grid_support,    only: cam_grid_get_decomp, cam_grid_dimensions
     use cam_history_support, only: fillvalue
     use pio,                 only: pio_read_darray
+    use subcol_utils,        only: is_subcol_on
+    use subcol,              only: subcol_read_restart
+    use pio,                 only: pio_read_darray
+    use carma_intr,          only: carma_restart_read
     !
     ! Arguments
     !
@@ -129,7 +139,7 @@ CONTAINS
     if (frierson_phys) then
        call frierson_restart_read(File)
     else if (mars_phys) then
-       call mars_restart_read(File)
+       call mars_restart_read(File, cam_in, cam_out)
     end if
   end subroutine read_restart_physics
 
