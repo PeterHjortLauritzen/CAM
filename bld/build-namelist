@@ -853,6 +853,8 @@ elsif ($rad_pkg =~ m/exort/) {
     add_default($nl, 'do_exo_rt');
     add_default($nl, 'do_exo_synchronous');
     add_default($nl, 'do_exo_gw');
+    add_default($nl, 'exo_rad_camtop');
+    add_default($nl, 'exo_rad_step');
 }
 if (not $waccm_phys) {
     add_default($nl, 'qrsmlt_scaling');
@@ -1001,52 +1003,81 @@ my @aerosources = ();
 # and commas) that will be assigned to the namelist variable rad_climate.
 my $radval = "'A:Q:H2O'";
 
-if (($chem =~ /waccm_ma/ or $chem =~ /waccm_tsmlt/ or $chem =~ /waccm_t4ma/) and !$chem_rad_passive) {
-    $radval .= ",'A:O2:O2','A:CO2:CO2'";
-}
-elsif (($chem =~ /trop_strat/ or $chem =~ /geoschem/) and !$chem_rad_passive) {
-    $radval .= ",'N:O2:O2','A:CO2:CO2'";
-}
-elsif (($co2_cycle and !$co2_cycle_rad_passive) or ($chem =~ /ghg_mam4/)) {
-    $radval .= ",'N:O2:O2','A:CO2:CO2'";
-}
-else {
-    $radval .= ",'N:O2:O2','N:CO2:CO2'";
-}
-
-if ($rad_prog_ozone) {
-    $radval .= ",'A:O3:O3'";
-} elsif ($moz_ozone_data =~ /$TRUE/io) {
-    $radval .= ",'N:ozone:O3'";
-    if (!defined $nl->get_value('prescribed_ozone_file') and !$simple_phys) {
-        add_default($nl, 'prescribed_ozone_datapath');
-        add_default($nl, 'prescribed_ozone_file');
-        add_default($nl, 'prescribed_ozone_name');
-    }
-    if (!defined $nl->get_value('prescribed_ozone_type') and !$simple_phys) {
-        add_default($nl, 'prescribed_ozone_type');
-        add_default($nl, 'prescribed_ozone_cycle_yr');
-    }
-} else {
-    die "ERROR: can not set ozone rad_climate specification\n";
-}
-
-if ((($chem =~ /ghg_mam4/) or ($chem =~ /waccm_ma/) or ($chem =~ /waccm_t4ma/) or ($chem =~ /waccm_sc_mam/) or ($chem =~ /waccm_tsmlt/) or ($chem =~ /trop_strat/)) and !$chem_rad_passive ) {
-    $radval .= ",'A:N2O:N2O','A:CH4:CH4','N:CFC11STAR:CFC11','A:CFC12:CFC12'";
-} elsif ($prog_ghg1 and $prog_ghg2 and !$chem_rad_passive ) {
-    $radval .= ",'A:N2O:N2O','A:CH4:CH4','A:CFC11:CFC11','A:CFC12:CFC12'";
-} elsif ($prog_ghg1 and !$prog_ghg2  and !$chem_rad_passive ) {
-    $radval .= ",'A:N2O:N2O','A:CH4:CH4','N:CFC11:CFC11','N:CFC12:CFC12'";
-} elsif ($chem =~ /geoschem/) {
-    $radval .= ",'A:N2O:N2O','A:CH4:CH4','A:CFC11:CFC11','A:CFC12:CFC12'";
-} else {
-    $radval .= ",'N:N2O:N2O','N:CH4:CH4','N:CFC11:CFC11','N:CFC12:CFC12'";
-}
-
-# If Mars add set up rad for CO2 and N2
-if ($cfg->get('mars')) {
+# --- MODIFICATION: Exclusive Gas Logic ---
+if ($cfg->get('mars') || $rad_pkg =~ /exort/) {
+    # Mars/ExoRT: Only add CO2 and N2 (H2O is already in radval)
     $radval .= ",'A:CO2:CO2','A:N2:N2'";
 }
+else {
+    # Earth Logic (Standard CAM)
+    if (($chem =~ /waccm_ma/ or $chem =~ /waccm_tsmlt/ or $chem =~ /waccm_t4ma/) and !$chem_rad_passive) {
+        $radval .= ",'A:O2:O2','A:CO2:CO2'";
+    }
+    elsif (($chem =~ /trop_strat/ or $chem =~ /geoschem/) and !$chem_rad_passive) {
+        $radval .= ",'N:O2:O2','A:CO2:CO2'";
+    }
+    elsif (($co2_cycle and !$co2_cycle_rad_passive) or ($chem =~ /ghg_mam4/)) {
+        $radval .= ",'N:O2:O2','A:CO2:CO2'";
+    }
+    else {
+        $radval .= ",'N:O2:O2','N:CO2:CO2'";
+    }
+
+    if ($rad_prog_ozone) {
+        $radval .= ",'A:O3:O3'";
+    } elsif ($moz_ozone_data =~ /$TRUE/io) {
+        $radval .= ",'N:ozone:O3'";
+        if (!defined $nl->get_value('prescribed_ozone_file') and !$simple_phys) {
+            add_default($nl, 'prescribed_ozone_datapath');
+            add_default($nl, 'prescribed_ozone_file');
+            add_default($nl, 'prescribed_ozone_name');
+        }
+        if (!defined $nl->get_value('prescribed_ozone_type') and !$simple_phys) {
+            add_default($nl, 'prescribed_ozone_type');
+            add_default($nl, 'prescribed_ozone_cycle_yr');
+        }
+    } else {
+        die "ERROR: can not set ozone rad_climate specification\n";
+    }
+
+    if ((($chem =~ /ghg_mam4/) or ($chem =~ /waccm_ma/) or ($chem =~ /waccm_t4ma/) or ($chem =~ /waccm_sc_mam/) or ($chem =~ /waccm_tsmlt/) or ($chem =~ /trop_strat/)) and !$chem_rad_passive ) {
+        $radval .= ",'A:N2O:N2O','A:CH4:CH4','N:CFC11STAR:CFC11','A:CFC12:CFC12'";
+    } elsif ($prog_ghg1 and $prog_ghg2 and !$chem_rad_passive ) {
+        $radval .= ",'A:N2O:N2O','A:CH4:CH4','A:CFC11:CFC11','A:CFC12:CFC12'";
+    } elsif ($prog_ghg1 and !$prog_ghg2  and !$chem_rad_passive ) {
+        $radval .= ",'A:N2O:N2O','A:CH4:CH4','N:CFC11:CFC11','N:CFC12:CFC12'";
+    } elsif ($chem =~ /geoschem/) {
+        $radval .= ",'A:N2O:N2O','A:CH4:CH4','A:CFC11:CFC11','A:CFC12:CFC12'";
+    } else {
+        $radval .= ",'N:N2O:N2O','N:CH4:CH4','N:CFC11:CFC11','N:CFC12:CFC12'";
+    }
+}
+# -------------------------------------------------------------------------
+# Mars Physical Constants
+# Force the physconst_nl group to appear by setting defaults here.
+# Defaults are read from namelist_defaults_cam.xml (where they use D0).
+# -------------------------------------------------------------------------
+if ($cfg->get('mars') || $rad_pkg =~ /exort/) {
+    # Gravity (m/s^2)
+    add_default($nl, 'gravit');
+
+    # Planet Radius (m)
+    add_default($nl, 'rearth');
+
+    # Solar Constant (W/m^2) - Modern Mars
+    add_default($nl, 'scon');
+
+    # Specific Heat of Air (J/kg/K) - CO2 Atmosphere
+    add_default($nl, 'cpair');
+
+    # Length of Day (s)
+    add_default($nl, 'sday');
+
+    # Molecular Weight of Dry Air
+    add_default($nl, 'mwdry');
+}
+
+# -------------------------------------------------------------------------
 
 # Aerosol contributions to rad_climate
 
@@ -1074,6 +1105,10 @@ else {
 # are constructed to get the default physprops files.
 my $aer_model = 'bam';
 if ($prescribed_aero_model eq 'modal' or $chem =~ /_mam/) {$aer_model = 'mam';}
+
+# Until we have and aerosol model for mars lets turn it off
+# Explicitly disable aerosol model for Mars/ExoRT
+if ($cfg->get('mars') || $rad_pkg =~ /exort/) {$aer_model = 'none';}
 
 if ($aer_model eq 'mam' ) {
 
@@ -1208,7 +1243,7 @@ if ($aer_model eq 'mam' ) {
   # water refractive index properties needed for modal optics calculations
   add_default($nl, 'water_refindex_file');
 
-} else {
+} elsif ($aer_model eq 'bam') {
 
   # bulk aerosol contributions
 

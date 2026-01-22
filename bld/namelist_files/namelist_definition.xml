@@ -9339,6 +9339,14 @@ Planetary rotation rate (radians/second). Value set here is ONLY used in the atm
 Default: set to shr_const value
 </entry>
 
+<entry id="scon" type="real" category="physconst"
+       group="physconst_nl" valid_values="" >
+  Solar constant (W/m^2). Used to override the default or solar file value.
+  Earth: ~1361.0
+  Standard Mars: ~586.2
+  Ancient Mars (75%): ~441.1
+Default: set to shr_const value
+</entry>
 <!-- for offine unit drivers -->
 
 <entry id="offline_driver_infile" type="char*256" input_pathname="abs" category="offline_unit_driver"

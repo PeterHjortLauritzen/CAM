@@ -34,16 +34,7 @@ module physconst
    use shr_flux_mod,   only: shr_flux_adjust_constants
    use cam_abortutils, only: endrun
    use constituents,   only: pcnst
-!!$#ifdef planet_mars
-!!$   use exoplanet_mod,  only: &
-!!$        exo_scon, &      ! solar constant ! W m-2
-!!$        exo_mwdair, &    ! molecular weight dry air ~ kg/kmole
-!!$        exo_cpdair, &    ! specific heat of dry air   ~ J/kg/K
-!!$        exo_pstd, &         ! standard pressure
-!!$        exo_sday, &         ! siderial day ~ sec
-!!$        exo_planet_radius, &  ! planet radius
-!!$        exo_surface_gravity, &     ! surface gravity
-!!$#endif
+
    implicit none
    private
    save
@@ -61,24 +52,10 @@ module physconst
    real(r8), public, parameter :: latice      = shr_const_latice     ! Latent heat of fusion (J kg-1)
    real(r8), public, parameter :: latvap      = shr_const_latvap     ! Latent heat of vaporization (J kg-1)
    real(r8), public, parameter :: pi          = shr_const_pi         ! 3.14...
-#ifdef planet_mars
-   real(r8), public, parameter :: pstd        = 6.1E2_r8             ! Standard pressure (Pascals)
-   real(r8), public, parameter :: pref        = 6.1E2_r8             ! Reference pressure (Pascals)
-!!jt   real(r8), public, parameter :: pstd        = exo_pstd             ! Standard pressure (Pascals)
-   real(r8), public, parameter :: tref        = 160._r8              ! Reference temperature
-   real(r8), public, parameter :: lapse_rate  = 0.0025_r8            ! reference lapse rate [K/m]
-!!  real(r8), public, parameter :: scon = 586.2_r8                     ! Solar constant (W m-2)  ! Modern Mars
-   real(r8), public, parameter :: scon = 441.1_r8                    ! Solar constant (W m-2)  ! Ancient Mars (75%)
-#else
-   real(r8), public, parameter :: pstd        = shr_const_pstd       ! Standard pressure (Pascals)
-   real(r8), public, protected :: pref        = 1.0e5_r8             ! Reference surface pressure (Pascals)
-   real(r8), public, parameter :: tref        = 288._r8              ! Reference temperature (K)
-   real(r8), public, parameter :: lapse_rate  = 0.0065_r8            ! reference lapse rate (K m-1)
-!!jt   real(r8), public, protected :: scon        = shr_cost_scon        ! solar constant ! W m-2
-#endif
+
    real(r8), public, parameter :: r_universal = shr_const_rgas       ! Universal gas constant (J K-1 kmol-1)
    real(r8), public, parameter :: rhoh2o      = shr_const_rhofw      ! Density of liquid water at STP (kg m-3)
-   real(r8), public, parameter :: spval       = shr_const_spval      !special value
+   real(r8), public, parameter :: spval       = shr_const_spval      ! special value
    real(r8), public, parameter :: stebol      = shr_const_stebol     ! Stefan-Boltzmann's constant (W m-2 K-4)
    real(r8), public, parameter :: h2otrip     = shr_const_tktrip     ! Triple point temperature of water (K)
 
@@ -86,35 +63,43 @@ module physconst
    real(r8), public, parameter :: planck      = 6.6260755e-34_r8     ! Planck's constant (J.s)
    real(r8), public, parameter :: amu         = 1.66053886e-27_r8    ! Atomic Mass Unit (kg)
 
-   ! Molecular weights (g mol-1)
-#ifdef planet_mars
-   real(r8), public, parameter :: mwn2  =  28.              ! molecular weight of n2
-   real(r8), public, parameter :: mwo2  =  32.		    ! molecular weight O2
-   real(r8), public, parameter :: mwh2  =  2.		    ! molecular weight H2
-   real(r8), public, parameter :: mwc2h6 = 30.              ! molecular weight c2h6
-#endif
-   real(r8), public, parameter :: mwco2       =  44._r8             ! molecular weight co2
-   real(r8), public, parameter :: mwn2o       =  44._r8             ! molecular weight n2o
-   real(r8), public, parameter :: mwch4       =  16._r8             ! molecular weight ch4
-   real(r8), public, parameter :: mwf11       = 136._r8             ! molecular weight cfc11
-   real(r8), public, parameter :: mwf12       = 120._r8             ! molecular weight cfc12
-   real(r8), public, parameter :: mwo3        =  48._r8             ! molecular weight O3
-   real(r8), public, parameter :: mwso2       =  64._r8             ! molecular weight so2
-   real(r8), public, parameter :: mwso4       =  96._r8             ! molecular weight so4
-   real(r8), public, parameter :: mwh2o2      =  34._r8             ! molecular weight h2o2
-   real(r8), public, parameter :: mwdms       =  62._r8             ! molecular weight dms
-   real(r8), public, parameter :: mwnh4       =  18._r8             ! molecular wieght nh4
-   real(r8), public, protected :: mwh2o       =  shr_const_mwwv     ! molecular weight h2o
-   real(r8), public, protected :: rair       = shr_const_rdair           ! Dry air gas constant     (J K-1 kg-1)
-   real(r8), public, protected :: mwdry       =  shr_const_mwdair   ! molecular weight dry air
+   ! Molecular weights (g mol-1) - Made universal for all planets
+   real(r8), public, parameter :: mwn2   =  28._r8             ! molecular weight of n2
+   real(r8), public, parameter :: mwo2   =  32._r8             ! molecular weight O2
+   real(r8), public, parameter :: mwh2   =  2._r8              ! molecular weight H2
+   real(r8), public, parameter :: mwc2h6 =  30._r8             ! molecular weight c2h6
+   real(r8), public, parameter :: mwco2  =  44._r8             ! molecular weight co2
+   real(r8), public, parameter :: mwn2o  =  44._r8             ! molecular weight n2o
+   real(r8), public, parameter :: mwch4  =  16._r8             ! molecular weight ch4
+   real(r8), public, parameter :: mwf11  = 136._r8             ! molecular weight cfc11
+   real(r8), public, parameter :: mwf12  = 120._r8             ! molecular weight cfc12
+   real(r8), public, parameter :: mwo3   =  48._r8             ! molecular weight O3
+   real(r8), public, parameter :: mwso2  =  64._r8             ! molecular weight so2
+   real(r8), public, parameter :: mwso4  =  96._r8             ! molecular weight so4
+   real(r8), public, parameter :: mwh2o2 =  34._r8             ! molecular weight h2o2
+   real(r8), public, parameter :: mwdms  =  62._r8             ! molecular weight dms
+   real(r8), public, parameter :: mwnh4  =  18._r8             ! molecular wieght nh4
 
-   ! modifiable physical constants for  other planets (including aquaplanet)
-   real(r8), public, protected :: gravit  = shr_const_g            ! gravitational acceleration (m s-2)
-   real(r8), public, protected :: sday    = shr_const_sday         ! sec in sidereal day (seconds)
-   real(r8), public, protected :: cpwv    = shr_const_cpwv         ! specific heat of water vapor (J K-1 kg-1)
-   real(r8), public, protected :: cpair   = shr_const_cpdair       ! specific heat of dry air (J K-1 kg-1)
-   real(r8), public, protected :: rearth  = shr_const_rearth       ! radius of earth (m)
-   real(r8), public, protected :: tmelt   = shr_const_tkfrz        ! Freezing point of water (K)
+   ! -------------------------------------------------------------------------
+   ! Modifiable Physical Constants (Protected)
+   ! Initialized to Earth values, modifiable via namelist
+   ! -------------------------------------------------------------------------
+   real(r8), public, protected :: mwh2o   =  shr_const_mwwv     ! molecular weight h2o
+   real(r8), public, protected :: rair    =  shr_const_rdair    ! Dry air gas constant (J K-1 kg-1)
+   real(r8), public, protected :: mwdry   =  shr_const_mwdair   ! molecular weight dry air
+   real(r8), public, protected :: gravit  =  shr_const_g        ! gravitational acceleration (m s-2)
+   real(r8), public, protected :: sday    =  shr_const_sday     ! sec in sidereal day (seconds)
+   real(r8), public, protected :: cpwv    =  shr_const_cpwv     ! specific heat of water vapor (J K-1 kg-1)
+   real(r8), public, protected :: cpair   =  shr_const_cpdair   ! specific heat of dry air (J K-1 kg-1)
+   real(r8), public, protected :: rearth  =  shr_const_rearth   ! radius of earth (m)
+   real(r8), public, protected :: tmelt   =  shr_const_tkfrz    ! Freezing point of water (K)
+   real(r8), public, protected :: scon    =  1361.27_r8         ! Solar constant (W m-2)
+
+   ! Atmospheric Structure (Initialized to Earth, modifiable for Mars)
+   real(r8), public, protected :: pstd        = shr_const_pstd   ! Standard pressure (Pascals)
+   real(r8), public, protected :: pref        = 1.0e5_r8         ! Reference surface pressure (Pascals)
+   real(r8), public, protected :: tref        = 288._r8          ! Reference temperature (K)
+   real(r8), public, protected :: lapse_rate  = 0.0065_r8        ! reference lapse rate (K m-1)
 
    !-----  Variables below here are derived from those above -----------------
 
@@ -148,15 +133,10 @@ CONTAINS
 
       ! Local variables
       integer                     :: unitn, ierr
-      logical                     :: newg
-      logical                     :: newsday
-      logical                     :: newmwh2o
-      logical                     :: newcpwv
-      logical                     :: newmwdry
-      logical                     :: newcpair
-      logical                     :: newrearth
-      logical                     :: newtmelt
-      logical                     :: newomega
+      logical                     :: newg, newsday, newmwh2o, newcpwv, newmwdry
+      logical                     :: newcpair, newrearth, newtmelt, newomega, newscon
+      logical                     :: newpstd, newpref, newtref, newlapse
+
       integer,          parameter :: lsize = 76
       integer,          parameter :: fsize = 23
       character(len=*), parameter :: subname = 'physconst_readnl :: '
@@ -166,9 +146,10 @@ CONTAINS
       character(len=fsize)        :: field
 
       ! Physical constants needing to be reset
-      !    (e.g., for aqua planet experiments)
       namelist /physconst_nl/  gravit, sday, mwh2o, cpwv, mwdry,              &
-           cpair, rearth, tmelt, omega
+           cpair, rearth, tmelt, omega, scon, &
+           pstd, pref, tref, lapse_rate
+
       !-----------------------------------------------------------------------
 
       banner = repeat('*', lsize)
@@ -205,6 +186,18 @@ CONTAINS
       if (ierr /= 0) call endrun(subname//": FATAL: mpi_bcast: tmelt")
       call MPI_bcast(omega,  1, mpi_real8, masterprocid, mpicom, ierr)
       if (ierr /= 0) call endrun(subname//": FATAL: mpi_bcast: omega")
+      call MPI_bcast(scon,   1, mpi_real8, masterprocid, mpicom, ierr)
+      if (ierr /= 0) call endrun(subname//": FATAL: mpi_bcast: scon")
+
+      ! Broadcast new Mars variables
+      call MPI_bcast(pstd,       1, mpi_real8, masterprocid, mpicom, ierr)
+      if (ierr /= 0) call endrun(subname//": FATAL: mpi_bcast: pstd")
+      call MPI_bcast(pref,       1, mpi_real8, masterprocid, mpicom, ierr)
+      if (ierr /= 0) call endrun(subname//": FATAL: mpi_bcast: pref")
+      call MPI_bcast(tref,       1, mpi_real8, masterprocid, mpicom, ierr)
+      if (ierr /= 0) call endrun(subname//": FATAL: mpi_bcast: tref")
+      call MPI_bcast(lapse_rate, 1, mpi_real8, masterprocid, mpicom, ierr)
+      if (ierr /= 0) call endrun(subname//": FATAL: mpi_bcast: lapse_rate")
 
       newg     =  gravit /= shr_const_g
       newsday  =  sday   /= shr_const_sday
@@ -215,12 +208,21 @@ CONTAINS
       newrearth=  rearth /= shr_const_rearth
       newtmelt =  tmelt  /= shr_const_tkfrz
       newomega =  omega  /= shr_const_omega
+      newscon  =  scon   /= 1361.27_r8
 
-      if (newg .or. newsday .or. newmwh2o .or. newcpwv .or. newmwdry .or.     &
-           newrearth .or. newtmelt .or. newomega) then
+      ! Check for new Mars variables changes
+      newpstd  =  pstd   /= shr_const_pstd
+      newpref  =  pref   /= 1.0e5_r8
+      newtref  =  tref   /= 288._r8
+      newlapse =  lapse_rate /= 0.0065_r8
+
+      if (newg .or. newsday .or. newmwh2o .or. newcpwv .or. newmwdry .or. &
+          newrearth .or. newtmelt .or. newomega .or. newscon .or. &
+          newpstd .or. newpref .or. newtref .or. newlapse) then
+
          if (masterproc) then
             write(iulog, *) banner
-            write(iulog, *) '***    New Physical Constant Values set ',       &
+            write(iulog, *) '*** New Physical Constant Values set ',       &
                  'via namelist                     ***'
             write(iulog, *) bline
             write(iulog, *) '*** Physical Constant    Old Value                  New Value         ***'
@@ -260,8 +262,30 @@ CONTAINS
                field = 'OMEGA'
                write(iulog, 2000) field, shr_const_omega, omega
             end if
+            if (newscon) then
+               field = 'SCON'
+               write(iulog, 2000) field, 1361.27_r8, scon
+            end if
+            if (newpstd) then
+               field = 'PSTD'
+               write(iulog, 2000) field, shr_const_pstd, pstd
+            end if
+            if (newpref) then
+               field = 'PREF'
+               write(iulog, 2000) field, 1.0e5_r8, pref
+            end if
+            if (newtref) then
+               field = 'TREF'
+               write(iulog, 2000) field, 288._r8, tref
+            end if
+            if (newlapse) then
+               field = 'LAPSE_RATE'
+               write(iulog, 2000) field, 0.0065_r8, lapse_rate
+            end if
+
             write(iulog,*) banner
          end if
+
          rga = 1._r8 / gravit
          ra  = 1._r8 / rearth
          if (.not. newomega) then
@@ -270,7 +294,7 @@ CONTAINS
          cpvir  = (cpwv / cpair) - 1._r8
          epsilo = mwh2o / mwdry
 
-         !  defined rair and rh2o before any of the variables that use them
+         ! defined rair and rh2o before any of the variables that use them
          rair = r_universal / mwdry
          rh2o = r_universal / mwh2o
 
@@ -284,9 +308,7 @@ CONTAINS
       end if
 
       ez = omega / sqrt(0.375_r8)
-      !
       ! vertical coordinate info
-      !
       vc_physics = vc_moist_pressure
       if (masterproc) then
          call string_vc(vc_physics, str)
@@ -294,73 +316,5 @@ CONTAINS
       end if
 
    end subroutine physconst_readnl
-!!$#ifdef planet_mars
-!!$      subroutine  physconst_exo_print
-!!$   !
-!!$   ! print new physical constants from exoplanet modulation
-!!$   !
-!!$
-!!$      use shr_const_mod
-!!$      use exoplanet_mod
-!!$      use spmd_utils,      only: masterproc
-!!$      use cam_logfile,     only: iulog
-!!$
-!!$      if (masterproc) then
-!!$        write(iulog,*) '******************************************************'
-!!$        write(iulog,*) '******************************************************'
-!!$        write(iulog,*) '******************************************************'
-!!$        write(iulog,*) '***       ExoCAM: exoplanet_mod run options        ***'
-!!$        write(iulog,*) '******************************************************'
-!!$        write(iulog,*) 'DO_EXO_RT: ', do_exo_rt
-!!$        write(iulog,*) 'DO_EXO_ATMCONST: ', do_exo_atmconst
-!!$        write(iulog,*) 'DO_EXO_SYNCHRONOUS: ', do_exo_synchronous
-!!$        write(iulog,*) 'DO_EXO_RT_CLEARSKY: ', do_exo_rt_clearsky
-!!$        write(iulog,*) 'DO_EXO_RT_SPECTRAL: ', do_exo_rt_spectral
-!!$        write(iulog,*) 'EXO_RAD_STEP: ', exo_rad_step
-!!$        write(iulog,*) 'DO_GRAVITY_WAVES: ', do_exo_gw
-!!$        write(iulog,*) '******************************************************'
-!!$        write(iulog,*) '***       ExoCAM: Stellar Spectral Options         ***'
-!!$        write(iulog,*) '******************************************************'
-!!$        write(iulog,*) 'SOLAR CONSTANT: ', scon
-!!$        write(iulog,*) 'SOLAR SPECTRUM FILE: ', exo_solar_file
-!!$        write(iulog,*) '******************************************************'
-!!$        write(iulog,*) '***           ExoCAM: Planet properties            ***'
-!!$        write(iulog,*) '******************************************************'
-!!$        write(iulog,*) 'PLANET RADIUS (m): ', rearth
-!!$        write(iulog,*) 'SURFACE GRAVITY (m/s2): ', gravit
-!!$        write(iulog,*) 'LENGTH OF DIURNAL PERIOD (days): ', EXO_NDAYS
-!!$        write(iulog,*) 'SIDEREAL DAY (seconds): ', sday
-!!$        write(iulog,*) 'ORBITAL PERIOD (days): ',exo_porb
-!!$        write(iulog,*) 'ECCENTRICITY: ',exo_eccen
-!!$        write(iulog,*) 'OBLIQUITY: ',exo_obliq
-!!$        write(iulog,*) 'LONGITUDE OF VERNEL EQUINOX: ',exo_mvelp
-!!$        write(iulog,*) '******************************************************'
-!!$        write(iulog,*) '***           ExoCAM: Atmosphere properties            ***'
-!!$        write(iulog,*) '******************************************************'
-!!$        write(iulog,*) 'SURFACE PRESSURE: ', pstd
-!!$        write(iulog,*) 'N2   BAR: ', exo_n2bar
-!!$        write(iulog,*) 'O2   BAR: ', exo_o2bar
-!!$        write(iulog,*) 'H2   BAR: ', exo_h2bar
-!!$        write(iulog,*) 'CO2  BAR: ', exo_co2bar
-!!$        write(iulog,*) 'CH4  BAR: ', exo_ch4bar
-!!$        write(iulog,*) 'C2H6 BAR: ', exo_c2h6bar
-!!$        write(iulog,*) 'N2   VMR, MMR: ', exo_n2vmr, exo_n2mmr
-!!$        write(iulog,*) 'O2   VMR, MMR: ', exo_o2vmr, exo_o2mmr
-!!$        write(iulog,*) 'H2   VMR, MMR: ', exo_h2vmr, exo_h2mmr
-!!$        write(iulog,*) 'CO2  VMR, MMR: ', exo_co2vmr, exo_co2mmr
-!!$        write(iulog,*) 'CH4  VMR, MMR: ', exo_ch4vmr, exo_ch4mmr
-!!$        write(iulog,*) 'C2H6 VMR, MMR: ', exo_c2h6vmr, exo_c2h6mmr
-!!$        write(iulog,*) 'CPDAIR:  ', cpair
-!!$        write(iulog,*) 'MWDRY:   ', mwdry
-!!$        write(iulog,*) 'RWV:     ', rh2o
-!!$        write(iulog,*) 'RAIR:    ', rair
-!!$        write(iulog,*) 'RHODAIR: ', rhodair
-!!$        write(iulog,*) 'ZVIR:    ', zvir
-!!$        write(iulog,*) 'CPVIR:   ', cpvir
-!!$        write(iulog,*) '******************************************************'
-!!$        write(iulog,*) '******************************************************'
-!!$      end if
-!!$
-!!$    end subroutine physconst_exo_print
-!!$#endif
+
 end module physconst
