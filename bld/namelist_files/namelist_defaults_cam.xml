@@ -277,7 +277,7 @@
 <do_exo_rt                rad="exort" >.true.</do_exo_rt>
 <do_exo_rt_clearsky       rad="exort" >.true.</do_exo_rt_clearsky>
 <do_exo_rt_optimize_bands rad="exort" >.true.</do_exo_rt_optimize_bands>
-<do_exo_rt_spectral       rad="exort" >.true.</do_exo_rt_spectral>
+<do_exo_rt_spectral       rad="exort" >.false.</do_exo_rt_spectral>
 <do_exo_synchronous       rad="exort" >.false.</do_exo_synchronous>
 <exo_rad_camtop           rad="exort" >1</exo_rad_camtop>
 <exo_rad_step             rad="exort" >1</exo_rad_step>
