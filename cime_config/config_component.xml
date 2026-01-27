@@ -185,7 +185,7 @@
       <value compset="_CAM\d0%WC.*%SDYN">-nlev 88</value>
       <value compset="_CAM\d0%WX.*%SDYN">-nlev 145</value>
       <!-- CAM MARS -->
-      <value compset="_CAM.*%MARS">-nlev 49</value>
+      <value compset="_CAM.*%MARS">-nlev 30</value>
 
       <value compset="_CAM70%LT">-model_top lt</value>
       <value compset="_CAM70%MT">-model_top mt</value>

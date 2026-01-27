@@ -252,9 +252,6 @@ contains
 
     ! output scm_relax_fincl character array
 
-    namelist /mars_nl/ mars_relax_bot_p,mars_relax_linear,mars_relax_tau_bot_sec, &
-                       mars_relax_tau_sec,mars_relax_tau_top_sec,mars_relax_top_p, &
-                       mars_relaxation, mars_relax_fincl
    if (masterproc) then
       write(iulog,*) 'MARS Simple Physics namelist parameters:'
       write(iulog,10) mars_relax_bot_p,mars_relax_linear,mars_relax_tau_bot_sec, &
@@ -268,7 +265,7 @@ contains
           '     mars_relax_tau_sec     :                         ',f8.1/, &
           '     mars_relax_tau_top_sec :                         ',f8.1/, &
           '     mars_relax_top_p       :                         ',f8.1/, &
-          '     mars_use_hs_uv         :                         ',f8.1/, &
+          '     mars_use_hs_uv         :                         ',l8/, &
           '     mars_relaxation        :                         ',l8/)
 
     write (iulog,*) '  mars_relax_fincl: '

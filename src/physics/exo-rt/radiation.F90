@@ -800,10 +800,10 @@ subroutine radiation_tend( &
     real(r8), pointer :: flns(:)  ! Srf longwave cooling (up-down) flux
     real(r8), pointer :: flnt(:)  ! Net outgoing lw flux at model top
 
-    real(r8), pointer, dimension(:,:,:) :: su => NULL()  ! shortwave spectral flux up
-    real(r8), pointer, dimension(:,:,:) :: sd => NULL()  ! shortwave spectral flux down
-    real(r8), pointer, dimension(:,:,:) :: lu => NULL()  ! longwave  spectral flux up
-    real(r8), pointer, dimension(:,:,:) :: ld => NULL()  ! longwave  spectral flux down
+    real(r8), pointer, dimension(:,:,:) :: su  ! shortwave spectral flux up
+    real(r8), pointer, dimension(:,:,:) :: sd  ! shortwave spectral flux down
+    real(r8), pointer, dimension(:,:,:) :: lu  ! longwave  spectral flux up
+    real(r8), pointer, dimension(:,:,:) :: ld  ! longwave  spectral flux down
     real(r8) :: calday                        ! current calendar day
     real(r8), dimension(pcols) :: clat        ! current latitudes(radians)
     real(r8), dimension(pcols) :: clon        ! current longitudes(radians)
@@ -1046,7 +1046,9 @@ subroutine radiation_tend( &
              c2h6mmr(:,:) = exo_c2h6mmr
              o2mmr(:,:)   = 0._r8   !exo_o2mmr
              o3mmr(:,:)   = 0._r8   !exo_o3mmr   !use if CESM doesnt have these guys
-
+             !jt These need to be initialized in mars_surface_init
+             rel(:,:)   = 10.0_r8
+             rei(:,:)   = 3.0_r8
              ! Do a parallel clearsky radiative calculation so we can calculate cloud forcings
              ! Setting do_exo_rt_clearsky to true, slows the code dramatically, use wisely and sparingly
              ! The climate (icall==0) calculation must occur last.
