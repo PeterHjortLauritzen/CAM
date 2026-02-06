@@ -407,7 +407,7 @@
 
   <compset>
     <alias>FMARSEXORT</alias>
-    <lname>2000_CAM%MARS_SLND_SICE_SOCN_SROF_SGLC_SWAV</lname>
+    <lname>2000_CAM%MARS_CLM60%SP_SICE_SOCN_SROF_SGLC_SWAV</lname>
   </compset>
 
   <!-- cam-chem untested compsets -->

@@ -10,6 +10,7 @@ module physpkg
   use spmd_utils,      only: masterproc, mpicom
   use physics_types,   only: physics_state, physics_tend, physics_state_set_grid, &
                              physics_ptend, physics_update, physics_type_alloc
+  use physics_buffer,  only: physics_buffer_desc, pbuf_get_chunk, pbuf_allocate
   use phys_grid,       only: get_ncols_p
   use phys_gmean,      only: gmean_mass
   use ppgrid,          only: begchunk, endchunk, pcols, pver, pverp
@@ -23,6 +24,8 @@ module physpkg
   use cam_abortutils,  only: endrun
   use dyn_tests_utils, only: vc_dycore
   use chemistry,       only: chem_is_active
+  use gw_drag_cam,     only: gw_drag_cam_init, gw_drag_cam_tend
+  use mars_cam,        only: mars_register, mars_grow_topo, mars_condensate_tend, mars_radiative_tend
 
   implicit none
   private
@@ -40,6 +43,10 @@ module physpkg
   ! Physics buffer indices
   integer :: teout_idx     = 0
   integer :: dtcore_idx    = 0
+
+  integer ::  landm_idx          = 0
+  integer ::  sgh_idx            = 0
+  integer ::  sgh30_idx          = 0
 
   integer :: qini_idx      = 0
   integer :: ast_idx       = 0
@@ -78,7 +85,6 @@ contains
     use kessler_cam,        only: kessler_register
     use tj2016_cam,         only: thatcher_jablonowski_register
     use frierson_cam,       only: frierson_register
-    use mars_cam,           only: mars_register
     use radiation,          only: radiation_register
     use dyn_comp,           only: dyn_register
     use vertical_diffusion, only: vd_register
@@ -122,6 +128,12 @@ contains
        call vd_register()
     end if
 
+    ! Topography file fields.
+    call pbuf_add_field('LANDM',     'global',  dtype_r8, (/pcols/),      landm_idx)
+    call pbuf_add_field('SGH',       'global',  dtype_r8, (/pcols/),      sgh_idx)
+    call pbuf_add_field('SGH30',     'global',  dtype_r8, (/pcols/),      sgh30_idx)
+
+
     ! Fields for physics package diagnostics
     call pbuf_add_field('QINI',      'physpkg', dtype_r8, (/pcols,pver/), qini_idx)
     call pbuf_add_field('AST',        'global', dtype_r8, (/pcols,pver,dyn_time_lvls/),    ast_idx)
@@ -163,29 +175,80 @@ contains
   subroutine phys_inidat( cam_out, pbuf2d )
     use cam_abortutils,      only: endrun
 
-    use physics_buffer,      only: physics_buffer_desc
+    use physics_buffer,      only:  physics_buffer_desc, pbuf_set_field
 
+
+    use cam_initfiles,       only: initial_file_get_id, topo_file_get_id
     use cam_grid_support,    only: cam_grid_check, cam_grid_id
     use cam_grid_support,    only: cam_grid_get_dim_names
+    use pio,                 only: file_desc_t
+    use ncdio_atm,           only: infld
+    use cam_control_mod,     only: aqua_planet
 
-    ! Dummy arguments
-    type(cam_out_t), intent(inout)     :: cam_out(begchunk:endchunk)
+    type(cam_out_t),     intent(inout) :: cam_out(begchunk:endchunk)
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
+    integer :: lchnk, m, n, ncol
+    type(file_desc_t), pointer :: fh_ini, fh_topo
+    character(len=8) :: fieldname
+    real(r8), pointer :: tptr(:,:), tptr_2(:,:), tptr3d(:,:,:), tptr3d_2(:,:,:)
 
-    ! Local variables
-    character(len=8)                   :: dim1name, dim2name
-    integer                            :: grid_id ! grid ID for data mapping
-    character(len=*), parameter        :: subname='phys_inidat'
+    character(len=11) :: subname='phys_inidat' ! subroutine name
+    integer :: tpert_idx, qpert_idx, pblh_idx
 
-    !   dynamics variables are handled in dyn_init - here we read variables
-    !      needed for physics but not dynamics
+    logical :: found=.false., found2=.false.
+    integer :: ierr
+    character(len=8) :: dim1name, dim2name
+    integer :: ixcldice, ixcldliq
+    integer                   :: grid_id  ! grid ID for data mapping
+
+    nullify(tptr,tptr_2,tptr3d,tptr3d_2)
+
+    fh_ini  => initial_file_get_id()
+    fh_topo => topo_file_get_id()
+
+    !   dynamics variables are handled in dyn_init - here we read variables needed for physics
+    !   but not dynamics
 
     grid_id = cam_grid_id('physgrid')
     if (.not. cam_grid_check(grid_id)) then
-      call endrun(subname//': Internal error, no "physgrid" grid')
+      call endrun(trim(subname)//': Internal error, no "physgrid" grid')
     end if
     call cam_grid_get_dim_names(grid_id, dim1name, dim2name)
 
+    allocate(tptr(1:pcols,begchunk:endchunk))
+
+    if (associated(fh_topo) .and. .not. aqua_planet ) then
+      call infld('SGH', fh_topo, dim1name, dim2name, 1, pcols, begchunk, endchunk, &
+           tptr, found, gridname='physgrid')
+      if(.not. found) call endrun('ERROR: SGH not found on topo file')
+
+      call pbuf_set_field(pbuf2d, sgh_idx, tptr)
+
+      allocate(tptr_2(1:pcols,begchunk:endchunk))
+      call infld('SGH30', fh_topo, dim1name, dim2name, 1, pcols, begchunk, endchunk, &
+           tptr_2, found, gridname='physgrid')
+      if(found) then
+        call pbuf_set_field(pbuf2d, sgh30_idx, tptr_2)
+      else
+        if (masterproc) write(iulog,*) 'Warning: Error reading SGH30 from topo file.'
+        if (masterproc) write(iulog,*) 'The field SGH30 will be filled using data from SGH.'
+        call pbuf_set_field(pbuf2d, sgh30_idx, tptr)
+      end if
+
+      deallocate(tptr_2)
+
+      call infld('LANDM_COSLAT', fh_topo, dim1name, dim2name, 1, pcols, begchunk, endchunk, &
+           tptr, found, gridname='physgrid')
+
+      if(.not.found) call endrun(' ERROR: LANDM_COSLAT not found on topo dataset.')
+
+      call pbuf_set_field(pbuf2d, landm_idx, tptr)
+
+    else
+      call pbuf_set_field(pbuf2d, sgh_idx, 0._r8)
+      call pbuf_set_field(pbuf2d, sgh30_idx, 0._r8)
+      call pbuf_set_field(pbuf2d, landm_idx, 0._r8)
+    end if
   end subroutine phys_inidat
 
   !======================================================================================
@@ -236,6 +299,7 @@ contains
 
     ! local variables
     logical :: history_budget              ! output tendencies and state variables for
+    type(physics_buffer_desc), pointer :: phys_buffer_chunk(:)
                                            ! temperature, water vapor, cloud
                                            ! ice, cloud liquid, U, V
     integer :: history_budget_histfile_num ! output history file number for budget fields
@@ -290,7 +354,8 @@ contains
     else if (mars_phys) then
       call mars_init(phys_state,pbuf2d)
       call vertical_diffusion_init(pbuf2d)
-    end if
+      call gw_drag_cam_init()
+   end if
 
     ! Initialize Nudging Parameters
     !--------------------------------
@@ -684,6 +749,49 @@ contains
        end if
 
        call t_stopf ('vertical_diffusion_tend')
+
+       !===================================================
+       ! Gravity wave drag
+       !===================================================
+
+       call t_startf('gw_tend')
+
+       ! Use zero flux if not tracking energy yet, or hook up to energy checker
+       ! flx_heat(:) = 0._r8
+
+       if (trim(cam_take_snapshot_before) == "gw_tend") then
+          call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
+               fh2o, surfric, obklen, flx_heat)
+       end if
+
+       call gw_drag_cam_tend(state, pbuf, ztodt, ptend, cam_in, flx_heat)
+
+       if ( (trim(cam_take_snapshot_after) == "gw_tend") .and.                   &
+            (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
+          call cam_snapshot_ptend_outfld(ptend, lchnk)
+       end if
+
+       if ( ptend%lu ) then
+          call outfld( 'UTEND_GWDTOT', ptend%u, pcols, lchnk)
+       end if
+       if ( ptend%lv ) then
+          call outfld( 'VTEND_GWDTOT', ptend%v, pcols, lchnk)
+       end if
+
+       ! Apply tendencies
+       call physics_update(state, ptend, ztodt, tend)
+
+       if (trim(cam_take_snapshot_after) == "gw_tend") then
+          call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
+               fh2o, surfric, obklen, flx_heat)
+          call t_stopf('gw_tend')
+       end if
+
+       ! Check energy integrals
+       !call check_energy_cam_chng(state, tend, "gwdrag", nstep, ztodt, zero, &
+       !     zero, zero, flx_heat)
+       !call t_stopf('gw_tend')
+
     end if
 
 
@@ -835,7 +943,6 @@ contains
     use tj2016_cam,        only: thatcher_jablonowski_precip_tend
     use frierson_cam,      only: frierson_condensate_tend
     use frierson_cam,      only: frierson_radiative_tend
-    use mars_cam,          only: mars_condensate_tend,mars_radiative_tend
     use dycore,            only: dycore_is
     use cam_snapshot_common,only: cam_snapshot_all_outfld
     use cam_snapshot_common,only: cam_snapshot_ptend_outfld
@@ -1064,56 +1171,39 @@ contains
           call cam_snapshot_all_outfld(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf)
        end if
     else if (mars_phys) then
-       if (.true.) then
-          ! Compute the large-scale precipitation
-          !----------------------------------------
-          if (trim(cam_take_snapshot_before) == "mars_condensate_tend") then
-             call cam_snapshot_all_outfld(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf)
-          end if
-          call mars_condensate_tend(state, ptend, ztodt, pbuf)
-          if ( (trim(cam_take_snapshot_after) == "mars_condensate_tend") .and. &
-               (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
-             call cam_snapshot_ptend_outfld(ptend, lchnk)
-          end if
-          call physics_update(state, ptend, ztodt, tend)
-          if (trim(cam_take_snapshot_after) == "mars_condensate_tend") then
-             call cam_snapshot_all_outfld(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf)
-          end if
-
-          ! Compute the radiative tendencies
-          !-----------------------------------
-          if (trim(cam_take_snapshot_before) == "mars_radiative_tend") then
-             call cam_snapshot_all_outfld(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf)
-          end if
-          call mars_radiative_tend(state, ptend, pbuf, cam_out, cam_in, net_flx)
-
-          ! Set net flux used by spectral dycores
-          do i=1,ncol
-             tend%flx_net(i) = net_flx(i)
-          end do
-
-          if ( (trim(cam_take_snapshot_after) == "mars_radiative_tend") .and. &
-               (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
-             call cam_snapshot_ptend_outfld(ptend, lchnk)
-          end if
-          call physics_update(state, ptend, ztodt, tend)
-          if (trim(cam_take_snapshot_after) == "mars_radiative_tend") then
-             call cam_snapshot_all_outfld(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf)
-          end if
-       end if
-    else
-       if (trim(cam_take_snapshot_before) == "held_suarez_tend") then
+       ! Compute the large-scale precipitation
+       !----------------------------------------
+       if (trim(cam_take_snapshot_before) == "mars_condensate_tend") then
           call cam_snapshot_all_outfld(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf)
        end if
-
-       call held_suarez_tend(state, ptend, ztodt)
-       if ( (trim(cam_take_snapshot_after) == "held_suarez_tend") .and.       &
+       call mars_condensate_tend(state, ptend, ztodt, pbuf)
+       if ( (trim(cam_take_snapshot_after) == "mars_condensate_tend") .and. &
             (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
           call cam_snapshot_ptend_outfld(ptend, lchnk)
        end if
        call physics_update(state, ptend, ztodt, tend)
+       if (trim(cam_take_snapshot_after) == "mars_condensate_tend") then
+          call cam_snapshot_all_outfld(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf)
+       end if
 
-       if (trim(cam_take_snapshot_after) == "held_suarez_tend") then
+       ! Compute the radiative tendencies
+       !-----------------------------------
+       if (trim(cam_take_snapshot_before) == "mars_radiative_tend") then
+          call cam_snapshot_all_outfld(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf)
+       end if
+       call mars_radiative_tend(state, ptend, pbuf, cam_out, cam_in, net_flx)
+
+       ! Set net flux used by spectral dycores
+       do i=1,ncol
+          tend%flx_net(i) = net_flx(i)
+       end do
+
+       if ( (trim(cam_take_snapshot_after) == "mars_radiative_tend") .and. &
+            (trim(cam_take_snapshot_before) == trim(cam_take_snapshot_after))) then
+          call cam_snapshot_ptend_outfld(ptend, lchnk)
+       end if
+       call physics_update(state, ptend, ztodt, tend)
+       if (trim(cam_take_snapshot_after) == "mars_radiative_tend") then
           call cam_snapshot_all_outfld(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf)
        end if
     end if

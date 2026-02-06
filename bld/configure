@@ -1006,7 +1006,7 @@ elsif ($rad_pkg =~ m/rrtmg/) {
         die "configure ERROR: The CARMA microphysics package does not currently work with RRTMGP\n";
     }
 }
-elsif ($mars and $rad_pkg ne 'exort') {
+elsif ($mars and $rad_pkg ne 'exort' and !($simple_phys)) {
     die "configure ERROR: The CAM-MARS configuration only works with the ExoRT radiation package\n";
 }
 
@@ -1230,6 +1230,9 @@ elsif ($phys_pkg eq 'cam5') {
 }
 elsif ($phys_pkg eq 'cam4') {
     $nlev = 26;
+}
+elsif ($mars) {
+    $nlev = 32;
 }
 else {
     # Simple models use cam7-lt vertical grid.

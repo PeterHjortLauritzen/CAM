@@ -6377,6 +6377,12 @@ bottom of pressure range (i.e., the larger pressure value).
 Default: 10800
 </entry>
 
+<entry id="mars_topo_ramp_days" type="real" category="mars"
+       group="mars_nl" valid_values="">
+MARS scaling time for orography
+Default:
+</entry>
+
 <entry id="scm_use_obs_T" type="logical" category="scam"
        group="scam_nl" valid_values="">
 Use the SCAM-IOP specified T instead of using forecasted T at each time step.

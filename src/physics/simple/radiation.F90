@@ -7,7 +7,7 @@ use ppgrid,              only: pcols, pver
 use physics_types,      only: physics_state, physics_ptend
 use physics_buffer,     only: physics_buffer_desc
 use camsrfexch,         only: cam_out_t, cam_in_t
-
+use pio,                only: file_desc_t
 
 implicit none
 private
@@ -19,6 +19,9 @@ public :: &
    radiation_tend,         &
    rad_is_active,            &
    radiation_init,           &
+   radiation_define_restart,           &
+   radiation_write_restart,           &
+   radiation_read_restart,           &
    radiation_do
 
 type rad_out_t
@@ -92,6 +95,36 @@ subroutine radiation_readnl(nlfile)
    character(len=*), intent(in) :: nlfile
 
 end subroutine radiation_readnl
+
+!================================================================================================
+
+subroutine radiation_define_restart(file)
+
+   ! this stub can be called, but does nothing
+   ! arguments
+   type(file_desc_t), intent(inout) :: file
+
+ end subroutine radiation_define_restart
+
+!================================================================================================
+
+subroutine radiation_write_restart(file)
+
+   ! this stub can be called, but does nothing
+   ! arguments
+   type(file_desc_t), intent(inout) :: file
+
+ end subroutine radiation_write_restart
+
+!================================================================================================
+
+subroutine radiation_read_restart(file)
+
+   ! this stub can be called, but does nothing
+   ! arguments
+   type(file_desc_t), intent(inout) :: file
+
+ end subroutine radiation_read_restart
 
 !========================================================================================
 

@@ -25,7 +25,7 @@ module ic_baroclinic
   !=======================================================================
   real(r8), parameter, private :: Mvap = 0.608_r8           ! Ratio of molar mass dry air/water vapor
 #ifdef planet_mars
-  real(r8), parameter, private :: psurf_moist = pstd ! Moist surface pressure
+  real(r8), private            :: psurf_moist ! Moist surface pressure
   real(r8), parameter, private ::     &
        T0E        = 255.0_r8,         & ! Temperature at equatorial surface (K)
        T0P        = 205.0_r8,         & ! Temperature at polar surface (K)
@@ -170,6 +170,9 @@ contains
 
     ncol = size(latvals, 1)
     nlev = -1
+#ifdef planet_mars
+    psurf_moist = pstd
+#endif
     !
     !*******************************
     !
@@ -234,7 +237,7 @@ contains
          nlev = size(Q, 2)
          ! check whether first constituent in Q is water vapor.
          cnst1_is_moisture = m_cnst(1) == 1
-         allocate(zmid(size(Q, 1),nlev))         
+         allocate(zmid(size(Q, 1),nlev))
       end if
 
       allocate(zk(nlev))
@@ -352,8 +355,8 @@ contains
 
           call cnst_init_default(m_cnst(m), latvals, lonvals, Q(:,:,m),&
                mask=mask_use, verbose=verbose_use, notfound=.false.,&
-               z=zmid)               
-          
+               z=zmid)
+
        end do
     end if   ! lq
 
@@ -427,6 +430,10 @@ contains
     !--------------------------------------------
     ! Constants
     !--------------------------------------------
+#ifdef planet_mars
+    psurf_moist = pstd
+#endif
+
     aref = rearth / bigX
 
     T0 = 0.5_r8 * (T0E + T0P)
@@ -647,6 +654,9 @@ contains
     real(r8), INTENT(IN)  :: pwet, lat
 
     real(r8)  :: eta
+#ifdef planet_mars
+    psurf_moist = pstd
+#endif
     if (.not. analytic_ic_is_moist()) then
       qv_given_moist_pressure = 0.0_r8
     else

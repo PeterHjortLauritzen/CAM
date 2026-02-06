@@ -3994,54 +3994,103 @@ if ($chem =~ /_mam(\d)/) {
 # Gravity wave drag settings
 
 # By default, orographic waves are always on
+
 if (!$simple_phys or $phys eq 'simple_mars') {
+# ---------------------------------------------------------------------
+    # MARS CONFIGURATION
+    # ---------------------------------------------------------------------
+    if ($phys eq 'simple_mars') {
 
-    if ($phys =~ /cam6/ or $phys =~ /cam7/) {
+        # 1. Enable Basic Orographic (McFarlane)
+        #    Set efficiency to 1.0 for strong drag (Earth is 0.125).
+        #    Use symmetric drag (south_fac=1.0) and land scaling.
+        add_default($nl, 'use_gw_oro',       'val'=>'.true.');
+        add_default($nl, 'effgw_oro',        'val'=>'1.0D0');
+        add_default($nl, 'gw_oro_south_fac', 'val'=>'1.0D0');
+        add_default($nl, 'gw_lndscl_sgh',    'val'=>'.true.');
 
-       add_default($nl, 'use_gw_oro',        'val'=>'.false.');
+        # 2. Stability Controls (CRITICAL for Mars)
+        #    Tapering prevents stress blow-up at the model top.
+        #    Tau=0 BC enforces conservation.
+        add_default($nl, 'gw_top_taper',     'val'=>'.true.');
+        add_default($nl, 'tau_0_ubc',        'val'=>'.true.');
+        add_default($nl, 'gw_apply_tndmax',  'val'=>'.true.');
 
-       # Only add ridges if topo file is available
-       if ($use_topo_file =~ m/$FALSE/io) {
-          add_default($nl, 'use_gw_rdg_beta',   'val'=>'.false.');
-       }
-       else {
-          add_default($nl, 'use_gw_rdg_beta',   'val'=>'.true.');
-       }
-    }
-    else {
-       add_default($nl, 'use_gw_oro',        'val'=>'.true.');
-       add_default($nl, 'use_gw_rdg_beta',   'val'=>'.false.');
-    }
+        # 3. Disable Earth-Specific Schemes
+        #    Set efficiencies to 0.0 to safely disable Frontal/Inertial/Convective
+        #    without triggering "missing file" errors.
+        add_default($nl, 'effgw_cm',         'val'=>'0.0D0');
+        add_default($nl, 'effgw_cm_igw',     'val'=>'0.0D0');
+        add_default($nl, 'effgw_beres_dp',   'val'=>'0.0D0');
+        add_default($nl, 'effgw_beres_sh',   'val'=>'0.0D0');
 
-    if ($phys =~ /cam7/) {
-	#
-	# moving mountains only supported by MPAS and SE dycore
-	# (since vorticity needs to be passed to physics in dp_coupling)
-	#
-	if ( $dyn =~ /mpas|se/ ) {
-	    add_default($nl, 'use_gw_movmtn_pbl',        'val'=>'.true.');
-	} else {
-	    add_default($nl, 'use_gw_movmtn_pbl',        'val'=>'.false.');
+        # 4. Disable Anisotropic Ridge Scheme (for now)
+        add_default($nl, 'use_gw_rdg_beta',  'val'=>'.false.');
+        add_default($nl, 'use_gw_rdg_gamma', 'val'=>'.false.');
+        add_default($nl, 'use_gw_rdg_resid', 'val'=>'.false.');
+
+        #    Set this to .true. just in case we enable it later (prevents potential divide-by-zero in some code paths)
+        add_default($nl, 'gw_rdg_do_divstream','val'=>'.true.');
+
+	# Gravity Wave Spectrum Definitions (Required for memory allocation)
+        add_default($nl, 'pgwv',             'val'=>'32');    # Number of wave bins (Standard CAM default)
+        add_default($nl, 'gw_dc',            'val'=>'2.5D0'); # Phase speed spacing (Standard CAM default)
+
+        add_default($nl, 'mars_topo_ramp_days', 'val'=>'0.D0');
+
+	# ---------------------------------------------------------------------
+	# EARTH CONFIGURATION (Standard CAM)
+	# ---------------------------------------------------------------------
+    } else {
+        # Existing logic for Earth files and settings
+        # Only execute this if NOT simple_mars to avoid pollution
+	if ($phys =~ /cam6/ or $phys =~ /cam7/) {
+
+	    add_default($nl, 'use_gw_oro',        'val'=>'.false.');
+
+	    # Only add ridges if topo file is available
+	    if ($use_topo_file =~ m/$FALSE/io) {
+		add_default($nl, 'use_gw_rdg_beta',   'val'=>'.false.');
+	    }
+	    else {
+		add_default($nl, 'use_gw_rdg_beta',   'val'=>'.true.');
+	    }
 	}
+	else {
+	    add_default($nl, 'use_gw_oro',        'val'=>'.true.');
+	    add_default($nl, 'use_gw_rdg_beta',   'val'=>'.false.');
+	}
+
+	if ($phys =~ /cam7/) {
+	    #
+	    # moving mountains only supported by MPAS and SE dycore
+	    # (since vorticity needs to be passed to physics in dp_coupling)
+	    #
+	    if ( $dyn =~ /mpas|se/ ) {
+		add_default($nl, 'use_gw_movmtn_pbl',        'val'=>'.true.');
+	    } else {
+		add_default($nl, 'use_gw_movmtn_pbl',        'val'=>'.false.');
+	    }
+	}
+
+	my $use_gw_movmtn_pbl = $nl->get_value('use_gw_movmtn_pbl');
+	if ($use_gw_movmtn_pbl =~ /$TRUE/io) {
+	    if ( ! ($dyn =~ /mpas|se/) ) {
+		die "$ProgName - ERROR: use_gw_movmtn_pbl is only available with MPAS and SE dycore\n";
+	    }
+	}
+
+	add_default($nl, 'use_gw_rdg_gamma' , 'val'=>'.false.');
+	add_default($nl, 'use_gw_front_igw' , 'val'=>'.false.');
+	add_default($nl, 'use_gw_convect_sh', 'val'=>'.false.');
+	add_default($nl, 'gw_lndscl_sgh');
+	add_default($nl, 'gw_oro_south_fac');
+	add_default($nl, 'gw_apply_tndmax');
+
+	# Gravity wave ridge settings
+	# By default, gw_rdg_do_divstream is set to true
+	add_default($nl, 'gw_rdg_do_divstream'       , 'val'=>'.true.');
     }
-
-    my $use_gw_movmtn_pbl = $nl->get_value('use_gw_movmtn_pbl');
-    if ($use_gw_movmtn_pbl =~ /$TRUE/io) {
-        if ( ! ($dyn =~ /mpas|se/) ) {
-            die "$ProgName - ERROR: use_gw_movmtn_pbl is only available with MPAS and SE dycore\n";
-        }
-    }
-
-    add_default($nl, 'use_gw_rdg_gamma' , 'val'=>'.false.');
-    add_default($nl, 'use_gw_front_igw' , 'val'=>'.false.');
-    add_default($nl, 'use_gw_convect_sh', 'val'=>'.false.');
-    add_default($nl, 'gw_lndscl_sgh');
-    add_default($nl, 'gw_oro_south_fac');
-    add_default($nl, 'gw_apply_tndmax');
-
-    # Gravity wave ridge settings
-    # By default, gw_rdg_do_divstream is set to true
-    add_default($nl, 'gw_rdg_do_divstream'       , 'val'=>'.true.');
 }
 
 my $use_gw_convect_dp = '.false.';
@@ -4189,8 +4238,10 @@ if ($do_gw_rdg_gamma) {
 }
 
 if (($do_gw_rdg_beta or $do_gw_rdg_gamma) and $do_gw_oro) {
-    die "$ProgName - ERROR: both orographic wave and ridge scheme are on. \n" ;
-    "Turn off one of them.\n";
+    # MARS HACK: Allow double drag for stability spin-up
+    # die "$ProgName - ERROR: both orographic wave and ridge scheme are on. \n" ;
+    # "Turn off one of them.\n";
+    print "$ProgName - WARNING: allowing both Orographic and Ridge drag for Mars stability.\n";
 }
 
 if (($do_gw_rdg_beta or $do_gw_rdg_gamma)) {

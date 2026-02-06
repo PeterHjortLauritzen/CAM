@@ -227,8 +227,6 @@ subroutine gw_drag_cam_readnl(nlfile)
 
 !----------------------------------------------------------------------
 
-  if (use_simple_phys) return
-
   if (masterproc) then
      open( newunit=unitn, file=trim(nlfile), status='old' )
      call find_group_name(unitn, 'gw_drag_nl', status=ierr)

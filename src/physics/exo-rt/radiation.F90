@@ -1103,6 +1103,18 @@ subroutine radiation_tend( &
                    cam_out%flwds(i) = lw_dnflux(pverp)
 
                 enddo   ! ncol loop
+                ! ----------------------------------------------------------------------
+                ! JT FIX: Clamp surface fluxes to zero to prevent negative values
+                ! caused by numerical noise in the matrix solver.
+                ! This prevents the land model (CLM) from crashing.  Get rid of this
+                ! once we have something to diffuse the soloar (aerosol or  dust in the atmosphere.
+                ! ----------------------------------------------------------------------
+                cam_out%sols(1:ncol)  = max(0.0_r8, cam_out%sols(1:ncol))
+                cam_out%soll(1:ncol)  = max(0.0_r8, cam_out%soll(1:ncol))
+                cam_out%solsd(1:ncol) = max(0.0_r8, cam_out%solsd(1:ncol))
+                cam_out%solld(1:ncol) = max(0.0_r8, cam_out%solld(1:ncol))
+                cam_out%flwds(1:ncol) = max(0.0_r8, cam_out%flwds(1:ncol))
+                ! ----------------------------------------------------------------------
 
                 fsn(:,:) = swdown_rad(:,:) - swup_rad(:,:)
                 fln(:,:) = lwup_rad(:,:) - lwdown_rad(:,:)
@@ -1134,7 +1146,7 @@ subroutine radiation_tend( &
                 call aerad_driver(h2ommr(i,:), co2mmr(i,:), &
                      ch4mmr(i,:), c2h6mmr(i,:), &
                      h2mmr(i,:),  n2mmr(i,:), o3mmr(i,:), o2mmr(i,:), &
-                     cicewp(i,:)*10000.0_r8, cliqwp(i,:)*10000.0_r8, cldfrc(i,:), &
+                     cicewp(i,:)*1000.0_r8, cliqwp(i,:)*1000.0_r8, cldfrc(i,:), &
                      rei(i,:), rel(i,:), &
                      cam_in%ts(i), state%ps(i), state%pmid(i,:), &
                      state%pdel(i,:), state%pdeldry(i,:), state%t(i,:), state%pint(i,:), state%pintdry(i,:), &
@@ -1173,6 +1185,18 @@ subroutine radiation_tend( &
                 cam_out%solld(i) = nir_dif
                 cam_out%flwds(i) = lw_dnflux(pverp)
              enddo   ! ncol loop
+             ! ----------------------------------------------------------------------
+             ! JT FIX: Clamp surface fluxes to zero to prevent negative values
+             ! caused by numerical noise in the matrix solver.
+             ! This prevents the land model (CLM) from crashing.  Get rid of this
+             ! once we have something to diffuse the soloar (aerosol or  dust in the atmosphere.
+             ! ----------------------------------------------------------------------
+             cam_out%sols(1:ncol)  = max(0.0_r8, cam_out%sols(1:ncol))
+             cam_out%soll(1:ncol)  = max(0.0_r8, cam_out%soll(1:ncol))
+             cam_out%solsd(1:ncol) = max(0.0_r8, cam_out%solsd(1:ncol))
+             cam_out%solld(1:ncol) = max(0.0_r8, cam_out%solld(1:ncol))
+             cam_out%flwds(1:ncol) = max(0.0_r8, cam_out%flwds(1:ncol))
+             ! ----------------------------------------------------------------------
 
              fsn(:,:) = swdown_rad(:,:) - swup_rad(:,:)
              fln(:,:) = lwup_rad(:,:) - lwdown_rad(:,:)

@@ -927,10 +927,34 @@
 <!-- nudged QBO  -->
 <qbo_forcing_file>atm/waccm/qbo/qbocoefficients_c151023.nc</qbo_forcing_file>
 
+<effgw_cm>1.D0</effgw_cm>
+
 <!-- Gravity wave settings for WACCM -->
 <effgw_oro>0.125D0</effgw_oro>
 
-<effgw_cm>1.D0</effgw_cm>
+<!-- Gravity wave settings for Simple Mars -->
+<!-- effgw_oro:Earth uses 0.125. Mars's thin atmosphere requires much stronger coupling to the surface topography to
+                                 generate sufficient drag to close the jets.
+     gw_top_taper: Prevents the GW stress from becoming infinite at the model top (where density $\to$ 0), which can
+                                 lead to a badness occurring
+     effgw_cm/beres: These disable the frontal and convective schemes. If left active with Earth defaults,
+                                 they would search for files or pressure levels that don't exist on Mars, causing crashes.
+-->
+<use_gw_oro phys="simple_mars">.true.</use_gw_oro>
+<effgw_oro phys="simple_mars">1.0D0</effgw_oro>
+<gw_oro_south_fac phys="simple_mars">1.0D0</gw_oro_south_fac>
+<gw_top_taper phys="simple_mars">.true.</gw_top_taper>
+<tau_0_ubc phys="simple_mars">.true.</tau_0_ubc>
+<effgw_cm phys="simple_mars">0.0D0</effgw_cm>
+
+<effgw_beres_dp phys="simple_mars">0.0D0</effgw_beres_dp>
+<effgw_beres_sh phys="simple_mars">0.0D0</effgw_beres_sh>
+
+<use_gw_rdg_beta phys="simple_mars">.false.</use_gw_rdg_beta>
+<use_gw_rdg_gamma phys="simple_mars">.false.</use_gw_rdg_gamma>
+<use_gw_rdg_resid phys="simple_mars">.false.</use_gw_rdg_resid>
+
+<mars_topo_ramp_days phys="simple_mars">0.D0</mars_topo_ramp_days>
 
 <taubgnd                 >1.5D-3</taubgnd>
 <taubgnd hgrid="4x5"     >1.0D-3</taubgnd>

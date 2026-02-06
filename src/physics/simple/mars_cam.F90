@@ -8,7 +8,7 @@ module mars_cam
   !-------------------
   use cam_abortutils, only: endrun
   use cam_grid_support,only: cam_grid_id, cam_grid_dimensions, cam_grid_get_decomp
-  use cam_history,         only: addfld, add_default, outfld
+  use cam_history,         only: addfld, add_default, outfld, register_vector_field
   use cam_history_support, only: fillvalue
   use cam_logfile,    only: iulog
   use camsrfexch,     only: cam_in_t,cam_out_t
@@ -31,6 +31,7 @@ module mars_cam
   use shr_const_mod,  only: pi => shr_const_pi
   use shr_kind_mod,   only: r8 => shr_kind_r8, cl=>shr_kind_cl
   use held_suarez_cam,  only: held_suarez_init, held_suarez_tend
+  use spmd_utils,       only: masterproc
   use string_utils,     only: to_upper
   use subcol_utils,     only: is_subcol_on
 
@@ -50,6 +51,7 @@ module mars_cam
   public :: mars_restart_init
   public :: mars_restart_write
   public :: mars_restart_read
+  public :: mars_grow_topo
 !!$  public :: rad_out_t
   private :: mars_surface_init
 
@@ -121,15 +123,8 @@ module mars_cam
   real(r8) :: mars_Tdlt       = unset_r8      ! IC: eq-polar difference sst (K)
   real(r8) :: mars_Twidth     = unset_r8      ! IC: Latitudinal width parameter for sst (degrees latitude)
 
-  logical,  public,protected :: mars_relaxation      = .false.
-  logical,  public,protected :: mars_use_hs_uv       = .false.
-  logical,  public,protected :: mars_relax_linear    = .false.
-  real(r8), public,protected :: mars_relax_bot_p     = unset_r8
-  real(r8), public,protected :: mars_relax_tau_bot_sec    = unset_r8
-  real(r8), public,protected :: mars_relax_top_p    = unset_r8
-  real(r8), public,protected :: mars_relax_tau_sec     = unset_r8
-  real(r8), public,protected :: mars_relax_tau_top_sec    = unset_r8
-  character(len=26), public,protected  :: mars_relax_fincl(pcnst)
+! NEW: Topography Ramp Parameter
+  real(r8), public, protected :: mars_topo_ramp_days = 0.0_r8 ! Days to ramp up topo (0 = off)
 
   integer :: &
          ixcldliq = -1,      &! cloud liquid amount index
@@ -180,8 +175,13 @@ contains
     call cnst_add('CLDLIQ', mwh2o, cpair, 0._r8, ixcldliq,                    &
          longname='Grid box averaged cloud liquid amount', is_convtran1=.true.)
     ! Add ice constituents
-   call cnst_add('CLDICE', mwh2o, cpair, 0._r8, ixcldice, &
+    call cnst_add('CLDICE', mwh2o, cpair, 0._r8, ixcldice, &
       longname='Grid box averaged cloud ice amount', is_convtran1=.true.)
+
+! Register Gravity Wave Diagnostics (so they appear in history files)
+      call addfld('UTEND_GWDTOT', (/'lev'/), 'A', 'm/s2', 'Zonal wind tendency by all GWs')
+      call addfld('VTEND_GWDTOT', (/'lev'/), 'A', 'm/s2', 'Meridional wind tendency by all GWs')
+      call register_vector_field('UTEND_GWDTOT', 'VTEND_GWDTOT')
 
   end subroutine mars_register
   !==============================================================================
@@ -209,10 +209,7 @@ contains
 
     character(len=*), parameter :: sub = 'mars_readnl'
 
-    namelist /mars_nl/ mars_relax_bot_p,mars_relax_linear,mars_relax_tau_bot_sec, &
-                       mars_relax_tau_sec,mars_relax_tau_top_sec,mars_relax_top_p, &
-                       mars_relaxation, mars_relax_fincl, mars_use_hs_uv
-    mars_relax_fincl(:) = ' '
+    namelist /mars_nl/ mars_topo_ramp_days
 
    ! Read in namelist values
     !-------------------------
@@ -233,54 +230,15 @@ contains
     ! Broadcast namelist values
     !---------------------------
 
-    call mpi_bcast(mars_relax_linear  , 1, mpi_logical , masterprocid, mpicom, ierr)
-    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: mars_relax_linear")
-    call mpi_bcast(mars_relaxation  , 1, mpi_logical , masterprocid, mpicom, ierr)
-    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: mars_relaxation")
-    call mpi_bcast(mars_relax_bot_p  , 1, mpi_real8 , masterprocid, mpicom, ierr)
-    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: mars_relax_bot_p")
-    call mpi_bcast(mars_relax_top_p  , 1, mpi_real8 , masterprocid, mpicom, ierr)
-    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: mars_relax_top_p")
-    call mpi_bcast(mars_relax_tau_sec  , 1, mpi_real8 , masterprocid, mpicom, ierr)
-    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: mars_relax_tau_sec")
-    call mpi_bcast(mars_relax_tau_bot_sec  , 1, mpi_real8 , masterprocid, mpicom, ierr)
-    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: mars_relax_tau_bot_sec")
-    call mpi_bcast(mars_relax_tau_top_sec  , 1, mpi_real8 , masterprocid, mpicom, ierr)
-    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: mars_relax_tau_top_sec")
-    call mpi_bcast(mars_relax_fincl, len(mars_relax_fincl(1))*pcnst, mpi_character, masterprocid, mpicom, ierr)
-    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: mars_relax_fincl")
-
-    ! output scm_relax_fincl character array
+    call mpi_bcast(mars_topo_ramp_days, 1, mpi_real8, masterprocid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: mars_topo_ramp_days")
 
    if (masterproc) then
       write(iulog,*) 'MARS Simple Physics namelist parameters:'
-      write(iulog,10) mars_relax_bot_p,mars_relax_linear,mars_relax_tau_bot_sec, &
-                       mars_relax_tau_sec,mars_relax_tau_top_sec,mars_relax_top_p, &
-                       mars_use_hs_uv, mars_relaxation
+      write(iulog,10) mars_topo_ramp_days
    end if
 
-10 format('     mars_relax_bot_p       :                         ',f8.1/, &
-          '     mars_relax_linear      :                         ',l8/, &
-          '     mars_relax_tau_bot_sec :                         ',f8.1/, &
-          '     mars_relax_tau_sec     :                         ',f8.1/, &
-          '     mars_relax_tau_top_sec :                         ',f8.1/, &
-          '     mars_relax_top_p       :                         ',f8.1/, &
-          '     mars_use_hs_uv         :                         ',l8/, &
-          '     mars_relaxation        :                         ',l8/)
-
-    write (iulog,*) '  mars_relax_fincl: '
-    do i=1,pcnst
-       if (mars_relax_fincl(i) .ne. '') then
-          adv = mod(i,4)==0
-          if (adv) then
-             write (iulog, "(A18)") "'"//trim(mars_relax_fincl(i))//"',"
-          else
-             write (iulog, "(A18)", ADVANCE="NO") "'"//trim(mars_relax_fincl(i))//"',"
-          end if
-       else
-          exit
-       end if
-    end do
+10 format(' ars_topo_ramp_days    :                         ',f8.1/)
 
   end subroutine mars_readnl
   !==============================================================================
@@ -317,15 +275,6 @@ contains
     call radiation_init(pbuf2d)
     call radheat_init(pref_mid)
     call rad_cnst_init()
-
-    call addfld ('SRELAX',   (/ 'lev' /), 'A', 'J/kg/s','static energy relaxation amount')
-    call addfld ('TAURELAX', (/ 'lev' /), 'A', 'seconds','relaxation time constant')
-!!$    call addfld ('URELAX',   (/ 'lev' /), 'A', 'J/kg/s','static energy relaxation amount')
-!!$    call addfld ('VRELAX',   (/ 'lev' /), 'A', 'J/kg/s','static energy relaxation amount')
-    call add_default('SRELAX', 1, ' ')
-    call add_default('TAURELAX', 1, ' ')
-!!$    call add_default('URELAX', 1, ' ')
-!!$    call add_default('VRELAX', 1, ' ')
 
 !  These needed for cldliq/ice diagnostics - added for vdiff
     call addfld(apcnst(ixcldliq), (/ 'lev' /), 'A', 'kg/kg', trim(cnst_name(ixcldliq))//' after physics'  )
@@ -561,7 +510,18 @@ subroutine mars_surface_init(cam_in,state)
   !
   ! Local values
   !--------------
+  integer ncol
+
+
+  ncol=cam_in%ncol
+  write(6,*)'max cam_in%ts(:)=',maxval(cam_in%ts(:ncol))
+  write(6,*)'max cam_in%landfrac(:)=',maxval(cam_in%landfrac(:ncol))
+  write(6,*)'max cam_in%asdir(:) should be .17 =',maxval(cam_in%asdir(:ncol))
+  write(6,*)'max cam_in%asdif(:) should be .17 =',maxval(cam_in%asdif(:ncol))
+  write(6,*)'max cam_in%aldir(:) should be .35 =',maxval(cam_in%aldir(:ncol))
+  write(6,*)'max cam_in%aldif(:) should be .35 =',maxval(cam_in%aldif(:ncol))
   cam_in%ts(:)= state%t(:,pver)
+  cam_in%landfrac(:)= 1.0_r8
   !asdir, asdif (Visible)	0.15 to 0.20	Mars is dark in the visible (absorbs blue/green).
   !aldir, aldif (Near-IR)	0.30 to 0.40	Mars is bright in the infrared (reflects heat).
   !Broadband Average	~0.25	Matches global observation.
@@ -572,7 +532,6 @@ subroutine mars_surface_init(cam_in,state)
   ! Near-IR Band (Brighter)
   cam_in%aldir(:) = 0.35_r8
   cam_in%aldif(:) = 0.35_r8
-
 end subroutine mars_surface_init
 !=======================================================================
 
@@ -602,132 +561,24 @@ subroutine mars_radiative_tend( state, ptend, pbuf, cam_out, cam_in, net_flx)
   ! local
   !------------------
   real(r8)                                :: ztodt
-  type(physics_ptend)                     :: ptend_hs, ptend_rad     ! local tendencies
   logical                                 :: lq(pcnst)               ! Calc tendencies?
-  logical                                 ::  mars_fincl_empty
   integer                                 :: k
   integer                                 :: lchnk                   ! chunk identifier
   integer                                 :: ncol                    ! number of atmospheric columns
-  real(r8) rtau(state%ncol,pver)
-  real(r8) relax_s(state%ncol,pver),relax_u(state%ncol,pver),relax_v(state%ncol,pver)
-  real(r8) rslope ! [optional] slope for linear relaxation profile
-  real(r8) rycept ! [optional] y-intercept for linear relaxtion profile
   integer i
 
 
   lchnk       = state%lchnk
   ncol        = state%ncol
 
-  ! initialize ptend: depending on relaxation and mars_use_hs_uv this will be a combination of hs%s/%u/%v and output from exo_rad
-  call physics_ptend_init(ptend, state%psetcols, 'held_suarez', ls=.true., lu=.true., lv=.true.)
-
-  ztodt  = get_step_size()
-  call held_suarez_tend(state, ptend_hs, ztodt)
-
-  ! THIS IS A TEMPORARY TO SET SURFACE VALUES FOR TESTING - REMOVE WHEN HAVE SURFACE COMPONENT, TS is set to lowest level HS air temp
-  call mars_surface_init(cam_in,state)
+  ! initialize individual parameterization tendencies
+  !---------------------------------------------------
+  lq(:) = .false.
+  call physics_ptend_init(ptend, state%psetcols, 'mars exo-rt radiative_tend',   &
+       ls=.true., lu=.false., lv=.false., lq=lq)
 
   ! ExoRT radiation tendency
-  call radiation_tend( state, ptend_rad, pbuf, cam_out, cam_in, net_flx)
-
-
-  ! ------------------------------------------------------------------- !
-  ! Relaxation to the observed or specified state                       !
-  ! We should specify relaxation time scale ( rtau ) and                !
-  ! target-relaxation state ( in the current case, either 'obs' or 0 )  !
-  ! ------------------------------------------------------------------- !
-
-
-
-  !    prepare mars_relax_fincl for comparison in scmforecast.F90
-  mars_fincl_empty=.true.
-  do i=1,pcnst
-     if (len_trim(mars_relax_fincl(i)) > 0) then
-        mars_fincl_empty=.false.
-        mars_relax_fincl(i)=trim(to_upper(mars_relax_fincl(i)))
-     end if
-  end do
-
-  if (ANY(mars_relax_fincl(:).eq.'S')) then
-     if (ANY(mars_relax_fincl(:).ne.'S')) then
-        call endrun('mars_radiative_tend: ERROR CAM Mars can only relax S. It uses HS-diffusion on lower level winds by default, &
-             set mars_use_hs_uv to .false. to disable this behavior')
-     end if
-  end if
-
-  if ( mars_relaxation.and.mars_relax_linear ) then
-     rslope = (mars_relax_top_p - mars_relax_bot_p)/(mars_relax_tau_top_sec - mars_relax_tau_bot_sec)
-     rycept = mars_relax_tau_top_sec - (rslope*mars_relax_top_p)
-  endif
-
-  rtau=0._r8
-  relax_s = 0._r8
-  relax_u = 0._r8
-  relax_v = 0._r8
-  if( mars_relaxation ) then
-     do k = 1, pver
-        if (mars_relax_linear) then
-           where ( state%pmid(:,k).le.mars_relax_bot_p.and.state%pmid(:,k).ge.mars_relax_top_p ) ! inside layer
-              rtau(:,k) = rslope*state%pmid(:,k) + rycept ! linear regime
-           end where
-        else
-           where ( state%pmid(:,k).le.mars_relax_bot_p.and.state%pmid(:,k).ge.mars_relax_top_p ) ! inside layer
-              rtau(:,k)         = max( ztodt, mars_relax_tau_sec ) ! constant for whole layer / no relax outside
-           end where
-        endif
-        where (mars_relax_linear .and. state%pmid(:,k).le.mars_relax_top_p ) ! not linear => do nothing / linear => use upper value
-           rtau(:,k) = mars_relax_tau_top_sec ! above layer keep rtau equal to the top
-        end where
-        ! I put this in because if rtau doesn't get set above, then I don't want to do any relaxation in that layer.
-        ! maybe the logic of this whole loop needs to be re-thinked.
-        where (rtau(:ncol,k).ne.0)
-           relax_s(:ncol,k)      = -  ( ptend_rad%s(:ncol,k) - ptend_hs%s(:ncol,k) ) / rtau(:ncol,k)
-!!$           relax_u(:ncol,k)      = ptend_hs%u(:ncol,k)/ rtau(:ncol,k)
-!!$           relax_v(:ncol,k)      = ptend_hs%v(:ncol,k)/ rtau(:ncol,k)
-        elsewhere
-           relax_s(:ncol,k)      = 0._r8
-        end where
-        if (mars_fincl_empty .or. ANY(mars_relax_fincl(:).eq.'S')) then
-           ptend%s(:ncol,k)      =      ptend_rad%s(:ncol,k) + relax_s(:ncol,k) * ztodt
-        else
-           relax_s(:ncol,k)      = 0._r8
-           ptend%s(:ncol,k)      = ptend_rad%s(:ncol,k)
-        end if
-!!$        if (mars_fincl_empty .or. ANY(mars_relax_fincl(:).eq.'U')) then
-!!$           ptend%u(:ncol,k)      =      relax_u(:ncol,k) * ztodt
-!!$        else
-!!$           relax_u(:ncol,k)      = 0._r8
-!!$           ptend%u(:ncol,k)      = 0._r8
-!!$        end if
-!!$        if (mars_fincl_empty .or. ANY(mars_relax_fincl(:).eq.'V')) then
-!!$           ptend%v(:ncol,k)      =      relax_v(:ncol,k) * ztodt
-!!$        else
-!!$           relax_v(:ncol,k)      = 0._r8
-!!$           ptend%v(:ncol,k)      = 0._r8
-!!$        end if
-     end do
-  else
-     ! No relaxation, use only ptend%s coming from exort
-     relax_s(:ncol,:)      = 0._r8
-     ptend%s(:ncol,:)      = ptend_rad%s(:ncol,:)
-  end if
-
-  ! During radiation debug allow use of HS wind diffusion
-  if (mars_use_hs_uv) then
-     ptend%u(:ncol,:)      = ptend_hs%u(:ncol,:)
-     ptend%v(:ncol,:)      = ptend_hs%v(:ncol,:)
-  else
-     ptend%u(:ncol,:)      = 0._r8
-     ptend%v(:ncol,:)      = 0._r8
-  end if
-
-     call outfld( 'SRELAX'   , relax_s           , ncol, lchnk )
-     call outfld( 'TAURELAX' , rtau              , ncol, lchnk )
-!!$  call outfld( 'URELAX'   , relax_u           , ncol, lchnk )
-!!$  call outfld( 'VRELAX'   , relax_v           , ncol, lchnk )
-
-  call physics_ptend_dealloc(ptend_rad)
-  call physics_ptend_dealloc(ptend_hs)
+  call radiation_tend( state, ptend, pbuf, cam_out, cam_in, net_flx)
 
 end subroutine mars_radiative_tend
 
@@ -1215,5 +1066,80 @@ subroutine mars_restart_read(File, cam_in, cam_out)
 end subroutine mars_restart_read
 !============================================================================
 
+!=======================================================================
+  subroutine mars_grow_topo(state, pbuf, ztodt)
+    !-----------------------------------------------------------------------
+    ! Purpose: Scale topography fields (SGH, PHIS) from 0 to 1 over time
+    !          to prevent initialization shock.
+    !-----------------------------------------------------------------------
+    use physics_types,  only: physics_state
+    use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index
+    use time_manager,   only: get_curr_date, get_step_size, get_nstep
+    use physconst,      only: gravit
 
+    type(physics_state), intent(inout) :: state
+    type(physics_buffer_desc), pointer :: pbuf(:)
+    real(r8), intent(in)               :: ztodt
+
+    ! Local variables
+    integer :: yr, mon, day, ncsec
+    real(r8) :: time_days, scale_factor
+    real(r8), pointer :: sgh(:,:), sgh30(:,:)
+    integer :: sgh_idx, sgh30_idx
+    integer :: i, k, dt, nstep
+
+    ! 1. Calculate Scaling Factor
+    if (mars_topo_ramp_days <= 0.0_r8) return ! Scaling disabled
+    write(6,*)'In mars_grow_topo'
+
+    call get_curr_date(yr, mon, day, ncsec)
+
+    ! Calculate total simulation time in days (assuming start at day 0/1)
+    ! Note: Adjust this logic if your run doesn't start at day 0.
+    ! Simple approximation: Just rely on elapsed time steps if available,
+    ! but here we approximate from date components or just use ztodt accumulation if stored.
+    ! Ideally, pass 'nstep' or total time. For now, we assume simple start.
+
+    ! Robust method: Use a global time tracker or assume start at time 0.
+    ! Here we assume the user sets ramp_days relative to start of run.
+    ! If this is a restart, we assume topography is already grown (scale=1).
+
+    ! ** CRITICAL **: You likely need to pass 'nstep' to this routine or use time_manager
+    ! 'get_curr_calday' if starting from day 0.
+    ! For simplicity here, we assume standard startup.
+
+    ! 1. Calculate Time from Steps (Robust across restarts/calendars)
+    nstep = get_nstep()
+    dt    = get_step_size()
+
+    ! Convert seconds to days
+    time_days = (real(nstep, r8) * dt) / 86400.0_r8
+
+    if (time_days >= mars_topo_ramp_days) then
+       scale_factor = 1.0_r8
+    else
+       scale_factor = max(0.0_r8, time_days / mars_topo_ramp_days)
+    endif
+    if (masterproc) write(6,*)'scale_factor=',scale_factor
+    ! 2. Scale Physics State PHIS (Geopotential Height) Don't
+    ! This affects surface pressure calc in physics and some drag routines
+    ! state%phis(:) = state%phis(:) * scale_factor
+
+    ! 3. Scale Physics Buffer Fields (SGH, SGH30)
+    ! These drive the Gravity Wave Drag schemes directly.
+    sgh_idx = pbuf_get_index('SGH')
+    sgh30_idx = pbuf_get_index('SGH30')
+
+    call pbuf_get_field(pbuf, sgh_idx, sgh)
+    call pbuf_get_field(pbuf, sgh30_idx, sgh30)
+
+    sgh(:,:)   = sgh(:,:)   * scale_factor
+    sgh30(:,:) = sgh30(:,:) * scale_factor
+
+    ! Optional: Print status periodically (e.g., column 1)
+    if (masterproc .and. state%lchnk == begchunk) then
+       write(iulog,*) 'MARS_TOPO_RAMP: Day=', time_days, ' Scale=', scale_factor
+    endif
+
+  end subroutine mars_grow_topo
 end module mars_cam
