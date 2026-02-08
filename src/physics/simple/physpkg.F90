@@ -784,8 +784,9 @@ contains
        if (trim(cam_take_snapshot_after) == "gw_tend") then
           call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
                fh2o, surfric, obklen, flx_heat)
-          call t_stopf('gw_tend')
        end if
+
+       call t_stopf('gw_tend')
 
        ! Check energy integrals
        !call check_energy_cam_chng(state, tend, "gwdrag", nstep, ztodt, zero, &
