@@ -4004,8 +4004,8 @@ if (!$simple_phys or $phys eq 'simple_mars') {
         # 1. Enable Basic Orographic (McFarlane)
         #    Set efficiency to 1.0 for strong drag (Earth is 0.125).
         #    Use symmetric drag (south_fac=1.0) and land scaling.
-        add_default($nl, 'use_gw_oro',       'val'=>'.true.');
-        add_default($nl, 'effgw_oro',        'val'=>'1.0D0');
+        add_default($nl, 'use_gw_oro',       'val'=>'.false.');
+        add_default($nl, 'effgw_oro',        'val'=>'0.0D0');
         add_default($nl, 'gw_oro_south_fac', 'val'=>'1.0D0');
         add_default($nl, 'gw_lndscl_sgh',    'val'=>'.true.');
 
@@ -4024,8 +4024,8 @@ if (!$simple_phys or $phys eq 'simple_mars') {
         add_default($nl, 'effgw_beres_dp',   'val'=>'0.0D0');
         add_default($nl, 'effgw_beres_sh',   'val'=>'0.0D0');
 
-        # 4. Disable Anisotropic Ridge Scheme (for now)
-        add_default($nl, 'use_gw_rdg_beta',  'val'=>'.false.');
+        # 4. Enable Anisotropic Ridge Scheme
+        add_default($nl, 'use_gw_rdg_beta',  'val'=>'.true.');
         add_default($nl, 'use_gw_rdg_gamma', 'val'=>'.false.');
         add_default($nl, 'use_gw_rdg_resid', 'val'=>'.false.');
 
