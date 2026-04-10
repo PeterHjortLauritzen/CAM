@@ -285,6 +285,7 @@ contains
     logical :: top_000_032km, top_032_042km, top_042_090km, top_090_140km, top_140_600km ! model top location ranges
     logical :: nu_set,div_set,lev_set
 
+    real (kind=r8) ::  transition_width
     ! Eigenvalues calculated by folks at UMich (Paul U & Jared W)
     select case (np)
     case (2)
@@ -638,14 +639,16 @@ contains
     !
     ! if user or namelist is not specifying sponge del4 settings here are best guesses (empirically determined)
     !
+    transition_width = 2.0_r8
     if (top_042_090km) then
        if (sponge_del4_lev       <0) sponge_del4_lev        = 4
        if (sponge_del4_nu_fac    <0) sponge_del4_nu_fac     = 3.375_r8 !max value without having to increase subcycling of div4
        if (sponge_del4_nu_div_fac<0) sponge_del4_nu_div_fac = 3.375_r8 !max value without having to increase subcycling of div4
     else if (top_090_140km.or.top_140_600km) then ! defaults for waccm(x)
-      if (sponge_del4_lev       <0) sponge_del4_lev        = 20
-      if (sponge_del4_nu_fac    <0) sponge_del4_nu_fac     = 5.0_r8
-      if (sponge_del4_nu_div_fac<0) sponge_del4_nu_div_fac = 10.0_r8
+      if (sponge_del4_lev       <0) sponge_del4_lev        = 10
+      if (sponge_del4_nu_fac    <0) sponge_del4_nu_fac     = 7.5_r8
+      if (sponge_del4_nu_div_fac<0) sponge_del4_nu_div_fac = 7.5_r8
+      transition_width = 0.5_r8
     else
       if (sponge_del4_lev       <0) sponge_del4_lev        = 1
       if (sponge_del4_nu_fac    <0) sponge_del4_nu_fac     = 1.0_r8
@@ -683,7 +686,7 @@ contains
     nu_div_max =  sponge_del4_nu_div_fac*nu_p
     do k=1,nlev
       ! Vertical profile from FV dycore (see Lauritzen et al. 2012 DOI:10.1177/1094342011410088)
-      scale1        = 0.5_r8*(1.0_r8+tanh(2.0_r8*log(pmid(sponge_del4_lev)/pmid(k))))
+      scale1        = 0.5_r8*(1.0_r8+tanh(transition_width*log(pmid(sponge_del4_lev)/pmid(k))))
       if (sponge_del4_nu_div_fac /= 1.0_r8) then
         nu_div_lev(k) = (1.0_r8-scale1)*nu_div+scale1*nu_div_max
       end if
