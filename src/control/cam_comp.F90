@@ -15,6 +15,9 @@ use shr_sys_mod,       only: shr_sys_flush
 
 use spmd_utils,        only: masterproc, mpicom
 use cam_control_mod,   only: cam_ctrl_init, cam_ctrl_set_orbit
+#ifdef planet_mars
+use cam_control_mod,   only: cam_ctrl_set_exo_orbit
+#endif
 use runtime_opts,      only: read_namelist
 use time_manager,      only: timemgr_init, get_nstep
 use camsrfexch,        only: cam_out_t, cam_in_t
@@ -59,6 +62,10 @@ subroutine cam_init(                                             &
    calendar, brnch_retain_casename, aqua_planet,                 &
    single_column, scmlat, scmlon,                                &
    eccen, obliqr, lambm0, mvelpp,                                &
+#ifdef planet_mars
+   exo_planet_radius, exo_surface_gravity,                       &
+   exo_diurnal, exo_ndays, exo_porb, exo_sday,                   &
+#endif
    perpetual_run, perpetual_ymd,                                 &
    dtime, start_ymd, start_tod, ref_ymd, ref_tod,                &
    stop_ymd, stop_tod, curr_ymd, curr_tod,                       &
@@ -109,7 +116,14 @@ subroutine cam_init(                                             &
    real(r8),          intent(in) :: obliqr
    real(r8),          intent(in) :: lambm0
    real(r8),          intent(in) :: mvelpp
-
+#ifdef planet_mars
+    real(r8),         intent(in) :: exo_planet_radius    ! radius ~ m
+    real(r8),         intent(in) :: exo_surface_gravity  ! gravity ~ m/s^2
+    real(r8),         intent(in) :: exo_diurnal ! Length of diurnal period, solar-day ~ s
+    real(r8),         intent(in) :: exo_ndays   ! scaler to number of Earth days
+    real(r8),         intent(in) :: exo_porb    ! orbital period in Earth Days, for obliquity/eccentricity cycles
+    real(r8),         intent(in) :: exo_sday    ! sidereal period
+#endif
    logical,           intent(in) :: perpetual_run    ! true => perpetual mode enabled
    integer,           intent(in) :: perpetual_ymd    ! Perpetual date (YYYYMMDD)
    integer,           intent(in) :: dtime                 ! model timestep (sec)
@@ -144,7 +158,10 @@ subroutine cam_init(                                             &
       brnch_retain_casename_in=brnch_retain_casename)
 
    call cam_ctrl_set_orbit(eccen, obliqr, lambm0, mvelpp)
-
+#ifdef planet_mars
+   call cam_ctrl_set_exo_orbit(exo_planet_radius, exo_surface_gravity, &
+        exo_diurnal, exo_ndays, exo_porb, exo_sday)
+#endif
    call timemgr_init( &
       dtime, calendar, start_ymd, start_tod, ref_ymd,  &
       ref_tod, stop_ymd, stop_tod, curr_ymd, curr_tod, &

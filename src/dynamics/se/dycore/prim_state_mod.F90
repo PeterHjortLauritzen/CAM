@@ -437,10 +437,10 @@ CONTAINS
     ! Local variables...
     integer            :: k,ie
 
-    real (kind=r8), dimension(nets:nete,nlev) :: max_local
-    real (kind=r8), dimension(nets:nete,nlev) :: min_local
-    real (kind=r8), dimension(nlev)           :: max_p
-    real (kind=r8), dimension(nlev)           :: min_p
+    real (kind=r8), dimension(nets:nete,nlev) :: max_local,max_local_t
+    real (kind=r8), dimension(nets:nete,nlev) :: min_local,min_local_t
+    real (kind=r8), dimension(nlev)           :: max_p,max_t
+    real (kind=r8), dimension(nlev)           :: min_p,min_t
     integer        :: n0, n0_qdp, q, nm, nm2
 
     !dt=tstep*qsplit
@@ -457,19 +457,23 @@ CONTAINS
       do k=1,nlev
         max_local(ie,k)  = MAXVAL(elem(ie)%state%v(:,:,:,k,n0))
         min_local(ie,k)  = MINVAL(elem(ie)%state%v(:,:,:,k,n0))
+        max_local_t(ie,k)  = MAXVAL(elem(ie)%state%t(:,:,k,n0))
+        min_local_t(ie,k)  = MINVAL(elem(ie)%state%t(:,:,k,n0))
       end do
     end do
     !JMD This is a Thread Safe Reduction
     do k = 1, nlev
       max_p(k) = Parallelmax(max_local(:,k),hybrid)
       min_p(k) = Parallelmin(min_local(:,k),hybrid)
+      max_t(k) = Parallelmax(max_local_t(:,k),hybrid)
+      min_t(k) = Parallelmin(min_local_t(:,k),hybrid)
     end do
     if (hybrid%masterthread) then
        write(iulog,*)   '  '
-       write(iulog,*)   'min/max of wind components in each layer'
+       write(iulog,*)   'min/max of wind and temp components in each layer'
        write(iulog,*)   '  '
        do k=1,nlev
-          write(iulog,*) 'k,V (min max)= ',k,min_p(k),max_p(k)
+          write(iulog,'(A, I5, 4F12.3)') 'k,V,T = ',k,min_p(k),max_p(k),min_t(k),max_t(k)
        end do
     end if
   end subroutine prim_printstate_U

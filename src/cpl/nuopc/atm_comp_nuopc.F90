@@ -57,6 +57,9 @@ module atm_comp_nuopc
    use phys_grid           , only : get_ncols_p, get_gcol_p, get_rlon_all_p, get_rlat_all_p
    use phys_grid           , only : ngcols=>num_global_phys_cols
    use cam_control_mod     , only : cam_ctrl_set_orbit
+#ifdef planet_mars
+   use cam_control_mod     , only : cam_ctrl_set_exo_orbit
+#endif
    use cam_pio_utils       , only : cam_pio_createfile, cam_pio_openfile, cam_pio_closefile, pio_subsystem
    use cam_initfiles       , only : cam_initfiles_get_caseid, cam_initfiles_get_restdir
    use cam_history_support , only : fillvalue
@@ -91,6 +94,9 @@ module atm_comp_nuopc
   private :: cam_write_srfrest
   private :: cam_orbital_init
   private :: cam_orbital_update
+#ifdef planet_mars
+  private :: cam_exo_orbital_update
+#endif
   private :: cam_set_mesh_for_single_column
   private :: cam_pio_checkerr
 
@@ -127,6 +133,15 @@ module atm_comp_nuopc
   character(len=*) , parameter :: orb_fixed_year       = 'fixed_year'
   character(len=*) , parameter :: orb_variable_year    = 'variable_year'
   character(len=*) , parameter :: orb_fixed_parameters = 'fixed_parameters'
+
+#ifdef planet_mars
+  real(r8)               :: orb_exo_planet_radius      !! radius ~ m
+  real(r8)               :: orb_exo_surface_gravity    !! gravity ~ m/s^2
+  real(r8)               :: orb_exo_diurnal            !! Length of diurnal period, solar-day ~ s
+  real(r8)               :: orb_exo_ndays              !! scaler to number of Earth days
+  real(r8)               :: orb_exo_porb               !! orbital period in Earth Days, for obliquity/eccentricity cycles
+  real(r8)               :: orb_exo_sday               !! sidereal period
+#endif
 
   real(R8) , parameter         :: grid_tol = 1.e-2_r8 ! tolerance for calculated lat/lon vs read in
 
@@ -393,6 +408,14 @@ contains
     real(r8)                :: obliqr
     real(r8)                :: lambm0
     real(r8)                :: mvelpp
+#ifdef planet_mars
+    real(r8)                :: exo_planet_radius    ! radius ~ m
+    real(r8)                :: exo_surface_gravity  ! gravity ~ m/s^2
+    real(r8)                :: exo_diurnal     ! Length of diurnal period, solar-day ~ s
+    real(r8)                :: exo_ndays       ! scaler to number of Earth days
+    real(r8)                :: exo_porb        ! orbital period in Earth Days, for obliquity/eccentricity cycls
+    real(r8)                :: exo_sday        ! sidereal period
+#endif
     !character(len=cl)      :: atm_resume_all_inst(num_inst_atm) ! atm resume file
     integer                 :: lbnum
     character(CS)           :: inst_name
@@ -493,9 +516,15 @@ contains
     call cam_orbital_init(gcomp, iulog, masterproc, rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
+#ifdef planet_mars
+    call cam_exo_orbital_update(clock, iulog, masterproc, exo_planet_radius, exo_surface_gravity, &
+         exo_diurnal, exo_ndays, exo_porb, exo_sday, rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call cam_ctrl_set_exo_orbit(exo_planet_radius, exo_surface_gravity, &
+         exo_diurnal, exo_ndays, exo_porb, exo_sday)
+#endif
     call cam_orbital_update(clock, iulog, masterproc, eccen, obliqr, lambm0, mvelpp, rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
-
     call cam_ctrl_set_orbit(eccen, obliqr, lambm0, mvelpp)
 
     !----------------------
@@ -630,9 +659,13 @@ contains
     ! Initialize module orbital values and update orbital
     call cam_orbital_init(gcomp, iulog, masterproc, rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
+#ifdef planet_mars
+    call cam_exo_orbital_update(clock, iulog, masterproc, exo_planet_radius, exo_surface_gravity, &
+         exo_diurnal, exo_ndays, exo_porb, exo_sday, rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+#endif
     call cam_orbital_update(clock, iulog, masterproc, eccen, obliqr, lambm0, mvelpp, rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
-
     ! Initialize CAM
     if (aqua_planet) then
        perpetual_run = .true.
@@ -646,6 +679,10 @@ contains
          calendar=calendar, brnch_retain_casename=brnch_retain_casename, aqua_planet=aqua_planet, &
          single_column=single_column, scmlat=scol_lat, scmlon=scol_lon, &
          eccen=eccen, obliqr=obliqr, lambm0=lambm0, mvelpp=mvelpp,  &
+#ifdef planet_mars
+         exo_planet_radius=exo_planet_radius,exo_surface_gravity=exo_surface_gravity, &
+         exo_diurnal=exo_diurnal,exo_ndays=exo_ndays,exo_porb=exo_porb,exo_sday=exo_sday, &
+#endif
          perpetual_run=perpetual_run, perpetual_ymd=perpetual_ymd, &
          dtime=dtime, start_ymd=start_ymd, start_tod=start_tod, ref_ymd=ref_ymd, ref_tod=ref_tod, &
          stop_ymd=stop_ymd, stop_tod=stop_tod, curr_ymd=curr_ymd, curr_tod=curr_tod, &
@@ -1018,6 +1055,14 @@ contains
     real(r8)                :: obliqr
     real(r8)                :: lambm0
     real(r8)                :: mvelpp
+#ifdef planet_mars
+    real(r8)                :: exo_planet_radius    ! radius ~ m
+    real(r8)                :: exo_surface_gravity  ! gravity ~ m/s^2
+    real(r8)                :: exo_diurnal     ! Length of diurnal period, solar-day ~ s
+    real(r8)                :: exo_ndays       ! scaler to number of Earth days
+    real(r8)                :: exo_porb        ! orbital period in Earth Days, for obliquity/eccentricity cycls
+    real(r8)                :: exo_sday        ! sidereal period
+#endif
     logical                 :: dosend      ! true => send data back to driver
     integer                 :: dtime       ! time step increment (sec)
     integer                 :: ymd_sync    ! Sync ymd
@@ -1081,6 +1126,13 @@ contains
     !----------------------
 
     if (trim(orb_mode) == trim(orb_variable_year) .or. first_time) then
+#ifdef planet_mars
+       call cam_exo_orbital_update(clock, iulog, masterproc, exo_planet_radius, exo_surface_gravity, &
+            exo_diurnal, exo_ndays, exo_porb, exo_sday, rc)
+       if (ChkErr(rc,__LINE__,u_FILE_u)) return
+       call cam_ctrl_set_exo_orbit(exo_planet_radius, exo_surface_gravity, &
+            exo_diurnal, exo_ndays, exo_porb, exo_sday)
+#endif
        call cam_orbital_update(clock, iulog, masterproc, eccen, obliqr, lambm0, mvelpp, rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
        call cam_ctrl_set_orbit(eccen, obliqr, lambm0, mvelpp)
@@ -1444,6 +1496,31 @@ contains
     call NUOPC_CompAttributeGet(gcomp, name="orb_mvelp", value=cvalue, rc=rc)
     if (chkerr(rc,__LINE__,u_FILE_u)) return
     read(cvalue,*) orb_mvelp
+#ifdef planet_mars
+    call NUOPC_CompAttributeGet(gcomp, name="orb_exo_planet_radius", value=cvalue, rc=rc)
+    if (chkerr(rc,__LINE__,u_FILE_u)) return
+    read(cvalue,*) orb_exo_planet_radius
+
+    call NUOPC_CompAttributeGet(gcomp, name="orb_exo_surface_gravity", value=cvalue, rc=rc)
+    if (chkerr(rc,__LINE__,u_FILE_u)) return
+    read(cvalue,*) orb_exo_surface_gravity
+
+    call NUOPC_CompAttributeGet(gcomp, name="orb_exo_diurnal", value=cvalue, rc=rc)
+    if (chkerr(rc,__LINE__,u_FILE_u)) return
+    read(cvalue,*) orb_exo_diurnal
+
+    call NUOPC_CompAttributeGet(gcomp, name="orb_exo_ndays", value=cvalue, rc=rc)
+    if (chkerr(rc,__LINE__,u_FILE_u)) return
+    read(cvalue,*) orb_exo_ndays
+
+    call NUOPC_CompAttributeGet(gcomp, name="orb_exo_porb", value=cvalue, rc=rc)
+    if (chkerr(rc,__LINE__,u_FILE_u)) return
+    read(cvalue,*) orb_exo_porb
+
+    call NUOPC_CompAttributeGet(gcomp, name="orb_exo_sday", value=cvalue, rc=rc)
+    if (chkerr(rc,__LINE__,u_FILE_u)) return
+    read(cvalue,*) orb_exo_sday
+#endif
 
     ! Error checks
     if (trim(orb_mode) == trim(orb_fixed_year)) then
@@ -1552,6 +1629,42 @@ contains
 
   end subroutine cam_orbital_update
 
+#ifdef planet_mars
+  !===============================================================================
+  subroutine cam_exo_orbital_update(clock, logunit,  mastertask, planet_radius, &
+       surface_gravity, diurnal, ndays, porb, sday, rc)
+
+    !----------------------------------------------------------
+    ! Update orbital settings
+    !----------------------------------------------------------
+
+    ! input/output variables
+    type(ESMF_Clock) , intent(in)    :: clock
+    integer          , intent(in)    :: logunit
+    logical          , intent(in)    :: mastertask
+    real(r8)         , intent(inout) :: planet_radius    ! radius ~ m
+    real(r8)         , intent(inout) :: surface_gravity  ! gravity ~ m/s^2
+    real(r8)         , intent(inout) :: diurnal ! Length of diurnal period, solar-day ~ s
+    real(r8)         , intent(inout) :: ndays   ! scaler to number of Earth days
+    real(r8)         , intent(inout) :: porb    ! orbital period in Earth Days, for obliquity/eccentricity cycles
+    real(r8)         , intent(inout) :: sday    ! sidereal period
+    integer          , intent(out)   :: rc     ! output error
+
+    character(len=*) , parameter :: subname = "(cam_orbital_update)"
+    !-------------------------------------------
+
+    rc = ESMF_SUCCESS
+
+    planet_radius = orb_exo_planet_radius
+    surface_gravity = orb_exo_surface_gravity
+    diurnal = orb_exo_diurnal
+    ndays = orb_exo_ndays
+    porb = orb_exo_porb
+    sday = orb_exo_sday
+    rc = ESMF_SUCCESS
+
+  end subroutine cam_exo_orbital_update
+#endif
   !===============================================================================
   subroutine cam_read_srfrest( gcomp, clock, rc )
 

@@ -5331,7 +5331,7 @@ end subroutine print_active_fldlst
     use cam_history_support, only: history_patch_t, dim_index_2d, dim_index_3d
     use cam_grid_support,    only: cam_grid_write_dist_array, cam_grid_dimensions
     use interp_mod,       only : write_interpolated
-
+    use, intrinsic  :: ieee_arithmetic
     ! Dummy arguments
     integer,     intent(in)    :: fld              ! Field index
     integer,     intent(in)    :: t                ! Tape index
@@ -5448,6 +5448,26 @@ end subroutine print_active_fldlst
               rtemp2 = 0.0_r4
               do ind3 = begdim3, enddim3
                  dimind2 = tape(t)%hlist(fld)%field%get_dims(ind3)
+                  ! -------------------------------------------------------------
+                  ! CAM DIAGNOSTIC TRAP: Catch NaN/Infinity before history write
+                  ! -------------------------------------------------------------
+                  ! We must check the slice of the buffer we are about to write
+                  ! using standard Fortran IEEE checks.
+                  if (any(ieee_is_nan(tape(t)%hlist(fld)%hbuf(dimind2%beg1:dimind2%end1, 1, ind3))) .or. &
+                      any(abs(tape(t)%hlist(fld)%hbuf(dimind2%beg1:dimind2%end1, 1, ind3)) > 1.0e30_8)) then
+                     write(iulog,*) '=== CAM HISTORY BUFFER CORRUPTION TRAP ==='
+                     write(iulog,*) 'FATAL: NaN or Infinity detected in history buffer!'
+                     write(iulog,*) 'Corrupted Field Name: ', trim(tape(t)%hlist(fld)%field%name)
+                     write(iulog,*) 'Tape Index (t): ', t
+                     write(iulog,*) 'File Index (f): ', f
+                     write(iulog,*) 'Level Index (ind3): ', ind3
+                     write(iulog,*) 'Array Min: ', minval(tape(t)%hlist(fld)%hbuf(dimind2%beg1:dimind2%end1, 1, ind3))
+                     write(iulog,*) 'Array Max: ', maxval(tape(t)%hlist(fld)%hbuf(dimind2%beg1:dimind2%end1, 1, ind3))
+                     write(iulog,*) '=========================================='
+                     call shr_sys_flush(iulog)
+                     call endrun('CAM HISTORY: Floating point corruption detected before write.')
+                  end if
+                  ! -------------------------------------------------------------
                  rtemp2(dimind2%beg1:dimind2%end1,ind3) = &
                       tape(t)%hlist(fld)%hbuf(dimind2%beg1:dimind2%end1, 1, ind3)
               end do

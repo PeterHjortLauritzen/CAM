@@ -252,6 +252,7 @@
 <!-- <ncdata dyn="se" hgrid="ne16np4"  nlev="49"  mars="1"  >atm/cam/inic/se/Mars_ne16_ne16_mg17_L49.cam.i.0001-04-01-00000.nc</ncdata> -->
 <!-- <ncdata dyn="se" hgrid="ne16np4"  nlev="49"  mars="1"  >atm/cam/inic/se/init.HS.no-topo.nc</ncdata> -->
 <ncdata dyn="se" hgrid="ne16np4"  nlev="49"  mars="1"  >atm/cam/inic/se/init.HS.no-topo_241016.nc</ncdata>
+<ncdata dyn="se" hgrid="ne16np4"  nlev="32"  mars="1"  >atm/cam/inic/se/FMARSEXORT.ne16_ne16.init.L32.nc</ncdata>
 <ncdata dyn="se" hgrid="ne3np4"  nlev="49"  mars="1"   >atm/cam/inic/se/CAM_Mars_ne3np4.HS.no-topo_241016.nc</ncdata>
 <ncdata dyn="se" hgrid="ne16np4"  nlev="30"  mars="1"   >atm/cam/inic/se/init.HS.L30.init.HS.no-topo_241016.nc</ncdata>
 <ncdata dyn="se" hgrid="ne3np4"  nlev="30"  mars="1"   >atm/cam/inic/se/cami_mars_ne3np4_L30_no-topo.260121.nc</ncdata>

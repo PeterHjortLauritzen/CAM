@@ -36,12 +36,13 @@ use shr_kind_mod,        only: r8=>shr_kind_r8, cl=>shr_kind_cl
 use spmd_utils,          only: masterproc,mpicom, mstrid=>masterprocid, mpi_integer, &
                                mpi_logical, mpi_real8, mpi_character
 use time_manager,        only: get_nstep, is_first_restart_step, &
-                               get_curr_calday, get_step_size, get_curr_date
+                               get_curr_calday, get_step_size, get_curr_date,TIMEMGR_IS_CALTYPE
+use shr_cal_mod,         only: shr_cal_noleap
 use exoplanet_mod,       only: &
      do_exo_rt_spectral, do_exo_rt_clearsky, do_exo_rt_optimize_bands, do_exo_rt, &
      do_carma_exort, do_exo_atmconst, do_exo_synchronous, do_exo_gw, &
      do_exo_condense_co2, do_exo_co2cld_rad, do_exo_soilcp,&
-     exo_h2mmr,exo_c2h6mmr,exo_ndays,exo_ch4mmr, exo_rad_step
+     exo_h2mmr,exo_c2h6mmr,exo_ch4mmr, exo_rad_step
 
 implicit none
 private
@@ -50,6 +51,7 @@ save
 public :: &
    radiation_readnl,         &! read namelist variables
    radiation_register,       &! registers radiation physics buffer fields
+   radiation_nextsw_cday,    &! calendar day of next radiation calculation
    rad_is_active,            &! active radiation pkg
    radiation_define_restart, &! define variables for restart
    radiation_write_restart,  &! write variables to restart
@@ -91,7 +93,7 @@ public :: &
     solar_file
 
     integer, public, protected :: exo_rad_camtop = 1 ! Specifies length of time in timesteps (positive)
-real(r8), public, protected :: nextsw_cday = -1._r8 ! future radiation calday for surface models
+    real(r8), public, protected :: nextsw_cday = -1._r8 ! future radiation calday for surface models
    ! Physics buffer indices
    integer :: qrs_idx      = 0
    integer :: qrl_idx      = 0
@@ -678,6 +680,45 @@ function radiation_do(op, timestep)
 
 
  end function radiation_do
+!================================================================================================
+
+real(r8) function radiation_nextsw_cday()
+
+   ! Return calendar day of next sw radiation calculation
+
+   ! Local variables
+   integer :: nstep      ! timestep counter
+   logical :: dosw       ! true => do shosrtwave calc
+   integer :: offset     ! offset for calendar day calculation
+   integer :: dtime      ! integer timestep size
+   real(r8):: calday     ! calendar day of
+   real(r8):: caldayp1   ! calendar day of next time-step
+   !-----------------------------------------------------------------------
+
+   radiation_nextsw_cday = -1._r8
+   dosw   = .false.
+   nstep  = get_nstep()
+   dtime  = get_step_size()
+   offset = 0
+   do while (.not. dosw)
+      nstep = nstep + 1
+      offset = offset + dtime
+      if (radiation_do('sw', nstep)) then
+         radiation_nextsw_cday = get_curr_calday(offset=offset)
+         dosw = .true.
+      end if
+   end do
+   if(radiation_nextsw_cday == -1._r8) then
+      call endrun('error in radiation_nextsw_cday')
+   end if
+
+   ! determine if next radiation time-step not equal to next time-step
+   if (get_nstep() >= 1) then
+      caldayp1 = get_curr_calday(offset=int(dtime))
+      if (caldayp1 /= radiation_nextsw_cday) radiation_nextsw_cday = -1._r8
+   end if
+
+end function radiation_nextsw_cday
 
 !========================================================================================
 
@@ -754,6 +795,10 @@ subroutine radiation_tend( &
     ! mars_radiative_tend: Run the radiative process
     !=========================================================================
     use cam_control_mod, only: lambm0, obliqr, eccen, mvelpp
+#ifdef planet_mars
+    use cam_control_mod, only: exo_planet_radius, exo_surface_gravity, &
+         exo_diurnal, exo_ndays, exo_sday, exo_porb
+#endif
     use rad_constituents,    only: N_DIAG, rad_cnst_get_call_list, rad_cnst_get_gas, rad_cnst_out
     use radheat,             only: radheat_tend
     use exo_radiation_mod,    only: aerad_driver
@@ -811,6 +856,7 @@ subroutine radiation_tend( &
     integer  :: nstep                         ! current timestep number
     logical  :: conserve_energy = .true.      ! flag to carry (QRS,QRL)*dp across time steps
     real(r8) :: frac_day
+    real(r8) :: dt_avg
     real(r8) :: day_in_year
     logical :: do_exo_rad
     real(r8) :: eccf                            ! Earth/sun distance factor
@@ -898,6 +944,13 @@ subroutine radiation_tend( &
     real(r8), dimension(pcols,pverp) :: swup_rad
     real(r8), dimension(pcols,pverp) :: swdown_rad
     integer :: icall                  ! index through climate/diagnostic radiation calls
+#ifdef planet_mars
+    integer :: dtime      ! timestep size
+    integer  :: yr, mon, day, tod
+    real(r8) :: abs_earth_days
+    real(r8) :: mars_calday
+#endif
+    character(len=*), parameter :: sub = 'radiation_tend'
 
     !------------------------------------------------------------------------
     !
@@ -961,17 +1014,93 @@ subroutine radiation_tend( &
     call get_rlat_all_p(lchnk, ncol, clat)
     call get_rlon_all_p(lchnk, ncol, clon)
 
+    ! Get time of next radiation calculation - albedos will need to be
+    ! calculated by each surface model at this time
+    nextsw_cday = radiation_nextsw_cday()
+#ifdef planet_mars
+    ! The CESM-MARS clock (The "Fake Calendar" Trick) Explained
+    !
+    ! The core problem in CESM is that the CIME driver (which controls NetCDF history files,
+    ! flux accumulators, and restarts) is inextricably hardcoded to an Earth 365-day or NOLEAP
+    ! calendar. If you try to force CIME to use a 668-day year and a 24.6-hour day, the I/O
+    ! break.
+    ! Instead of rewriting the global computer clock, we trick the physical Sun. We decoupled
+    ! the solar radiation geometry from the model's calendar:
+    !
+    ! The Diurnal Scaler (exo_ndays): An Earth day is 86,400 seconds. A Mars "Sol" is
+    ! ~88,775 seconds. The ratio between them is ~1.0275. The model takes the total number of
+    ! Earth days elapsed and divides by 1.0275. The remainder of that division (frac_day)
+    ! tells the model exactly where the sun is in the Martian sky, completely ignoring the
+    ! Earth time of day.
+    !
+    ! The Seasonal Scaler (exo_porb): A Mars year is 687.0 Earth days. When calculating the
+    ! solar declination (the tilt causing seasons), the code divides the elapsed Earth days
+    ! by 687 instead of 365. This "stretches" the seasons out so that one full Martian orbit
+    ! takes 687 CIME Earth-days to complete.
+    !
+    ! The history files stay perfectly happy stamping "Day 365", but the physics experience
+    ! a true Mars year.
     ! Wolf, length of day scaling for zenith angle calculation
-    call get_curr_calday_rotation(frac_day, day_in_year)
-    call zenith_rotation (frac_day, calday, clat, clon, coszrs, ncol)
-    !call zenith (calday, clat, clon, coszrs, ncol)
 
-    ! calculate Earth-Sun distance factor, scaled by eccentricity factor
-    ! in the next version the orbital details will be more heavily modulated.
-    ! NOTE:  SHR_CONST_MSDIST = normalized planet-star distance squared
-    ! do standard orbital calculation, for determining sflux_frac
+    if (timemgr_is_caltype(trim(shr_cal_noleap))) then
+       ! 1. Get current simulation year from CIME clock
+       call get_curr_date(yr, mon, day, tod)
+
+       ! 2. Calculate total absolute days since Year 1, Day 1.0
+       abs_earth_days = real(yr - 1, r8) * 365.0_r8 + (calday - 1.0_r8)
+
+       ! 3. Map absolute time onto the 687-day Martian seasonal cycle
+       mars_calday = mod(abs_earth_days, exo_porb) + 1.0_r8
+
+       ! 4. Map diurnal cycle (Mars fractional day) using absolute time
+       frac_day = (abs_earth_days / exo_ndays) - FLOOR(abs_earth_days / exo_ndays)
+    else
+       call endrun(sub//": FATAL: Mars ExoRT radiation only works for noleap calendars")
+    end if
+
+    ! 5. Integrate over the CURRENT timestep only.
+    dt_avg = real(get_step_size(), r8)
+
+    ! 6. Scale dt_avg for Martian rotation!
+    dt_avg = dt_avg * (86400.0_r8 / exo_sday)
+
+    ! -------------------------------------------------------------
+    ! ATM DIAGNOSTIC TRAP: Verify orbital parameters
+    ! -------------------------------------------------------------
+    if (masterproc) then
+       write(iulog,*) '=== ATM ORBITAL TRAP ==='
+       write(iulog,*) 'ATM Year          = ', yr
+       write(iulog,*) 'ATM nextsw_cday   = ', nextsw_cday
+       write(iulog,*) 'ATM Earth calday  = ', calday
+       write(iulog,*) 'ATM Abs days      = ', abs_earth_days
+       write(iulog,*) 'ATM Mars calday   = ', mars_calday
+       write(iulog,*) 'ATM frac_day      = ', frac_day
+       write(iulog,*) 'ATM dt_avg_mars   = ', dt_avg
+       write(iulog,*) '========================'
+    endif
+    ! -------------------------------------------------------------
+
+    ! 7. Calculate zenith angle using mapped calday and absolute frac_day
+    call zenith_rotation (frac_day, mars_calday, clat, clon, coszrs, ncol, dt_avg=dt_avg)
+
+    ! 8. Calculate Earth-Sun distance factor, scaled by eccentricity factor
+    call shr_orb_decl(mars_calday, eccen, mvelpp, lambm0, obliqr, delta, eccf)
+    ext_msdist = 1.0_r8 / eccf
+
+#else
+    ! Standard Earth calculation using the wrapping calendar day
     call shr_orb_decl(calday, eccen, mvelpp, lambm0, obliqr, delta, eccf)
-    ext_msdist=1.0/eccf
+
+    if (use_rad_uniform_angle) then
+       do i = 1, ncol
+          coszrs(i) = shr_orb_cosz(calday, clat(i), clon(i), delta, dt_avg, uniform_angle=rad_uniform_angle)
+       end do
+    else
+       do i = 1, ncol
+          coszrs(i) = shr_orb_cosz(calday, clat(i), clon(i), delta, dt_avg)
+       end do
+    end if
+#endif
 
     ! Get the active climate/diagnostic shortwave calculations
     call rad_cnst_get_call_list(active_calls)
@@ -984,7 +1113,6 @@ subroutine radiation_tend( &
        do icall = N_DIAG, 0, -1
           if (active_calls(icall)) then
              !write(*,*) "inside RT if statement"
-
              !-------for now, set these topography angles to 0 (ie, no topography blocking sun)
              !-------should be moved to inside do loop if we want to use them
              !-------azimuth can be calculated from cos(azim) = (cos(hr_ang)*cos(dec)*sin(lat)-sin(dec)*cos(lat))/cos(elev)
@@ -1109,11 +1237,11 @@ subroutine radiation_tend( &
                 ! This prevents the land model (CLM) from crashing.  Get rid of this
                 ! once we have something to diffuse the soloar (aerosol or  dust in the atmosphere.
                 ! ----------------------------------------------------------------------
-                cam_out%sols(1:ncol)  = max(0.0_r8, cam_out%sols(1:ncol))
-                cam_out%soll(1:ncol)  = max(0.0_r8, cam_out%soll(1:ncol))
-                cam_out%solsd(1:ncol) = max(0.0_r8, cam_out%solsd(1:ncol))
-                cam_out%solld(1:ncol) = max(0.0_r8, cam_out%solld(1:ncol))
-                cam_out%flwds(1:ncol) = max(0.0_r8, cam_out%flwds(1:ncol))
+!!$                cam_out%sols(1:ncol)  = max(0.0_r8, cam_out%sols(1:ncol))
+!!$                cam_out%soll(1:ncol)  = max(0.0_r8, cam_out%soll(1:ncol))
+!!$                cam_out%solsd(1:ncol) = max(0.0_r8, cam_out%solsd(1:ncol))
+!!$                cam_out%solld(1:ncol) = max(0.0_r8, cam_out%solld(1:ncol))
+!!$                cam_out%flwds(1:ncol) = max(0.0_r8, cam_out%flwds(1:ncol))
                 ! ----------------------------------------------------------------------
 
                 fsn(:,:) = swdown_rad(:,:) - swup_rad(:,:)
@@ -1123,6 +1251,9 @@ subroutine radiation_tend( &
                 rd%flnsc(:) = fln(:,pverp)
                 rd%fsntc(:) = fsn(:,camtop)
                 rd%flntc(:) = fln(:,camtop)
+                ! Net TOA Clear Sky = Incident Solar - Upward Clear Sky at camtop
+                rd%fsntoac(:) = fsdtoa(:) - swup_rad(:,camtop)
+                rd%fsnrtc(:)  = 0.0_r8  ! Near-IR Clear Sky (Safe Default)
                 rd%fsdsc(:) = swdown_rad(:,pverp)
                 rd%fulc(:,:) =lwup_rad(:,:)
                 rd%fdlc(:,:) =lwdown_rad(:,:)
@@ -1191,11 +1322,11 @@ subroutine radiation_tend( &
              ! This prevents the land model (CLM) from crashing.  Get rid of this
              ! once we have something to diffuse the soloar (aerosol or  dust in the atmosphere.
              ! ----------------------------------------------------------------------
-             cam_out%sols(1:ncol)  = max(0.0_r8, cam_out%sols(1:ncol))
-             cam_out%soll(1:ncol)  = max(0.0_r8, cam_out%soll(1:ncol))
-             cam_out%solsd(1:ncol) = max(0.0_r8, cam_out%solsd(1:ncol))
-             cam_out%solld(1:ncol) = max(0.0_r8, cam_out%solld(1:ncol))
-             cam_out%flwds(1:ncol) = max(0.0_r8, cam_out%flwds(1:ncol))
+!!$             cam_out%sols(1:ncol)  = max(0.0_r8, cam_out%sols(1:ncol))
+!!$             cam_out%soll(1:ncol)  = max(0.0_r8, cam_out%soll(1:ncol))
+!!$             cam_out%solsd(1:ncol) = max(0.0_r8, cam_out%solsd(1:ncol))
+!!$             cam_out%solld(1:ncol) = max(0.0_r8, cam_out%solld(1:ncol))
+!!$             cam_out%flwds(1:ncol) = max(0.0_r8, cam_out%flwds(1:ncol))
              ! ----------------------------------------------------------------------
 
              fsn(:,:) = swdown_rad(:,:) - swup_rad(:,:)
@@ -1204,9 +1335,21 @@ subroutine radiation_tend( &
              rd%flns(:) = fln(:,pverp)
              rd%fsnt(:) = fsn(:,camtop)
              rd%flnt(:) = fln(:,camtop)
+             ! Net TOA = Incident Solar - Upward at camtop
+             rd%fsntoa(:) = fsdtoa(:) - swup_rad(:,camtop)
+             ! Upward TOA = Upward at camtop
+             rd%fsutoa(:) = swup_rad(:,camtop)
+             ! Near-IR (Safe Defaults to prevent NaN history crashes)
+             rd%fsnirt(:)   = 0.0_r8
+             rd%fsnirtsq(:) = 0.0_r8
              rd%fsds(:) = swdown_rad(:,pverp)
-             !ftem/sw_dTdt heating rates in K/s convert to j/kg/s to be carried in physics buffer
+             rd%ful(:,:) =lwup_rad(:,:)
+             rd%fdl(:,:) =lwdown_rad(:,:)
+             rd%flut(:) =lwup_rad(:,camtop)
+             rd%fus(:,:)= swup_rad(:,:)
+             rd%fds(:,:)= swdown_rad(:,:)
              rd%solin(:ncol)=fsdtoa(:ncol)
+             !ftem/sw_dTdt heating rates in K/s convert to j/kg/s to be carried in physics buffer
              rd%qrs(:ncol,:pver) = ftem(:ncol,:pver)*cpair
              rd%qrl(:ncol,:pver) = ftem2(:ncol,:pver)*cpair
              qrs(:ncol,:pver) = ftem(:ncol,:pver)*cpair
@@ -1262,56 +1405,7 @@ subroutine radiation_tend( &
    end if
 contains
 
-  subroutine get_curr_calday_rotation(frac_day, day_in_year, offset)
-
-    ! WOLF, subroutine get_curr_calday_rotation
-    ! modified to calculate zenith angle by scaling factor, exo_ndays
-    ! allows modification to diurnal cycles without mucking with the calendar
-    ! and history file systems
-
-    implicit none
-    integer, optional, intent(in) :: offset  ! Offset from current time in seconds.
-    ! Positive for future times, negative
-    ! for previous times.
-
-    real(r8) ,intent(out) :: frac_day, day_in_year
-
-    integer ::&
-         yr,    &! year
-         mon,   &! month
-         day,   &! day of month
-         tod     ! time of day (seconds past 0Z)
-    integer, parameter :: y0 = 1950
-    integer  :: leap_days, y
-    real(r8) :: day_earth, f
-
-    if (present(offset)) then
-       call get_curr_date(yr, mon, day, tod, offset)
-       day_earth = get_curr_calday(offset)
-    else
-       call get_curr_date(yr, mon, day, tod)
-       day_earth = get_curr_calday()
-    endif
-
-    leap_days = 0
-    !do y=y0, yr-1
-    !   if ( mod(y,4) == 0 )    leap_days = leap_days+1
-    !   if ( mod(y,100) == 0 )  leap_days = leap_days-1
-    !   if ( mod(y,400) == 0 )  leap_days = leap_days+1
-    !enddo
-
-    day_earth = day_earth + 365.*(yr) + leap_days - 1
-    frac_day = day_earth/exo_ndays - FLOOR(day_earth / exo_ndays)
-
-    ! length of year scaling not currently available
-    !day_in_year = day_earth - (365.)*FLOOR(day_earth/(365.))
-
-    !write(*,*) "day_earth, frac_day", day_earth, frac_day
-
-  end subroutine get_curr_calday_rotation
-
-
-  subroutine zenith_rotation(frac_day,  calday  ,clat    , clon   ,coszrs  ,ncol    )
+  subroutine zenith_rotation(frac_day,  calday  ,clat    , clon   ,coszrs  ,ncol  ,dt_avg )
     !-----------------------------------------------------------------------
     !
     ! Purpose:
@@ -1340,6 +1434,7 @@ contains
     real(r8), intent(in) :: calday              ! Calendar day, including fraction
     real(r8), intent(in) :: clat(ncol)          ! Current centered latitude (radians)
     real(r8), intent(in) :: clon(ncol)          ! Centered longitude (radians)
+    real(r8), intent(in),optional :: dt_avg     ! radiation window length
     !
     ! Output arguments
     !
@@ -1350,6 +1445,7 @@ contains
     integer i         ! Position loop index
     real(r8) delta    ! Solar declination angle  in radians
     real(r8) eccf     ! Earth orbit eccentricity factor
+    integer dtime
     !
     !-----------------------------------------------------------------------
     !
@@ -1358,9 +1454,27 @@ contains
     !
     ! Compute local cosine solar zenith angle,
     !
+    dtime  = get_step_size()
     do i=1,ncol
        !coszrs(i) = shr_orb_cosz( calday, clat(i), clon(i), delta )
-       coszrs(i) = shr_orb_cosz( frac_day, clat(i), clon(i), delta )
+       if (masterproc) write(6,*)'dt_avg before trap=',dt_avg
+       coszrs(i) = shr_orb_cosz( frac_day, clat(i), clon(i), delta ,dt_avg=dt_avg)
+! -------------------------------------------------------------
+      ! ATM DIAGNOSTIC TRAP: Dump orbital state for the first column
+      ! -------------------------------------------------------------
+      if (i == 1) then
+         write(iulog,*) '=== ATM ORBITAL TRAP ==='
+         write(iulog,*) 'ATM dtime (s)       = ', dtime
+         write(iulog,*) 'ATM mapped delta    = ', delta
+         write(iulog,*) 'ATM calday          = ', calday
+         write(iulog,*) 'ATM frac_day        = ', frac_day
+         write(iulog,*) 'ATM dt_avg          = ', dt_avg
+         write(iulog,*) 'ATM declin          = ', delta
+         write(iulog,*) 'ATM clat / clon     = ', clat(i), clon(i)
+         write(iulog,*) 'ATM coszrs          = ', coszrs(i)
+         write(iulog,*) '========================'
+      endif
+      ! -------------------------------------------------------------
     end do
 
   end subroutine zenith_rotation

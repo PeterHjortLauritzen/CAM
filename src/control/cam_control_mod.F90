@@ -19,6 +19,9 @@ save
 !
 !   cam_ctrl_init
 !   cam_ctrl_set_orbit
+#ifdef planet_mars
+!   cam_ctrl_set_exo_orbit
+#endif
 !   cam_ctrl_set_physics_type
 
 character(len=cl), protected :: caseid  ! case ID
@@ -50,7 +53,14 @@ real(r8), protected :: lambm0      ! Mean longitude of perihelion at the
                                    ! vernal equinox (radians)
 real(r8), protected :: mvelpp      ! Earth's moving vernal equinox longitude
                                    ! of perihelion plus pi (radians)
-
+#ifdef planet_mars
+real(r8), protected  :: exo_planet_radius    ! radius ~ m
+real(r8), protected  :: exo_surface_gravity  ! gravity ~ m/s^2
+real(r8), protected  :: exo_diurnal     ! Length of diurnal period, solar-day ~ s
+real(r8), protected  :: exo_ndays       ! scaler to number of Earth days
+real(r8), protected  :: exo_porb        ! orbital period in Earth Days, for obliquity/eccentricity cycles
+real(r8), protected  :: exo_sday        ! sidereal period
+#endif
 !================================================================================================
 contains
 !================================================================================================
@@ -125,6 +135,27 @@ subroutine cam_ctrl_set_orbit(eccen_in, obliqr_in, lambm0_in, mvelpp_in)
 
 end subroutine cam_ctrl_set_orbit
 
+#ifdef planet_mars
+!--------------------------------------------------------------------------------------------------
+subroutine cam_ctrl_set_exo_orbit (planet_radius_in, surface_gravity_in, &
+     diurnal_in, ndays_in, porb_in, sday_in)
+
+   real(r8), intent(in) :: planet_radius_in
+   real(r8), intent(in) :: surface_gravity_in
+   real(r8), intent(in) :: diurnal_in
+   real(r8), intent(in) :: ndays_in
+   real(r8), intent(in) :: porb_in
+   real(r8), intent(in) :: sday_in
+
+   exo_planet_radius = planet_radius_in
+   exo_surface_gravity = surface_gravity_in
+   exo_diurnal = diurnal_in
+   exo_ndays = ndays_in
+   exo_porb = porb_in
+   exo_sday = sday_in
+
+end subroutine cam_ctrl_set_exo_orbit
+#endif
 !--------------------------------------------------------------------------------------------------
 
 subroutine cam_ctrl_set_physics_type(phys_package)

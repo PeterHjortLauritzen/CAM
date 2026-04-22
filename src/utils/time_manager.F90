@@ -125,7 +125,7 @@ subroutine timemgr_init( &
       start_date = curr_date
    end if
 
-   ! Initialize ESMF clock
+   ! Initialize_ ESMF clock
    call initialize_clock(start_date, ref_date, curr_date, stop_date)
 
    if (.not. initial_run) then
