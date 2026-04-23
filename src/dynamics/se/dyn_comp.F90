@@ -868,6 +868,15 @@ subroutine dyn_init(dyn_in, dyn_out)
          nu_scale_top(6) = 0.1_r8
          ksponge_end = 6
       end if
+#ifdef planet_mars
+      nu_scale_top(1) = 5.0_r8
+      nu_scale_top(2) = 5.0_r8
+      nu_scale_top(3) = 5.0_r8
+      nu_scale_top(4) = 2.0_r8
+      nu_scale_top(5) = 1.0_r8
+      nu_scale_top(6) = 0.1_r8
+      ksponge_end = 6
+#endif
    else
       ksponge_end = 0
    end if
