@@ -1723,10 +1723,6 @@ my $cfg_cppdefs = ' ';
 # Building for perturbation growth tests
 if ($pergro eq "ON") { $cfg_cppdefs .= " -DPERGRO"; }
 
-# Building for Mars
-#if ($mars eq 'ON') { $cfg_cppdefs .= " -Dplanet_mars"; }
-if ($mars) { $cfg_cppdefs .= " -Dplanet_mars"; }
-
 # Configure CAM to produce IOP files for SCAM
 if ($camiop eq 'ON') { $cfg_cppdefs .= " -DBFB_CAM_SCAM_IOP"; }
 
