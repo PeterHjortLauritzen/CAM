@@ -2056,8 +2056,7 @@ sub write_filepath
     }
     elsif ($rad eq 'exort') {
 	print $fh "$camsrcdir/src/physics/exo-rt\n";
-	print $fh "$camsrcdir/src/physics/exo-rt/ext/source\n";
-	print $fh "$camsrcdir/src/physics/exo-rt/ext/3dmodels/src.cam.n68equiv\n";
+	print $fh "$camsrcdir/src/physics/exo-rt/ext/3dmodels/src.cam7.n68equiv\n";
     }
 
     if ($simple_phys) {
