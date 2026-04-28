@@ -201,6 +201,7 @@ fxDONOTUSEurl = https://github.com/NCAR/CUPiD.git
 [submodule "exo-rt"]
 path = src/physics/exo-rt/ext
 url = https://github.com/storyofthewolf/ExoRT.git
-fxtag = main
+fxsparse = ../.exort_sparse_checkout
+fxtag = 13d6f88c7a6e29b086fae0c92f1803a970573531
 fxrequired = AlwaysRequired
 fxDONOTUSEurl = https://github.com/storyofthewolf/ExoRT.git
