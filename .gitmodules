@@ -200,7 +200,7 @@ fxDONOTUSEurl = https://github.com/NCAR/CUPiD.git
 
 [submodule "exo-rt"]
 path = src/physics/exo-rt/ext
-url = https://github.com/jtruesdal/ExoRT
-fxtag = cesm3-planets.01
+url = https://github.com/storyofthewolf/ExoRT.git
+fxtag = main
 fxrequired = AlwaysRequired
-fxDONOTUSEurl = https://github.com/jtruesdal/ExoRT
+fxDONOTUSEurl = https://github.com/storyofthewolf/ExoRT.git
