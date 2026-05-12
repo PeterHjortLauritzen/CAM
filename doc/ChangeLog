@@ -27,6 +27,7 @@ List all existing files that have been modified, and describe the changes:
 
 
 Expecting failures against baseline for all tests using SE dycore
+(only tests without moisture should not fail)
 
 
 ===============================================================
