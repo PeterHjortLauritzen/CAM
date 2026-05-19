@@ -1033,6 +1033,7 @@ subroutine dyn_run(dyn_state)
    real(r8) :: rec2dt, pdel
 
    real(r8), allocatable, dimension(:,:,:) :: ps_before
+   real(r8), allocatable, dimension(:,:)   :: ps_after
    real(r8), allocatable, dimension(:,:,:) :: abs_ps_tend
    real (kind=r8)                          :: omega_cn(2,nelemd) !min and max of vertical Courant number
    integer                                 :: nets_in,nete_in
@@ -1051,8 +1052,8 @@ subroutine dyn_run(dyn_state)
    ldiag = hist_fld_active('ABS_dPSdt')
    if (ldiag) then
       allocate(ps_before(np,np,nelemd))
+      allocate(ps_after(np,np))
       allocate(abs_ps_tend(np,np,nelemd))
-
    end if
 
    !$OMP PARALLEL NUM_THREADS(horz_num_threads), DEFAULT(SHARED), PRIVATE(hybrid,nets,nete,n,ie,m,i,j,k,ftmp)
@@ -1092,7 +1093,6 @@ subroutine dyn_run(dyn_state)
        end do
      end if
    end do
-
    ! convert elem(ie)%derived%fq to mass tendency
    if (.not.use_cslam) then
      do ie = nets, nete
@@ -1142,17 +1142,18 @@ subroutine dyn_run(dyn_state)
    end if
 
    if (ldiag) then
-      abs_ps_tend(:,:,nets:nete) = 0.0_r8
-   endif
+      do ie = nets, nete
+         ps_before(:,:,ie) = dyn_state%elem(ie)%state%psdry(:,:)
+         do nq=dry_air_species_num + 1, thermodynamic_active_species_num
+            m_cnst = thermodynamic_active_species_idx_dycore(nq)
+            do k=1,nlev
+               ps_before(:,:,ie) = ps_before(:,:,ie)+dyn_state%elem(ie)%state%Qdp(:,:,k,m_cnst,n0_qdp)
+            end do
+         end do
+      end do
+   end if
 
    do n = 1, nsplit_local
-
-      if (ldiag) then
-         do ie = nets, nete
-            ps_before(:,:,ie) = dyn_state%elem(ie)%state%psdry(:,:)
-         end do
-      end if
-
       ! forward-in-time RK, with subcycling
       if (single_column) then
          nets_in=ie_scm
@@ -1163,21 +1164,22 @@ subroutine dyn_run(dyn_state)
       end if
       call prim_run_subcycle(dyn_state%elem, dyn_state%fvm, hybrid, nets_in, nete_in, &
                              tstep, TimeLevel, hvcoord, n, single_column, omega_cn)
-
-      if (ldiag) then
-         do ie = nets, nete
-            abs_ps_tend(:,:,ie) = abs_ps_tend(:,:,ie) +                                &
-               ABS(ps_before(:,:,ie)-dyn_state%elem(ie)%state%psdry(:,:)) &
-               /(tstep*qsplit*rsplit)
-         end do
-      end if
-
    end do
 
    if (ldiag) then
+      call TimeLevel_Qdp(TimeLevel, qsplit, n0_qdp)!get n0_qdp for diagnostics call
+      do ie = nets, nete
+         ps_after(:,:) = dyn_state%elem(ie)%state%psdry(:,:)
+         do nq=dry_air_species_num+1,thermodynamic_active_species_num
+            m_cnst = thermodynamic_active_species_idx_dycore(nq)
+            do k=1,nlev
+               ps_after(:,:) = ps_after(:,:)+dyn_state%elem(ie)%state%Qdp(:,:,k,m_cnst,n0_qdp)
+            end do
+         end do
+         abs_ps_tend(:,:,ie)     = ABS(ps_before(:,:,ie)-ps_after(:,:))/dtime
+      end do
       do ie=nets,nete
-         abs_ps_tend(:,:,ie)=abs_ps_tend(:,:,ie)/DBLE(nsplit)
-         call outfld('ABS_dPSdt',RESHAPE(abs_ps_tend(:,:,ie),(/npsq/)),npsq,ie)
+         call outfld('ABS_dPSdt'    ,RESHAPE(abs_ps_tend(:,:,ie),    (/npsq/)),npsq,ie)
       end do
    end if
 
@@ -1783,6 +1785,7 @@ subroutine read_inidat(dyn_in)
          end do
       end do
    end if
+
 
    ! interpolate fvm tracers and fvm pressure variables
 
