@@ -1,3 +1,4 @@
+#define del4_q
 module prim_advance_mod
   use shr_kind_mod,   only: r8=>shr_kind_r8
   use edgetype_mod,   only: EdgeBuffer_t
@@ -11,15 +12,21 @@ module prim_advance_mod
   save
 
   public :: prim_advance_exp, prim_advance_init, applyCAMforcing, tot_energy_dyn, compute_omega
+#ifdef del4_q
+  public :: hypervis_Qdp
+#endif
 
   type (EdgeBuffer_t) :: edge3,edgeOmega,edgeSponge
+#ifdef del4_q
+  type (EdgeBuffer_t) :: edgeQdp
+#endif
   real (kind=r8), allocatable :: ur_weights(:)
 contains
 
   subroutine prim_advance_init(par, elem)
     use edge_mod,       only: initEdgeBuffer
     use element_mod,    only: element_t
-    use dimensions_mod, only: nlev,ksponge_end
+    use dimensions_mod, only: nlev,ksponge_end,nelemd,qsize,use_cslam
     use control_mod,    only: qsplit
 
     type (parallel_t)                       :: par
@@ -27,6 +34,10 @@ contains
     integer                                 :: i
 
     call initEdgeBuffer(par,edge3   ,elem,4*nlev   ,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
+#ifdef del4_q
+    if (use_cslam) &
+      call initEdgeBuffer(par,edgeQdp,elem,qsize*nlev,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
+#endif
     if (ksponge_end>0) then
        call initEdgeBuffer(par,edgeSponge,elem,4*ksponge_end,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
     end if
@@ -50,7 +61,7 @@ contains
   subroutine prim_advance_exp(elem, fvm, deriv, hvcoord, hybrid,dt, tl,  nets, nete)
     use control_mod,       only: tstep_type, qsplit
     use derivative_mod,    only: derivative_t
-    use dimensions_mod,    only: np, nlev
+    use dimensions_mod,    only: np, nlev, use_cslam
     use element_mod,       only: element_t
     use hybvcoord_mod,     only: hvcoord_t
     use hybrid_mod,        only: hybrid_t
@@ -1840,4 +1851,59 @@ contains
      end if
      !call FreeEdgeBuffer(edgeOmega)
    end subroutine compute_omega
+
+#ifdef del4_q
+  !-----------------------------------------------------------------------
+  ! hypervis_Qdp
+  !
+  ! Apply del4 (weak biharmonic) to q = Qdp/dp3d for all tracers after
+  ! cslam2gll, damping element-boundary noise from the FVM->GLL mapping.
+  ! Uses actual dp3d (not reference dp0) so that Qdp and q stay consistent
+  ! with the dry-mass coordinate.  Conservation of dry mass on the GLL grid
+  ! within each SE element is maintained; the small imbalance from del4 is
+  ! accepted (same as the existing SE tracer hypervis).
+  !
+  ! dt_fvm should be the FVM remapping timestep (dt_remap = rsplit*qsplit*dt).
+  !-----------------------------------------------------------------------
+  subroutine hypervis_Qdp(elem, deriv, hybrid, tl_f, tl_qdp, dt_fvm, nets, nete)
+    use dimensions_mod,  only: np, nlev, qsize
+    use element_mod,     only: element_t
+    use hybrid_mod,      only: hybrid_t
+    use derivative_mod,  only: derivative_t
+    use global_norms_mod, only: nu_q_cslam
+    use viscosity_mod,   only: biharmonic_wk_scalar
+
+    type(element_t),    intent(inout) :: elem(:)
+    type(derivative_t), intent(in)    :: deriv
+    type(hybrid_t),     intent(in)    :: hybrid
+    integer,            intent(in)    :: tl_f, tl_qdp, nets, nete
+    real(r8),           intent(in)    :: dt_fvm
+
+    real(r8) :: qtens(np,np,nlev,qsize,nets:nete)
+    integer  :: ie, k, q
+
+    do ie = nets, nete
+      do q = 1, qsize
+        do k = 1, nlev
+          qtens(:,:,k,q,ie) = elem(ie)%state%Qdp(:,:,k,q,tl_qdp) &
+                             / elem(ie)%state%dp3d(:,:,k,tl_f)
+        end do
+      end do
+    end do
+
+    call biharmonic_wk_scalar(elem, qtens, deriv, edgeQdp, hybrid, nets, nete)
+
+    do ie = nets, nete
+      do q = 1, qsize
+        do k = 1, nlev
+          elem(ie)%state%Qdp(:,:,k,q,tl_qdp) = elem(ie)%state%Qdp(:,:,k,q,tl_qdp) &
+            - dt_fvm * nu_q_cslam * elem(ie)%state%dp3d(:,:,k,tl_f) &
+            * qtens(:,:,k,q,ie) / elem(ie)%spheremp(:,:)
+        end do
+      end do
+    end do
+
+  end subroutine hypervis_Qdp
+#endif
+
 end module prim_advance_mod
