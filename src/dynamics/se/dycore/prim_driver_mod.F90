@@ -1,6 +1,5 @@
 !#define _DBG_ print *,"file: ",__FILE__," line: ",__LINE__," ithr: ",hybrid%ithr
 #define _DBG_
-#define del4_q
 module prim_driver_mod
   use shr_kind_mod,           only: r8=>shr_kind_r8
   use cam_logfile,            only: iulog
@@ -223,9 +222,8 @@ contains
     use control_mod,            only: statefreq,qsplit, rsplit, variable_nsplit, dribble_in_rsplit_loop
     use prim_advance_mod,       only: applycamforcing
     use prim_advance_mod,       only: tot_energy_dyn,compute_omega
-#ifdef del4_q
     use prim_advance_mod,       only: hypervis_Qdp
-#endif
+    use dimensions_mod,         only: del4_cslam_qgll
     use prim_state_mod,         only: prim_printstate, adjust_nsplit
     use prim_advection_mod,     only: vertical_remap, deriv
     use thread_mod,             only: omp_get_thread_num
@@ -308,9 +306,8 @@ contains
       if (use_cslam.and.nsubstep==1.and.r==1) then
          call tot_energy_dyn(elem,fvm,nets,nete,tl%n0,n0_qdp,'dAF')
          call cslam2gll(elem, fvm, hybrid,nets,nete, tl%n0, n0_qdp)
-#ifdef del4_q
-         call hypervis_Qdp(elem, deriv, hybrid, tl%n0, n0_qdp, dt_remap, nets, nete)
-#endif
+         if (del4_cslam_qgll) &
+            call hypervis_Qdp(elem, deriv, hybrid, tl%n0, n0_qdp, dt_remap, nets, nete)
          call tot_energy_dyn(elem,fvm,nets,nete,tl%n0,n0_qdp,'dBD')
       end if
       call tot_energy_dyn(elem,fvm,nets,nete,tl%n0,n0_qdp,'dBL')
@@ -446,11 +443,9 @@ contains
     use prim_advance_mod,       only: prim_advance_exp
     use prim_advection_mod,     only: prim_advec_tracers_remap, prim_advec_tracers_fvm, deriv
     use derivative_mod,         only: subcell_integration
-#ifdef del4_q
     use prim_advance_mod,       only: hypervis_Qdp
-#endif
     use hybrid_mod,             only: set_region_num_threads, config_thread_region, get_loop_ranges
-    use dimensions_mod,         only: use_cslam,fvm_supercycling,fvm_supercycling_jet
+    use dimensions_mod,         only: use_cslam,fvm_supercycling,fvm_supercycling_jet,del4_cslam_qgll
     use dimensions_mod,         only: kmin_jet, kmax_jet
     use fvm_mod,                only: ghostBufQnhc_vh,ghostBufQ1_vh, ghostBufFlux_vh
     use fvm_mod,                only: ghostBufQ1_h,ghostBufQnhcJet_h, ghostBufFluxJet_h
@@ -624,9 +619,8 @@ contains
        call TimeLevel_Qdp( tl, qsplit, n0_qdp, np1_qdp)
        if (.not.last_step) then
          call cslam2gll(elem, fvm, hybrid,nets,nete, tl%np1, np1_qdp)
-#ifdef del4_q
-         call hypervis_Qdp(elem, deriv, hybrid, tl%np1, np1_qdp, dt_remap, nets, nete)
-#endif
+         if (del4_cslam_qgll) &
+           call hypervis_Qdp(elem, deriv, hybrid, tl%np1, np1_qdp, dt_remap, nets, nete)
        end if
       else if ((mod(rstep,fvm_supercycling_jet) == 0)) then
         !

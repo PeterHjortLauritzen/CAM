@@ -1,4 +1,3 @@
-#define del4_q
 module prim_advance_mod
   use shr_kind_mod,   only: r8=>shr_kind_r8
   use edgetype_mod,   only: EdgeBuffer_t
@@ -12,21 +11,17 @@ module prim_advance_mod
   save
 
   public :: prim_advance_exp, prim_advance_init, applyCAMforcing, tot_energy_dyn, compute_omega
-#ifdef del4_q
   public :: hypervis_Qdp
-#endif
 
   type (EdgeBuffer_t) :: edge3,edgeOmega,edgeSponge
-#ifdef del4_q
   type (EdgeBuffer_t) :: edgeQdp
-#endif
   real (kind=r8), allocatable :: ur_weights(:)
 contains
 
   subroutine prim_advance_init(par, elem)
     use edge_mod,       only: initEdgeBuffer
     use element_mod,    only: element_t
-    use dimensions_mod, only: nlev,ksponge_end,use_cslam
+    use dimensions_mod, only: nlev,ksponge_end,use_cslam,del4_cslam_qgll
     use control_mod,    only: qsplit
 
     type (parallel_t)                       :: par
@@ -34,11 +29,9 @@ contains
     integer                                 :: i
 
     call initEdgeBuffer(par,edge3   ,elem,4*nlev   ,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
-#ifdef del4_q
-    ! del4_q operates on water vapor only -> single-tracer edge buffer
-    if (use_cslam) &
+    ! del4_cslam_qgll operates on water vapor only -> single-tracer edge buffer
+    if (use_cslam.and.del4_cslam_qgll) &
       call initEdgeBuffer(par,edgeQdp,elem,nlev,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
-#endif
     if (ksponge_end>0) then
        call initEdgeBuffer(par,edgeSponge,elem,4*ksponge_end,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
     end if
@@ -1853,7 +1846,6 @@ contains
      !call FreeEdgeBuffer(edgeOmega)
    end subroutine compute_omega
 
-#ifdef del4_q
   !-----------------------------------------------------------------------
   ! hypervis_Qdp
   !
@@ -1903,6 +1895,5 @@ contains
     end do
 
   end subroutine hypervis_Qdp
-#endif
 
 end module prim_advance_mod

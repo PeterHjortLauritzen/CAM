@@ -1,4 +1,3 @@
-#define del4_q
 module global_norms_mod
 
   use shr_kind_mod, only: r8=>shr_kind_r8
@@ -22,15 +21,11 @@ module global_norms_mod
   public :: global_integrals_general
   public :: wrap_repro_sum
 
-#ifdef del4_q
   public :: nu_q_cslam
-#endif
 
   private :: global_maximum
   type (EdgeBuffer_t), private :: edgebuf
-#ifdef del4_q
   real(r8), save :: nu_q_cslam = -1.0_r8
-#endif
 
   interface global_integral
      module procedure global_integral_elem
@@ -240,7 +235,7 @@ contains
     use hybrid_mod,     only: hybrid_t
     use element_mod,    only: element_t
     use dimensions_mod, only: np,ne,nelem,nc,nhe,use_cslam,nlev,large_Courant_incr
-    use dimensions_mod, only: nu_scale_top,nu_div_lev,nu_lev,nu_t_lev
+    use dimensions_mod, only: nu_scale_top,nu_div_lev,nu_lev,nu_t_lev,del4_cslam_qgll
 
     use quadrature_mod, only: gausslobatto, quadrature_t
 
@@ -286,9 +281,7 @@ contains
     real (kind=r8) :: s_laplacian, s_hypervis, s_rk, s_rk_tracer !Stability region
     real (kind=r8) :: dt_max_adv, dt_max_gw, dt_max_tracer_se, dt_max_tracer_fvm
     real (kind=r8) :: dt_max_hypervis, dt_max_hypervis_tracer, dt_max_laplacian_top
-#ifdef del4_q
     real (kind=r8) :: dt_max_hypervis_cslam
-#endif
 
     real(kind=r8) :: I_sphere, nu_max, nu_div_max
     real(kind=r8) :: fld(np,np,nets:nete)
@@ -592,9 +585,7 @@ contains
 
     if (nu_q<0) nu_q = nu_p ! necessary for consistency
     if (nu_t<0) nu_t = nu_p ! temperature damping is always equal to nu_p
-#ifdef del4_q
-    nu_q_cslam = 3.0_r8 * nu_q
-#endif
+    nu_q_cslam = 3.0_r8 * nu_p
 
     nu_div_lev(:) = nu_div
     nu_lev(:)     = nu
@@ -776,9 +767,7 @@ contains
     nu_max = MAX(MAXVAL(nu_div_lev(:)),MAXVAL(nu_lev(:)),MAXVAL(nu_t_lev(:)))
     dt_max_hypervis        = s_hypervis/(nu_max*normDinv_hypervis)
     dt_max_hypervis_tracer = s_hypervis/(nu_q*normDinv_hypervis)
-#ifdef del4_q
     dt_max_hypervis_cslam  = s_hypervis/(nu_q_cslam*normDinv_hypervis)
-#endif
 
     max_laplace = MAX(MAXVAL(nu_scale_top(:))*nu_top,MAXVAL(kmvis_ref(:)/rho_ref(:)))
     max_laplace = MAX(max_laplace,MAXVAL(kmcnd_ref(:)/(cpair*rho_ref(:))))
@@ -809,11 +798,11 @@ contains
         write(iulog,'(a,f10.2,a,f10.2,a)') '* dt_tracer_fvm (time-stepping tracers ; q       ) < ',dt_max_tracer_fvm,&
              's ',dt_tracer_fvm_actual
         if (dt_tracer_fvm_actual>dt_max_tracer_fvm) write(iulog,*) 'WARNING: dt_tracer_fvm theortically unstable'
-#ifdef del4_q
-        write(iulog,'(a,f10.2,a,f10.2,a)') '* dt_remap_vis  (del4 Qdp hypervis    ; q       ) < ',&
-             dt_max_hypervis_cslam,'s ',dt_remap_actual,'s'
-        if (dt_remap_actual>dt_max_hypervis_cslam) write(iulog,*) 'WARNING: del4_q Qdp hyperviscosity theoretically unstable'
-#endif
+        if (del4_cslam_qgll) then
+          write(iulog,'(a,f10.2,a,f10.2,a)') '* dt_remap_vis  (del4 Qdp hypervis    ; q       ) < ',&
+               dt_max_hypervis_cslam,'s ',dt_remap_actual,'s'
+          if (dt_remap_actual>dt_max_hypervis_cslam) write(iulog,*) 'WARNING: del4_cslam_qgll hyperviscosity theoretically unstable'
+        end if
       end if
       write(iulog,'(a,f10.2)') '* dt_remap (vertical remap dt) ',dt_remap_actual
       do k=1,ksponge_end
