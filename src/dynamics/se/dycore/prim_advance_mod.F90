@@ -26,7 +26,7 @@ contains
   subroutine prim_advance_init(par, elem)
     use edge_mod,       only: initEdgeBuffer
     use element_mod,    only: element_t
-    use dimensions_mod, only: nlev,ksponge_end,nelemd,qsize,use_cslam
+    use dimensions_mod, only: nlev,ksponge_end,use_cslam
     use control_mod,    only: qsplit
 
     type (parallel_t)                       :: par
@@ -35,8 +35,9 @@ contains
 
     call initEdgeBuffer(par,edge3   ,elem,4*nlev   ,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
 #ifdef del4_q
+    ! del4_q operates on water vapor only -> single-tracer edge buffer
     if (use_cslam) &
-      call initEdgeBuffer(par,edgeQdp,elem,qsize*nlev,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
+      call initEdgeBuffer(par,edgeQdp,elem,nlev,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
 #endif
     if (ksponge_end>0) then
        call initEdgeBuffer(par,edgeSponge,elem,4*ksponge_end,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
@@ -1856,8 +1857,10 @@ contains
   !-----------------------------------------------------------------------
   ! hypervis_Qdp
   !
-  ! Apply del4 (weak biharmonic) to q = Qdp/dp3d for all tracers after
-  ! cslam2gll, damping element-boundary noise from the FVM->GLL mapping.
+  ! Apply del4 (weak biharmonic) to q = Qdp/dp3d for water vapor only
+  ! after cslam2gll, damping element-boundary noise from the FVM->GLL mapping.
+  ! Water vapor carries by far the largest mass among the thermodynamically
+  ! active species so the other tracers are not worth the extra cost.
   ! Uses actual dp3d (not reference dp0) so that Qdp and q stay consistent
   ! with the dry-mass coordinate.  Conservation of dry mass on the GLL grid
   ! within each SE element is maintained; the small imbalance from del4 is
@@ -1866,12 +1869,12 @@ contains
   ! dt_fvm should be the FVM remapping timestep (dt_remap = rsplit*qsplit*dt).
   !-----------------------------------------------------------------------
   subroutine hypervis_Qdp(elem, deriv, hybrid, tl_f, tl_qdp, dt_fvm, nets, nete)
-    use dimensions_mod,  only: np, nlev, qsize
-    use element_mod,     only: element_t
-    use hybrid_mod,      only: hybrid_t
-    use derivative_mod,  only: derivative_t
+    use dimensions_mod,   only: np, nlev, wv_idx_dycore
+    use element_mod,      only: element_t
+    use hybrid_mod,       only: hybrid_t
+    use derivative_mod,   only: derivative_t
     use global_norms_mod, only: nu_q_cslam
-    use viscosity_mod,   only: biharmonic_wk_scalar
+    use viscosity_mod,    only: biharmonic_wk_scalar1
 
     type(element_t),    intent(inout) :: elem(:)
     type(derivative_t), intent(in)    :: deriv
@@ -1879,27 +1882,23 @@ contains
     integer,            intent(in)    :: tl_f, tl_qdp, nets, nete
     real(r8),           intent(in)    :: dt_fvm
 
-    real(r8) :: qtens(np,np,nlev,qsize,nets:nete)
-    integer  :: ie, k, q
+    real(r8) :: qtens(np,np,nlev,nets:nete)
+    integer  :: ie, k
 
     do ie = nets, nete
-      do q = 1, qsize
-        do k = 1, nlev
-          qtens(:,:,k,q,ie) = elem(ie)%state%Qdp(:,:,k,q,tl_qdp) &
-                             / elem(ie)%state%dp3d(:,:,k,tl_f)
-        end do
+      do k = 1, nlev
+        qtens(:,:,k,ie) = elem(ie)%state%Qdp(:,:,k,wv_idx_dycore,tl_qdp) &
+                         / elem(ie)%state%dp3d(:,:,k,tl_f)
       end do
     end do
 
-    call biharmonic_wk_scalar(elem, qtens, deriv, edgeQdp, hybrid, nets, nete)
+    call biharmonic_wk_scalar1(elem, qtens, deriv, edgeQdp, hybrid, nets, nete)
 
     do ie = nets, nete
-      do q = 1, qsize
-        do k = 1, nlev
-          elem(ie)%state%Qdp(:,:,k,q,tl_qdp) = elem(ie)%state%Qdp(:,:,k,q,tl_qdp) &
-            - dt_fvm * nu_q_cslam * elem(ie)%state%dp3d(:,:,k,tl_f) &
-            * qtens(:,:,k,q,ie) / elem(ie)%spheremp(:,:)
-        end do
+      do k = 1, nlev
+        elem(ie)%state%Qdp(:,:,k,wv_idx_dycore,tl_qdp) = elem(ie)%state%Qdp(:,:,k,wv_idx_dycore,tl_qdp) &
+          - dt_fvm * nu_q_cslam * elem(ie)%state%dp3d(:,:,k,tl_f) &
+          * qtens(:,:,k,ie) / elem(ie)%spheremp(:,:)
       end do
     end do
 
