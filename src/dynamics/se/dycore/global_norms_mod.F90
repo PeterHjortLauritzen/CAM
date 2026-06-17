@@ -236,7 +236,7 @@ contains
     use element_mod,    only: element_t
     use dimensions_mod, only: np,ne,nelem,nc,nhe,use_cslam,nlev,large_Courant_incr
     use dimensions_mod, only: nu_scale_top,nu_div_lev,nu_lev,nu_t_lev,del4_cslam_qgll
-
+    use dimensions_mod, only: nu_p_lev
     use quadrature_mod, only: gausslobatto, quadrature_t
 
     use reduction_mod,  only: ParallelMin,ParallelMax
@@ -281,7 +281,6 @@ contains
     real (kind=r8) :: s_laplacian, s_hypervis, s_rk, s_rk_tracer !Stability region
     real (kind=r8) :: dt_max_adv, dt_max_gw, dt_max_tracer_se, dt_max_tracer_fvm
     real (kind=r8) :: dt_max_hypervis, dt_max_hypervis_tracer, dt_max_laplacian_top
-    real (kind=r8) :: dt_max_hypervis_cslam
 
     real(kind=r8) :: I_sphere, nu_max, nu_div_max
     real(kind=r8) :: fld(np,np,nets:nete)
@@ -590,6 +589,7 @@ contains
     nu_div_lev(:) = nu_div
     nu_lev(:)     = nu
     nu_t_lev(:)   = nu_p
+    nu_p_lev(:)   = nu_p
 
     !
     ! sponge layer strength needed for stability depends on model top location
@@ -650,7 +650,7 @@ contains
     else if (top_090_140km.or.top_140_600km) then ! defaults for waccm(x)
       if (sponge_del4_lev       <0) sponge_del4_lev        = 20
       if (sponge_del4_nu_fac    <0) sponge_del4_nu_fac     = 5.0_r8
-      if (sponge_del4_nu_div_fac<0) sponge_del4_nu_div_fac = 10.0_r8
+      if (sponge_del4_nu_div_fac<0) sponge_del4_nu_div_fac = 7.5_r8
     else
       if (sponge_del4_lev       <0) sponge_del4_lev        = 1
       if (sponge_del4_nu_fac    <0) sponge_del4_nu_fac     = 1.0_r8
@@ -697,13 +697,21 @@ contains
         nu_t_lev(k)   = (1.0_r8-scale1)*nu_p  +scale1*nu_max
       end if
     end do
+    !
+    ! For WACCM and WACCM-x, apply the same sponge-layer ramp to dp (pressure)
+    ! damping as is used for temperature damping. For lower-top configurations
+    ! nu_p_lev remains uniform at nu_p (no ramp).
+    !
+    if (top_090_140km .or. top_140_600km) then
+      nu_p_lev(:) = nu_t_lev(:)
+    end if
 
     if (hybrid%masterthread)then
       write(iulog,*) "z computed from barometric formula (using US std atmosphere)"
       call std_atm_height(pmid(:),z(:))
-      write(iulog,*) "k,pmid_ref,z,nu_lev,nu_t_lev,nu_div_lev"
+      write(iulog,*) "k,pmid_ref,z,nu_lev,nu_t_lev,nu_p_lev,nu_div_lev"
       do k=1,nlev
-        write(iulog,'(i3,5e11.4)') k,pmid(k),z(k),nu_lev(k),nu_t_lev(k),nu_div_lev(k)
+        write(iulog,'(i3,6e11.4)') k,pmid(k),z(k),nu_lev(k),nu_t_lev(k),nu_p_lev(k),nu_div_lev(k)
       end do
       if (nu_top>0) then
         write(iulog,*) ": ksponge_end = ",ksponge_end
@@ -767,7 +775,6 @@ contains
     nu_max = MAX(MAXVAL(nu_div_lev(:)),MAXVAL(nu_lev(:)),MAXVAL(nu_t_lev(:)))
     dt_max_hypervis        = s_hypervis/(nu_max*normDinv_hypervis)
     dt_max_hypervis_tracer = s_hypervis/(nu_q*normDinv_hypervis)
-    dt_max_hypervis_cslam  = s_hypervis/(nu_q_cslam*normDinv_hypervis)
 
     max_laplace = MAX(MAXVAL(nu_scale_top(:))*nu_top,MAXVAL(kmvis_ref(:)/rho_ref(:)))
     max_laplace = MAX(max_laplace,MAXVAL(kmcnd_ref(:)/(cpair*rho_ref(:))))
@@ -798,11 +805,6 @@ contains
         write(iulog,'(a,f10.2,a,f10.2,a)') '* dt_tracer_fvm (time-stepping tracers ; q       ) < ',dt_max_tracer_fvm,&
              's ',dt_tracer_fvm_actual
         if (dt_tracer_fvm_actual>dt_max_tracer_fvm) write(iulog,*) 'WARNING: dt_tracer_fvm theortically unstable'
-        if (del4_cslam_qgll) then
-          write(iulog,'(a,f10.2,a,f10.2,a)') '* dt_remap_vis  (del4 Qdp hypervis    ; q       ) < ',&
-               dt_max_hypervis_cslam,'s ',dt_remap_actual,'s'
-          if (dt_remap_actual>dt_max_hypervis_cslam) write(iulog,*) 'WARNING: del4_cslam_qgll hyperviscosity theoretically unstable'
-        end if
       end if
       write(iulog,'(a,f10.2)') '* dt_remap (vertical remap dt) ',dt_remap_actual
       do k=1,ksponge_end
