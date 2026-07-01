@@ -83,6 +83,8 @@ module control_mod
   integer, public :: hypervis_subcycle=1    ! number of subcycles for hyper viscsosity timestep
   integer, public :: hypervis_subcycle_sponge=1    ! number of subcycles for hyper viscsosity timestep in sponge
   integer, public :: hypervis_subcycle_q=1  ! number of subcycles for hyper viscsosity timestep on TRACERS
+  integer, public :: hypervis_subcycle_cslam_q=1  ! number of subcycles for del4 damping of q on GLL after cslam2gll
+                                                  ! auto-set in print_cfl from nu_q_cslam stability bound
   integer, public :: psurf_vis = 0        ! 0 = use laplace on eta surfaces
                                           ! 1 = use (approx.) laplace on p surfaces
 
