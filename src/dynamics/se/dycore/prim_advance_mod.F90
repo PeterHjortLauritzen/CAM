@@ -1740,6 +1740,9 @@ contains
      use hybrid_mod,     only: hybrid_t
      use element_mod,    only: element_t
      use derivative_mod, only: divergence_sphere, derivative_t,gradient_sphere
+     use derivative_mod, only: laplace_sphere_wk
+     use control_mod,    only: nu_top
+     use dimensions_mod, only: nu_omega_del2_lev, del2omega
      use hybvcoord_mod,  only: hvcoord_t
      use edge_mod,       only: edgevpack, edgevunpack
      use bndry_mod,      only: bndry_exchange
@@ -1844,6 +1847,26 @@ contains
          end do
        end do
      end if
+     if (del2omega .and. nu_top > 0.0_r8) then
+     do ie=nets,nete
+       do k=1,nlev
+         call laplace_sphere_wk(elem(ie)%derived%omega(:,:,k),deriv,elem(ie),&
+              Otens(:,:,k,ie),var_coef=.true.)
+         Otens(:,:,k,ie) = nu_omega_del2_lev(k)*Otens(:,:,k,ie)
+       end do
+       kptr=0
+       call edgeVpack(edgeOmega,Otens(:,:,:,ie),nlev,kptr,ie)
+     end do
+     call bndry_exchange(hybrid,edgeOmega,location='compute_omega del2')
+     do ie=nets,nete
+       kptr=0
+       call edgeVunpack(edgeOmega,Otens(:,:,:,ie),nlev,kptr,ie)
+       do k=1,nlev
+         elem(ie)%derived%omega(:,:,k) = elem(ie)%derived%omega(:,:,k) + &
+              dt*elem(ie)%rspheremp(:,:)*Otens(:,:,k,ie)
+       end do
+     end do
+     end if
      !call FreeEdgeBuffer(edgeOmega)
    end subroutine compute_omega
 
@@ -1867,6 +1890,7 @@ contains
     use hybrid_mod,       only: hybrid_t
     use derivative_mod,   only: derivative_t
     use global_norms_mod, only: nu_q_cslam
+    use control_mod,      only: hypervis_subcycle_cslam_q
     use viscosity_mod,    only: biharmonic_wk_scalar1
     use edge_mod,         only: edgeVpack, edgeVunpack
     use bndry_mod,        only: bndry_exchange
@@ -1878,33 +1902,40 @@ contains
     real(r8),           intent(in)    :: dt_fvm
 
     real(r8) :: qtens(np,np,nlev,nets:nete)
-    integer  :: ie, k
+    real(r8) :: dt_sub
+    integer  :: ie, k, isub
+    hypervis_subcycle_cslam_q = 2
+    dt_sub = dt_fvm / real(hypervis_subcycle_cslam_q, r8)
 
-    do ie = nets, nete
-      do k = 1, nlev
-        qtens(:,:,k,ie) = elem(ie)%state%Qdp(:,:,k,wv_idx_dycore,tl_qdp) &
-                         / elem(ie)%state%dp3d(:,:,k,tl_f)
+    do isub = 1, hypervis_subcycle_cslam_q
+
+      do ie = nets, nete
+        do k = 1, nlev
+          qtens(:,:,k,ie) = elem(ie)%state%Qdp(:,:,k,wv_idx_dycore,tl_qdp) &
+                           / elem(ie)%state%dp3d(:,:,k,tl_f)
+        end do
       end do
-    end do
 
-    call biharmonic_wk_scalar1(elem, qtens, deriv, edgeQdp, hybrid, nets, nete)
+      call biharmonic_wk_scalar1(elem, qtens, deriv, edgeQdp, hybrid, nets, nete)
 
-    ! DSS the weak-form increment so it is continuous across element edges
-    ! before being added to Qdp.
-    do ie = nets, nete
-      call edgeVpack(edgeQdp, qtens(:,:,:,ie), nlev, 0, ie)
-    end do
-    call bndry_exchange(hybrid, edgeQdp, location='hypervis_Qdp')
-    do ie = nets, nete
-      call edgeVunpack(edgeQdp, qtens(:,:,:,ie), nlev, 0, ie)
-    end do
-
-    do ie = nets, nete
-      do k = 1, nlev
-        elem(ie)%state%Qdp(:,:,k,wv_idx_dycore,tl_qdp) = elem(ie)%state%Qdp(:,:,k,wv_idx_dycore,tl_qdp) &
-          - dt_fvm * nu_q_cslam * elem(ie)%state%dp3d(:,:,k,tl_f) &
-          * qtens(:,:,k,ie) * elem(ie)%rspheremp(:,:)
+      ! DSS the weak-form increment so it is continuous across element edges
+      ! before being added to Qdp.
+      do ie = nets, nete
+        call edgeVpack(edgeQdp, qtens(:,:,:,ie), nlev, 0, ie)
       end do
+      call bndry_exchange(hybrid, edgeQdp, location='hypervis_Qdp')
+      do ie = nets, nete
+        call edgeVunpack(edgeQdp, qtens(:,:,:,ie), nlev, 0, ie)
+      end do
+
+      do ie = nets, nete
+        do k = 1, nlev
+          elem(ie)%state%Qdp(:,:,k,wv_idx_dycore,tl_qdp) = elem(ie)%state%Qdp(:,:,k,wv_idx_dycore,tl_qdp) &
+               - dt_sub * nu_q_cslam * elem(ie)%state%dp3d(:,:,k,tl_f) &
+            * qtens(:,:,k,ie) * elem(ie)%rspheremp(:,:)
+        end do
+      end do
+
     end do
 
   end subroutine hypervis_Qdp
