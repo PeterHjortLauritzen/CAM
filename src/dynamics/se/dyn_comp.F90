@@ -835,6 +835,10 @@ subroutine dyn_init(dyn_in, dyn_out)
    end if
    !
    irecons_tracer_lev(:) = irecons_tracer !use high-order CSLAM in all layers
+                             !PLM test 2026-07-23 (job 6869372, irecons_tracer_lev=3): edge ridge
+                             !unchanged => curvature terms falsified; ridge is recon-order-blind
+                             !(PCoM/PLM/PPM identical) => defect in flux-side pairing of recon
+                             !coefficients for cross-edge pieces.
    !
    ! compute scaling of traditional sponge layer damping (following cd_core.F90 in CAM-FV)
    !

@@ -1,5 +1,6 @@
 !#define _DBG_ print *,"file: ",__FILE__," line: ",__LINE__," ithr: ",hybrid%ithr
 #define _DBG_
+#define SE_WV_CONTINUITY  ! RE-ENABLED 2026-07-22 (full-dp + CSLAM hard-overwrite investigation)  ! 2026-07-02: SE evolves water-vapor mass (wvdp) with its own continuity eq. (must match define in element/prim_advance/prim_advection/viscosity mods)
 module prim_driver_mod
   use shr_kind_mod,           only: r8=>shr_kind_r8
   use cam_logfile,            only: iulog
@@ -25,7 +26,10 @@ contains
 
   subroutine prim_init2(elem, fvm, hybrid, nets, nete, tl, hvcoord)
     use dimensions_mod,         only: irecons_tracer, fvm_supercycling
-    use dimensions_mod,         only: fv_nphys, nc
+    use dimensions_mod,         only: fv_nphys, nc, use_cslam
+#ifdef SE_WV_CONTINUITY
+    use dimensions_mod,         only: wv_idx_dycore
+#endif
     use parallel_mod,           only: syncmp
     use se_dyn_time_mod,        only: timelevel_t, tstep, phys_tscale, nsplit, TimeLevel_Qdp
     use se_dyn_time_mod,        only: nsplit_baseline,rsplit_baseline
@@ -67,6 +71,7 @@ contains
 
     real (kind=r8) :: dp,dp0,T1,T0,pmid_ref(np,np)
     real (kind=r8) :: ps_ref(np,np,nets:nete)
+    real (kind=r8) :: min_area_fvm    ! thread-local min CSLAM cell area (sr); reduced in print_cfl
 
     integer :: i,j,k,ie,t,q
     integer :: n0,n0_qdp
@@ -120,6 +125,15 @@ contains
        call endrun('Error: only cube topology supported for primaitve equations')
     endif
 
+    ! thread-local min CSLAM cell area for the CSLAM Q filter stability bound
+    ! (global ParallelMin reduction happens inside print_cfl)
+    min_area_fvm = 1.0e30_r8
+    if (use_cslam) then
+      do ie=nets,nete
+        min_area_fvm = min(min_area_fvm,minval(fvm(ie)%area_sphere))
+      end do
+    end if
+
     ! CAM has set tstep based on dtime before calling prim_init2(),
     ! so only now does HOMME learn the timstep.  print them out:
     call print_cfl(elem,hybrid,nets,nete,dtnu,&
@@ -128,7 +142,8 @@ contains
          !dt_remap,dt_tracer_fvm,dt_tracer_se
          tstep*qsplit*rsplit,tstep*qsplit*fvm_supercycling,tstep*qsplit,&
          !dt_dyn,dt_dyn_visco,dt_tracer_visco, dt_phys
-         tstep,dt_dyn_vis,dt_dyn_del2_sponge,dt_tracer_vis,tstep*nsplit*qsplit*rsplit)
+         tstep,dt_dyn_vis,dt_dyn_del2_sponge,dt_tracer_vis,tstep*nsplit*qsplit*rsplit,&
+         min_area_fvm)
     if (hybrid%masterthread) then
        if (phys_tscale/=0) then
           write(iulog,'(a,2f9.2)') "CAM physics timescale:        ",phys_tscale
@@ -174,6 +189,23 @@ contains
          end if
        end do
      end do
+
+#ifdef SE_WV_CONTINUITY
+     !
+     ! initialize SE-evolved MOIST pressure thickness (2026-07-22: wvdp now
+     ! holds full moist dp = dry dp3d + water-vapor mass, predicted as one
+     ! mass field; q_wv is diagnosed as (wvdp-dp3d)/dp3d).
+     ! Also covers restart runs (wvdp is not in the restart file)
+     !
+     if (wv_idx_dycore < 1) call endrun('SE_WV_CONTINUITY: wv_idx_dycore not set')
+     do ie=nets,nete
+       do k=1,timelevels
+         elem(ie)%state%wvdp(:,:,:,k) = elem(ie)%state%dp3d(:,:,:,n0) + &
+              elem(ie)%state%Qdp(:,:,:,wv_idx_dycore,n0_qdp)
+       end do
+     end do
+     if (hybrid%masterthread) write(iulog,*) "SE_WV_CONTINUITY: wvdp initialized to MOIST dp = dp3d + Qdp(wv)"
+#endif
 
      if (hybrid%masterthread) write(iulog,*) "initial state:"
      call prim_printstate(elem, tl, hybrid,nets,nete, fvm)
@@ -221,8 +253,8 @@ contains
     use control_mod,            only: statefreq,qsplit, rsplit, variable_nsplit, dribble_in_rsplit_loop
     use prim_advance_mod,       only: applycamforcing
     use prim_advance_mod,       only: tot_energy_dyn,compute_omega
-    use prim_advance_mod,       only: hypervis_Qdp
-    use dimensions_mod,         only: del4_cslam_qgll
+    use prim_advance_mod,       only: hypervis_Qdp, hypervis_Qdp_diff
+    use dimensions_mod,         only: del4_cslam_qgll, del2_qgll_diff
     use prim_state_mod,         only: prim_printstate, adjust_nsplit
     use prim_advection_mod,     only: vertical_remap, deriv
     use thread_mod,             only: omp_get_thread_num
@@ -267,13 +299,19 @@ contains
     !
     ! initialize variables for computing vertical Courant number
     !
+    ! omega_cn must be zeroed at substep 1 UNCONDITIONALLY: when nsplit>1
+    ! and statefreq aligns the diagnostic with a later substep,
+    ! compute_diagnostics is false at nsubstep==1 and omega_cn would enter
+    ! the MIN/MAX accumulation below holding uninitialized memory (it is
+    ! never initialized in dyn_comp).  Latent trunk bug; exposed at ne120.
+    !
+    if (nsubstep==1) then
+      do ie=nets,nete
+        omega_cn(1,ie) = 0.0_r8
+        omega_cn(2,ie) = 0.0_r8
+      end do
+    end if
     if (variable_nsplit.or.compute_diagnostics) then
-      if (nsubstep==1) then
-        do ie=nets,nete
-          omega_cn(1,ie) = 0.0_r8
-          omega_cn(2,ie) = 0.0_r8
-        end do
-      end if
       do ie=nets,nete
         dp_start(:,:,1:nlev,ie) = elem(ie)%state%dp3d(:,:,:,tl%n0)
         dp_start(:,:,nlev+1,ie) = elem(ie)%state%dp3d(:,:,nlev,tl%n0)
@@ -304,9 +342,15 @@ contains
       !
       if (use_cslam.and.nsubstep==1.and.r==1) then
          call tot_energy_dyn(elem,fvm,nets,nete,tl%n0,n0_qdp,'dAF')
-         call cslam2gll(elem, fvm, hybrid,nets,nete, tl%n0, n0_qdp)
+!CSLAM2GLL_OFF_2026_07_22: no CSLAM->GLL Q overwrite at all (per Peter; run4-style test on full-dp build)
+!         call cslam2gll(elem, fvm, hybrid,nets,nete, tl%n0, n0_qdp)
          if (del4_cslam_qgll) &
             call hypervis_Qdp(elem, deriv, hybrid, tl%n0, n0_qdp, dt_remap, nets, nete)
+         ! del2_qgll_diff (2026-07-24, Peter): del2 on the DIFFERENCE between
+         ! qdp on GLL and the CSLAM-mapped reference from the last anchor
+         ! (physics increments + remap drift); never damps the CSLAM field
+         if (del2_qgll_diff) &
+            call hypervis_Qdp_diff(elem, deriv, hybrid, tl%n0, n0_qdp, dt_remap, nets, nete)
          call tot_energy_dyn(elem,fvm,nets,nete,tl%n0,n0_qdp,'dBD')
       end if
       call tot_energy_dyn(elem,fvm,nets,nete,tl%n0,n0_qdp,'dBL')
@@ -442,10 +486,14 @@ contains
     use prim_advance_mod,       only: prim_advance_exp
     use prim_advection_mod,     only: prim_advec_tracers_remap, prim_advec_tracers_fvm, deriv
     use derivative_mod,         only: subcell_integration
-    use prim_advance_mod,       only: hypervis_Qdp
+    use prim_advance_mod,       only: hypervis_Qdp, hypervis_Qdp_diff_setref
     use hybrid_mod,             only: set_region_num_threads, config_thread_region, get_loop_ranges
-    use dimensions_mod,         only: use_cslam,fvm_supercycling,fvm_supercycling_jet,del4_cslam_qgll
+    use dimensions_mod,         only: use_cslam,fvm_supercycling,fvm_supercycling_jet,del4_cslam_qgll,del2_qgll_diff
     use dimensions_mod,         only: kmin_jet, kmax_jet
+#ifdef SE_WV_CONTINUITY
+    use dimensions_mod,         only: wv_idx_dycore, tau_wvdp, wvdp_nudge_scalesel
+    use prim_advance_mod,       only: wvdp_nudge_p1
+#endif
     use fvm_mod,                only: ghostBufQnhc_vh,ghostBufQ1_vh, ghostBufFlux_vh
     use fvm_mod,                only: ghostBufQ1_h,ghostBufQnhcJet_h, ghostBufFluxJet_h
     use se_dyn_time_mod,        only: timelevel_qdp
@@ -480,7 +528,9 @@ contains
     real (kind=r8) :: tempflux(nc,nc,4)
 
     real (kind=r8) :: dp_np1(np,np)
-
+#ifdef SE_WV_CONTINUITY
+    real (kind=r8) :: alpha_wvdp
+#endif
 
     dt_q = dt*qsplit
     ! ===============
@@ -616,9 +666,49 @@ contains
           end do
        end do
        call TimeLevel_Qdp( tl, qsplit, n0_qdp, np1_qdp)
+!CSLAM2GLL_OFF_2026_07_22 test ended 2026-07-23: cslam2gll RE-ENABLED for PS-sync — with it off,
+!GLL Qdp is stale, so the tau_wvdp nudging target dp3d+Qdp(wv) is garbage and PS/PS_gll drift
+!secularly (350 Pa local by day 14). cslam2gll refreshes the target; tau_wvdp low-passes the
+!wv noise conduit into the dynamics.
        call cslam2gll(elem, fvm, hybrid,nets,nete, tl%np1, np1_qdp)
        if (del4_cslam_qgll) &
             call hypervis_Qdp(elem, deriv, hybrid, tl%np1, np1_qdp, dt_remap, nets, nete)
+       ! del2_qgll_diff (2026-07-24, Peter): store the freshly-mapped q(wv)
+       ! as the deviation reference -- the mapped CSLAM field itself is
+       ! never damped; only deviations from it (accumulated between
+       ! anchors) get del2-damped at the nsubstep==1 site below.
+       if (del2_qgll_diff) &
+            call hypervis_Qdp_diff_setref(elem, tl%np1, np1_qdp, nets, nete)
+#ifdef SE_WV_CONTINUITY
+       !
+       ! relaxed joining of SE-evolved MOIST dp toward CSLAM values:
+       ! Qdp(wv,np1_qdp) was just overwritten by cslam2gll with
+       ! q_CSLAM*dp3d(np1), i.e. same floating levels as wvdp(np1), so the
+       ! CSLAM-consistent moist dp target is dp3d(np1) + Qdp(wv,np1_qdp).
+       ! This is the only coupling of physics moisture forcing and CSLAM
+       ! transport into wvdp (which otherwise free-runs under SE continuity).
+       !
+       ! tau_wvdp < 0 : nudging OFF (wvdp free-runs)
+       ! tau_wvdp = 0 : hard overwrite wvdp = dp3d + CSLAM Qdp every anchor
+       ! tau_wvdp > 0 : relaxation with e-folding time tau_wvdp
+       !
+       if (tau_wvdp >= 0.0_r8) then
+          alpha_wvdp = 1.0_r8
+          if (tau_wvdp > 0.0_r8) alpha_wvdp = 1.0_r8 - exp(-dt_q*fvm_supercycling/tau_wvdp)
+          if (wvdp_nudge_scalesel) then
+             ! scale-selective: nudge only the element-bilinear part of the
+             ! increment (DSSed) -- large-scale sync without slaving wvdp
+             ! onto the grid-scale texture of the CSLAM->GLL target
+             call wvdp_nudge_p1(elem, hybrid, tl%np1, np1_qdp, alpha_wvdp, nets, nete)
+          else
+             do ie=nets,nete
+               elem(ie)%state%wvdp(:,:,:,tl%np1) = elem(ie)%state%wvdp(:,:,:,tl%np1) + alpha_wvdp*  &
+                    (elem(ie)%state%dp3d(:,:,:,tl%np1) + &
+                     elem(ie)%state%Qdp(:,:,:,wv_idx_dycore,np1_qdp) - elem(ie)%state%wvdp(:,:,:,tl%np1))
+             end do
+          end if
+       end if
+#endif
       else if ((mod(rstep,fvm_supercycling_jet) == 0)) then
         !
         ! shorter fvm time-step in jet region

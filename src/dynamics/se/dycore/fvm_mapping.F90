@@ -1309,7 +1309,7 @@ contains
    ! by Lagrange interpolation from 3x3 CSLAM grid to GLL grid.
    !
    subroutine cslam2gll(elem, fvm, hybrid,nets,nete, tl_f, tl_qdp)
-     use dimensions_mod,  only: nc,nlev,np,nhc
+     use dimensions_mod,  only: nc,nlev,np,nhc,cslam2gll_hoc
      use hybrid_mod,      only: hybrid_t
      use air_composition, only: thermodynamic_active_species_num, thermodynamic_active_species_idx
      use fvm_mod,         only: ghostBuf_cslam2gll
@@ -1376,7 +1376,14 @@ contains
      !
      ! do mapping
      !
-     call fvm2dyn(fld_fvm,fld_gll,hybrid,nets,nete,nlev,nflds,fvm,llimiter,halo_filled=.true.)
+     if (cslam2gll_hoc) then
+       ! cell-mean-consistent high-order map: C0 at element boundaries by
+       ! symmetric construction, no limiter (target of wvdp nudging does not
+       ! need monotonicity); panel-edge elements use the original path inside
+       call cellmean2gll(fld_fvm,fld_gll,nets,nete,nlev,nflds,fvm)
+     else
+       call fvm2dyn(fld_fvm,fld_gll,hybrid,nets,nete,nlev,nflds,fvm,llimiter,halo_filled=.true.)
+     end if
 
      do ie=nets,nete
        do m_cnst=1,thermodynamic_active_species_num
@@ -1387,4 +1394,80 @@ contains
      deallocate(fld_fvm, fld_gll, llimiter)
      call t_stopf('cslam2gll')
    end subroutine cslam2gll
+
+   subroutine cellmean2gll(fld_fvm,fld_gll,nets,nete,numlev,num_flds,fvm)
+     !
+     ! 2026-07-23 (Peter): CSLAM->GLL map CONSISTENT with cell-AVERAGED input.
+     ! The original fvm2dyn/tensor_lagrange_interp treats the nc x nc cell
+     ! means as point values and applies a per-element min/max limiter; the
+     ! resulting static element-periodic artifact is accumulated by the wvdp
+     ! nudging into element-edge PS noise (job 6870585).
+     !
+     ! Method (per direction, tensor product, in normalized element coords
+     ! where CSLAM cells are uniform):
+     !  - element-boundary GLL nodes: 4th-order edge value from cell means,
+     !        q_edge = 7/12 (a_w1 + a_e1) - 1/12 (a_w2 + a_e2)
+     !    symmetric about the edge => every element sharing the node computes
+     !    a bit-identical value from the bit-exact exchanged halo => C0 across
+     !    elements by construction (no DSS, no limiter needed).
+     !  - interior GLL nodes (xi = (1 -+ 1/sqrt(5))/2): d/dx of the degree-5
+     !    Lagrange interpolant of the primitive function through the 6 cell
+     !    edges of the 5-cell stencil (element's 3 cells + 1 halo cell each
+     !    side); exact for cell means of polynomials up to degree 4.
+     !    Weights derived+validated offline (sum=1; mirror-symmetric; exactly
+     !    reproduces x^0..x^4 from cell means).
+     ! Panel-edge elements (cubeboundary/=0: halo cells curved in local
+     ! coords, non-uniform spacing) keep the original tensor_lagrange_interp
+     ! path in this version.
+     !
+     use dimensions_mod, only: np, nc, nhc
+     integer,  intent(in)  :: nets, nete, numlev, num_flds
+     real(r8), intent(inout) :: fld_fvm(1-nhc:nc+nhc,1-nhc:nc+nhc,numlev,num_flds,nets:nete)
+     real(r8), intent(out)   :: fld_gll(np,np,numlev,num_flds,nets:nete)
+     type(fvm_struct), intent(in) :: fvm(nets:nete)
+
+     real(r8), parameter :: wei = 7.0_r8/12.0_r8   ! edge value, inner pair
+     real(r8), parameter :: weo = -1.0_r8/12.0_r8  ! edge value, outer pair
+     real(r8), parameter :: wi(0:4) = (/ -5.97213595499959463e-02_r8, &
+          6.68186249058292825e-01_r8,  5.43333333333333890e-01_r8,    &
+          -1.81519582391626716e-01_r8, 2.97213595499958086e-02_r8 /)
+     real(r8) :: t(np,-1:5)
+     integer  :: ie,k,nq,r,g
+     logical  :: llim(num_flds)
+
+     if (nc /= 3 .or. np /= 4 .or. nhc < 2) &
+          call endrun('cellmean2gll: requires nc=3, np=4, nhc>=2')
+     do ie=nets,nete
+       if (fvm(ie)%cubeboundary == 0) then
+         do nq=1,num_flds
+           do k=1,numlev
+             do r=-1,5
+               t(1,r) = wei*(fld_fvm(0,r,k,nq,ie)+fld_fvm(1,r,k,nq,ie)) &
+                      + weo*(fld_fvm(-1,r,k,nq,ie)+fld_fvm(2,r,k,nq,ie))
+               t(2,r) = wi(0)*fld_fvm(0,r,k,nq,ie)+wi(1)*fld_fvm(1,r,k,nq,ie) &
+                      + wi(2)*fld_fvm(2,r,k,nq,ie)+wi(3)*fld_fvm(3,r,k,nq,ie) &
+                      + wi(4)*fld_fvm(4,r,k,nq,ie)
+               t(3,r) = wi(4)*fld_fvm(0,r,k,nq,ie)+wi(3)*fld_fvm(1,r,k,nq,ie) &
+                      + wi(2)*fld_fvm(2,r,k,nq,ie)+wi(1)*fld_fvm(3,r,k,nq,ie) &
+                      + wi(0)*fld_fvm(4,r,k,nq,ie)
+               t(4,r) = wei*(fld_fvm(3,r,k,nq,ie)+fld_fvm(4,r,k,nq,ie)) &
+                      + weo*(fld_fvm(2,r,k,nq,ie)+fld_fvm(5,r,k,nq,ie))
+             end do
+             do g=1,np
+               fld_gll(g,1,k,nq,ie) = wei*(t(g,0)+t(g,1)) + weo*(t(g,-1)+t(g,2))
+               fld_gll(g,2,k,nq,ie) = wi(0)*t(g,0)+wi(1)*t(g,1)+wi(2)*t(g,2) &
+                                    + wi(3)*t(g,3)+wi(4)*t(g,4)
+               fld_gll(g,3,k,nq,ie) = wi(4)*t(g,0)+wi(3)*t(g,1)+wi(2)*t(g,2) &
+                                    + wi(1)*t(g,3)+wi(0)*t(g,4)
+               fld_gll(g,4,k,nq,ie) = wei*(t(g,3)+t(g,4)) + weo*(t(g,2)+t(g,5))
+             end do
+           end do
+         end do
+       else
+         llim(:) = .true.
+         call tensor_lagrange_interp(fvm(ie)%cubeboundary,np,nc,nhc,numlev,num_flds, &
+              fld_fvm(:,:,:,:,ie),fld_gll(:,:,:,:,ie),llim,2,fvm(ie)%norm_elem_coord)
+       end if
+     end do
+   end subroutine cellmean2gll
 end module fvm_mapping

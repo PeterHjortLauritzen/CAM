@@ -1,4 +1,7 @@
 #define FVM_TIMERS .FALSE.
+! #define CSLAM_Q_FILTER_DEL2  ! disabled 2026-06-30: switching back to del4 at 1e15 m^4/s
+#define CSLAM_Q_FILTER_DEL4    ! RE-ENABLED 2026-07-24 (rev7 ne120 blowup A/B): h0i shows unfiltered CSLAM Q vertex noise at k40 growing x20/day from day 2.5 = the blowup seed; was commented 07-23 for the limiter test. del4-biharmonic Q damping on CSLAM grid (filter-off test 2026-07-06: element-scale noise returns even with SE_WV_CONTINUITY -- filter is required); keep del4_cslam_qgll=.false. while this is active (per Peter 07-21: no GLL-side hypervis_Qdp when Q is damped on the CSLAM grid)
+                               ! re-enabled 2026-07-02 with conservative face weights (antisymmetric w_ew/w_ns via owner-frame halo centers)
 module fvm_consistent_se_cslam
   use shr_kind_mod,           only: r8=>shr_kind_r8
   use dimensions_mod,         only: nc, nhe, nlev, ntrac, np, nhr, nhc, ngpc, ns, nht
@@ -76,7 +79,9 @@ contains
     real(r8), pointer :: fcube(:,:,:,:)
     real(r8), pointer :: spherecentroid(:,:,:)
 
-    llimiter = .true.
+    llimiter = .true.  !limiter-off test 2026-07-23 DONE (job 6868508, saved: dycore_snapshots/
+                       !run_limoff_6868508_2026-07-23): ridge/dq identical to baseline at every
+                       !band => slope limiter FALSIFIED as the edge-recon degradation.
 
     inJetCall = .false.
     if(((kminp .ne. 1) .or. (kmaxp .ne. nlev)) .and. vert_num_threads>1) then 
@@ -253,7 +258,21 @@ contains
       end do
     end do
     if(FVM_TIMERS) call t_stopf('fvm:end_of_reconstruct_subroutine')
-    !$OMP END PARALLEL 
+#if defined(CSLAM_Q_FILTER_DEL2) || defined(CSLAM_Q_FILTER_DEL4)
+    !
+    ! Mass-conservative del2/del4 filter on water-vapor on the CSLAM grid.
+    ! Conservation: Sum(Q_wv*dp_fvm*area_sphere) is preserved exactly;
+    ! dp_fvm is NOT modified.  DEL4 takes precedence when both are defined.
+    !
+    if(FVM_TIMERS) call t_startf('fvm:cslam_q_filter')
+#ifdef CSLAM_Q_FILTER_DEL4
+    call apply_cslam_q_filter_del4(elem, fvm, hybridnew, nets, nete, kmin, kmax, dt_fvm)
+#else
+    call apply_cslam_q_filter_del2(fvm, hybridnew, nets, nete, kmin, kmax, dt_fvm)
+#endif
+    if(FVM_TIMERS) call t_stopf('fvm:cslam_q_filter')
+#endif
+    !$OMP END PARALLEL
     call omp_set_nested(.false.)
   end subroutine run_consistent_se_cslam
 
@@ -320,9 +339,9 @@ contains
     do iside=1,4
       do j=jmin_side(iside),jmax_side(iside)
         do i=imin_side(iside),imax_side(iside)
-           !DO NOT USE MASS_FLUX_SE AS THRESHOLD - THRESHOLD CONDITION MUST BE CONSISTENT WITH 
+           !DO NOT USE MASS_FLUX_SE AS THRESHOLD - THRESHOLD CONDITION MUST BE CONSISTENT WITH
            !THE ONE USED IN DEFINE_SWEPT_AREAS
-!          if (mass_flux_se(i,j,iside)>eps) then 
+!          if (mass_flux_se(i,j,iside)>eps) then
           if (fvm%se_flux(i,j,iside,ilev)>eps) then
             !
             !        ||             ||
@@ -619,9 +638,935 @@ contains
           end if
         end do
       end do
-    end do    
+    end do
   end subroutine swept_flux
 
+
+#ifdef CSLAM_Q_FILTER_DEL2
+  !
+  ! Mass-conservative del2 filter on water-vapor mixing ratio (fvm%c(:,:,:,ixwv_fvm))
+  ! on the CSLAM grid.  Only water vapor is damped; other tracers untouched.
+  !
+  ! For each face shared by cells i and j (in either the same element or
+  ! across an element boundary):
+  !   flux_face_ij = nu_q * 0.5*(dp_i + dp_j) * (Q_j - Q_i)
+  !
+  ! Update at cell i:
+  !   Q_new_i = Q_i + dt * (sum of inward face fluxes) / (dp_i * area_sphere_i)
+  !
+  ! Conservation:  flux_face is antisymmetric in i<->j, so
+  !   sum_i (dp_i * area_i) * (Q_new_i - Q_i)
+  !     = dt * sum_faces (flux_face_ij + flux_face_ji) = 0
+  ! exactly (each shared face contributes equal-and-opposite to its two cells).
+  ! Holds as long as halo dp and Q values are bit-identical across ranks, which
+  ! is guaranteed by ghost_exchange.
+  !
+  ! dp_fvm is NOT modified by this routine.
+  !
+  ! Filter coefficient nu_q_cslam is a placeholder; promote to namelist when tuned.
+  !
+  subroutine apply_cslam_q_filter_del2(fvm, hybrid, nets, nete, kmin, kmax, dt_fvm)
+    use edge_mod , only: ghostpack, ghostunpack
+    use bndry_mod, only: ghost_exchange
+    use fvm_mod  , only: ghostBufQfilter
+    use physconst, only: rearth
+    implicit none
+    type (fvm_struct)   , intent(inout) :: fvm(:)
+    type (hybrid_t)     , intent(in)    :: hybrid
+    integer             , intent(in)    :: nets, nete, kmin, kmax
+    real (kind=r8)      , intent(in)    :: dt_fvm
+
+    ! nu_q_cslam: del2 hyperdiffusion coefficient in [m^2/s], same physical
+    ! units used by the SE sponge del2 coefficient nu_top (e.g. nu_top = 1.0e5).
+    ! The sphere-form coefficient is nu_q_cslam / rearth^2; the flux-form
+    ! update solves  dQ/dt = nu_q_cslam * laplacian(Q)  with laplacian in 1/m^2.
+    ! Stability (diffusion CFL):
+    !   dt_fvm * (nu_q_cslam / rearth^2) / area_sphere < 1/4
+    !   area_sphere ~ 1e-5 sr for ne120pg3 ; rearth^2 ~ 4.06e13 m^2 ; dt_fvm ~ 100 s
+    !   => nu_q_cslam <~ 1.0e6 m^2/s
+    ! Value 4.0e4 m^2/s is equivalent to the prior steradian-form value 1.0e-9
+    ! that dramatically suppressed the cube-vertex noise.
+    real (kind=r8), parameter :: nu_q_cslam = 4.0e4_r8   ! m^2/s
+    real (kind=r8)            :: nu_sphere               ! = nu_q_cslam / rearth^2
+    ! Water vapor index on the CSLAM/FVM grid (fvm%c(:,:,:,1)).  Per prim_advance_mod
+    ! convention when use_cslam: ixwv = 1.
+    integer       , parameter :: ixwv_fvm   = 1
+    real (kind=r8) :: dp_fw, dp_fe, dp_fs, dp_fn
+    real (kind=r8) :: flux_w, flux_e, flux_s, flux_n
+    real (kind=r8) :: q_new(nc,nc), inv_dp_area
+    integer        :: ie, k, q, i, j, kblk, kptr
+
+    nu_sphere = nu_q_cslam / (rearth*rearth)
+
+    kblk = kmax - kmin + 1
+
+    !----- 1. Fresh halo exchange of dp_fvm (Pa) and Q_wv (mixing ratio); WV only -----
+    ! ghostBufQfilter is 1-deep: the plus-stencil below only reads halo ring 1.
+    do ie = nets, nete
+       kptr = kmin - 1
+       call ghostpack(ghostBufQfilter, fvm(ie)%dp_fvm(0:nc+1, 0:nc+1, kmin:kmax), kblk, kptr, ie)
+       kptr = kptr + nlev
+       call ghostpack(ghostBufQfilter, fvm(ie)%c(0:nc+1, 0:nc+1, kmin:kmax, ixwv_fvm), kblk, kptr, ie)
+    end do
+    call ghost_exchange(hybrid, ghostBufQfilter, location='cslam_q_filter_del2')
+    do ie = nets, nete
+       kptr = kmin - 1
+       call ghostunpack(ghostBufQfilter, fvm(ie)%dp_fvm(0:nc+1, 0:nc+1, kmin:kmax), kblk, kptr, ie)
+       kptr = kptr + nlev
+       call ghostunpack(ghostBufQfilter, fvm(ie)%c(0:nc+1, 0:nc+1, kmin:kmax, ixwv_fvm), kblk, kptr, ie)
+    end do
+
+    !----- 2. Apply flux-form del2 on Q_wv only, dp-face weighted, all CSLAM cells -----
+    q = ixwv_fvm
+    do ie = nets, nete
+       do k = kmin, kmax
+          do j = 1, nc
+             do i = 1, nc
+                dp_fw = 0.5_r8 * (fvm(ie)%dp_fvm(i  , j  , k) + fvm(ie)%dp_fvm(i-1, j  , k))
+                dp_fe = 0.5_r8 * (fvm(ie)%dp_fvm(i  , j  , k) + fvm(ie)%dp_fvm(i+1, j  , k))
+                dp_fs = 0.5_r8 * (fvm(ie)%dp_fvm(i  , j  , k) + fvm(ie)%dp_fvm(i  , j-1, k))
+                dp_fn = 0.5_r8 * (fvm(ie)%dp_fvm(i  , j  , k) + fvm(ie)%dp_fvm(i  , j+1, k))
+
+                flux_w = nu_sphere * dp_fw * (fvm(ie)%c(i-1, j  , k, q) - fvm(ie)%c(i, j, k, q))
+                flux_e = nu_sphere * dp_fe * (fvm(ie)%c(i+1, j  , k, q) - fvm(ie)%c(i, j, k, q))
+                flux_s = nu_sphere * dp_fs * (fvm(ie)%c(i  , j-1, k, q) - fvm(ie)%c(i, j, k, q))
+                flux_n = nu_sphere * dp_fn * (fvm(ie)%c(i  , j+1, k, q) - fvm(ie)%c(i, j, k, q))
+
+                inv_dp_area = 1.0_r8 / (fvm(ie)%dp_fvm(i, j, k) * fvm(ie)%area_sphere(i, j))
+                q_new(i, j) = fvm(ie)%c(i, j, k, q) + &
+                     dt_fvm * (flux_w + flux_e + flux_s + flux_n) * inv_dp_area
+             end do
+          end do
+          fvm(ie)%c(1:nc, 1:nc, k, q) = q_new(1:nc, 1:nc)
+       end do
+    end do
+  end subroutine apply_cslam_q_filter_del2
+#endif
+
+#ifdef CSLAM_Q_FILTER_DEL4
+  !
+  ! Mass-conservative biharmonic (del4) filter on water-vapor mixing ratio
+  ! (fvm%c(:,:,:,ixwv_fvm)) on the CSLAM grid.  Two-pass del2 with proper
+  ! spherical metric terms.
+  !
+  !   Pass 1:  L_i = ( Sum_faces  w_face * (Q_j - Q_i) ) / area_C
+  !
+  !   Pass 2:  F_face = nu4(k) * dp_face * w_face * (L_j - L_i)
+  !            Q_new_i = Q_i - dt * Sum_faces(F) / (dp_i * area_i)
+  !
+  ! where the face metric weight is
+  !
+  !     w_face = arc-length of shared edge / great-circle distance between centers
+  !
+  ! computed analytically per cell from fvm%vtx_cart (tan-plane, halo-filled at
+  ! init) and elem%FaceNum via the standard face-based-cube-to-unit-sphere map.
+  !
+  ! Level-dependent coefficient: nu4(k) = nu_p_lev(k) (m^4/s), the same
+  ! biharmonic dp-damping coefficient used by the SE hypervis path.
+  ! Sign: dQ/dt = -nu4 * nabla^4 Q (dissipative).
+  !
+  ! Conservation: face flux is antisymmetric in i<->j because dp_face is a
+  ! symmetric arithmetic mean and w_face depends only on shared geometry.
+  ! Cross-panel faces can differ by ~1 ULP due to per-panel rotation +
+  ! different face-transform arithmetic; the resulting conservation drift
+  ! is O(1e-16 per face per step) -- negligible.
+  !
+  ! Monotone limiter (cslam_q_filter_limiter, dimensions_mod): Zalesak-type
+  ! FCT on the pass-2 fluxes.  Per-cell ratios Rp/Rm (allowed fraction of
+  ! the summed incoming/outgoing flux before leaving the pre-filter 5-point
+  ! neighborhood [min,max]) are computed, ghost-exchanged (ring 1), and each
+  ! face flux is scaled by min(Rm_giver, Rp_receiver) -- identical on both
+  ! sides of the face, so conservation is preserved exactly.  Kills del4
+  ! ringing/staircasing at resolved sharp Q fronts and guarantees
+  ! positivity; smooth grid-scale noise is damped at full strength (C=1).
+  !
+  ! Gradient mask (cslam_q_filter_gradmask, dimensions_mod): per-cell
+  ! grid-scale oscillation detector (opposing 1D slopes of pre-filter Q in
+  ! x or y -> 1, monotone -> 0), own ring-1 exchange before pass 1; every
+  ! face factor max(Msk_i, Msk_j) is applied in BOTH del2 passes, so the
+  ! masked operator is (div m grad) twice = SPD squared = dissipative for
+  ! any mask.  (One-sided masking of pass 2 alone is sign-indefinite and
+  ! PUMPS grid-scale noise -- observed run11 2026-07-09.)  Fronts get zero
+  ! damping; oscillations at any amplitude get full damping.  Composable
+  ! with the limiter (mask scales fluxes first).
+  !
+  ! Cross-diffusion correction (cslam_q_filter_xdiff, dimensions_mod): the
+  ! two-point face flux w*(Q_j - Q_i) is only a consistent spherical
+  ! Laplacian where the mesh is orthogonal (center-to-center line parallel
+  ! to the face normal); on the skewed gnomonic mesh it drops the
+  ! tangential-gradient part of the flux -- worst exactly at panel
+  ! edges/corners.  With the knob on, both del2 passes use the full
+  ! tangent-plane gradient reconstructed from the two-point difference plus
+  ! a tangential difference over the diagonal ring-1 halo cells (see
+  ! compute_face_weights for the geometry and the antisymmetry argument).
+  ! Exact for tangent-plane-linear Q.  No extra communication (corners of
+  ! ring 1 are already exchanged).  Faces whose tangential stencil touches
+  ! a non-existent cube-vertex wedge cell fall back to the two-point flux,
+  ! identically on both sides.  CAVEAT: the corrected operator matrix is
+  ! not symmetric, so the (SPD)^2 dissipativity proof no longer applies;
+  ! the correction is O(mesh skew) relative to the primary flux, the
+  ! checkerboard mode is untouched (tangential sums cancel), and the FCT
+  ! limiter bounds Q locally.  Watch for run11-style noise pumping in the
+  ! first test; if observed, turn the knob off.
+  !
+  ! Cost per subcycle: 2 ghost_exchanges (Q+dp, L); +1 with the mask
+  ! (Msk pass); +1 with the limiter (Rp/Rm pass).
+  ! Both exchanges use the dedicated 1-deep buffer ghostBufQfilter (the
+  ! plus-stencil only reads halo ring 1); rings 2..nhc of the fvm%c/dp_fvm
+  ! halo are left untouched (stale) -- every downstream consumer either
+  ! reads own cells only or does its own halo exchange (cslam2gll,
+  ! phys coupling, next CSLAM step).
+  ! Stability (2D von Neumann, checkerboard mode has laplacian eigenvalue
+  ! 8/A per cell): dt_sub * mult*nu_p_lev * (8/A_min)^2 < 2.  NOTE this is
+  ! 4x stricter than the 1D bound (16/h^4).  With the automatic Boville
+  ! coefficient scaling nu ~ dx^3.32 and dt ~ dx, the bound is essentially
+  ! resolution-neutral (S ~ dx^0.32): ~4x margin at 1x for both ne30pg3 and
+  ! ne120pg3 => nsub=1.  Subcycling (cslam_q_filter_nsub, auto-set in
+  ! print_cfl/global_norms_mod.F90) engages when the margin is eaten by a
+  ! raised cslam_q_filter_mult, a namelist nu_p above the automatic value,
+  ! or WACCM sponge ramps of nu_p_lev (x5 with no dt change).
+  !
+  ! dp_fvm is NOT modified.  Only water vapor (ixwv_fvm = 1) is damped.
+  !
+  ! NOTE: when this filter is active, set del4_cslam_qgll = .false. in
+  ! dimensions_mod.F90 so hypervis_Qdp does NOT also apply del4 to water
+  ! vapor on the GLL grid after cslam2gll -- otherwise double-damping.
+  !
+  subroutine apply_cslam_q_filter_del4(elem, fvm, hybrid, nets, nete, kmin, kmax, dt_fvm)
+    use edge_mod       , only: ghostpack, ghostunpack
+    use bndry_mod      , only: ghost_exchange
+    use fvm_mod        , only: ghostBufQfilter
+    use physconst      , only: rearth
+    use dimensions_mod , only: nu_p_lev, cslam_q_filter_mult, cslam_q_filter_limiter, &
+                               cslam_q_filter_gradmask, cslam_q_filter_xdiff
+    use control_mod    , only: cslam_q_filter_nsub
+    implicit none
+    type (element_t)    , intent(in)    :: elem(:)
+    type (fvm_struct)   , intent(inout) :: fvm(:)
+    type (hybrid_t)     , intent(in)    :: hybrid
+    integer             , intent(in)    :: nets, nete, kmin, kmax
+    real (kind=r8)      , intent(in)    :: dt_fvm
+
+    integer       , parameter :: ixwv_fvm = 1
+    real (kind=r8)            :: rearth4_inv        ! = 1 / rearth^4
+    real (kind=r8)            :: nu4k               ! nu_p_lev(k) / rearth^4
+
+    real (kind=r8), allocatable :: L(:,:,:,:)      ! (0:nc+1, 0:nc+1, kmin:kmax, nets:nete); ring-1 halo only
+    !
+    ! Limiter work arrays (allocated only when cslam_q_filter_limiter):
+    !   Fx(i,j)  : raw del4 flux at east-west face between cells i and i+1
+    !              (i=0..nc); Fx > 0 moves Q from cell i to cell i+1.
+    !   Fy(i,j)  : raw flux at north-south face between cells j and j+1.
+    !   Rp/Rm    : Zalesak ratios -- max fraction of the incoming (Rp) /
+    !              outgoing (Rm) flux sum a cell can accept without leaving
+    !              [qmn, qmx] of its pre-filter 5-point neighborhood.
+    !              Exchanged (ring 1) so both sides of a shared face use the
+    !              SAME pair -> limited flux stays antisymmetric -> conservation.
+    !
+    real (kind=r8), allocatable :: Fx(:,:,:,:)     ! (0:nc, 1:nc, kmin:kmax, nets:nete)
+    real (kind=r8), allocatable :: Fy(:,:,:,:)     ! (1:nc, 0:nc, kmin:kmax, nets:nete)
+    real (kind=r8), allocatable :: Rp(:,:,:,:)     ! (0:nc+1, 0:nc+1, kmin:kmax, nets:nete)
+    real (kind=r8), allocatable :: Rm(:,:,:,:)     ! (0:nc+1, 0:nc+1, kmin:kmax, nets:nete)
+    real (kind=r8) :: dqw, dqe, dqs, dqn, pp, pm, qmx, qmn, q0
+    real (kind=r8) :: c_w, c_e, c_s, c_n
+    !
+    ! Gradient mask (cslam_q_filter_gradmask): Msk = 1 where the pre-filter Q
+    ! has a grid-scale oscillation at the cell (opposing 1D slopes,
+    ! dxl*dxr < 0, in x or y), 0 on monotone stretches (resolved fronts).
+    ! Exchanged ring-1 (piggybacks on the L exchange, no extra communication);
+    ! each face flux is scaled by max(Msk_i, Msk_j) -- identical on both
+    ! sides -> antisymmetry/conservation preserved.
+    !
+    real (kind=r8), allocatable :: Msk(:,:,:,:)    ! (0:nc+1, 0:nc+1, kmin:kmax, nets:nete)
+    real (kind=r8) :: dxl, dxr, dyl, dyr
+    !
+    ! Per-element geometric arrays (level-independent, computed once per call).
+    ! Face weights use true center-to-center distances at ALL faces, with
+    ! halo-cell centers computed in the OWNER's tan-plane frame (panel from
+    ! flux_orient(1,i,j)) so both elements sharing a face agree to ULP ->
+    ! antisymmetric fluxes -> conservation.  See compute_face_weights.
+    !
+    !   c3d_own(:, i, j) : 3D unit vector on sphere at own-cell (i,j) center,
+    !                      i,j = 1..nc.  Mean-of-4-vertices in tan-plane maps
+    !                      to great-circle midpoint under gnomonic projection.
+    !   w_ew(i, j)       : metric weight at east-west face (index i = face
+    !                      between cells i and i+1), i=0..nc, j=1..nc.
+    !   w_ns(i, j)       : metric weight at north-south face, i=1..nc, j=0..nc.
+    !
+    real (kind=r8) :: c3d_own(3, 1:nc, 1:nc)
+    real (kind=r8) :: w_ew(0:nc  , 1:nc  )
+    real (kind=r8) :: w_ns(1:nc  , 0:nc  )
+    !
+    ! Cross-diffusion correction (cslam_q_filter_xdiff): corrected face-flux
+    ! coefficients from compute_face_weights.  Flux at an e-w face i =
+    !   xw_ew*(Q(i+1,j)-Q(i,j)) + xt_ew*T,
+    !   T = (Q(i,j+1)+Q(i+1,j+1)) - (Q(i,j-1)+Q(i+1,j-1))
+    ! (analogously n-s with the i+-1 pairs).  Gx/Gy hold the per-face fluxes
+    ! oriented toward increasing index; cell update = Gx(i,j)-Gx(i-1,j)+
+    ! Gy(i,j)-Gy(i,j-1).  T reads the diagonal ring-1 halo corners, which the
+    ! existing exchanges already fill (wedge corners at cube vertices carry
+    ! edgeDefaultVal placeholders but their faces have xt = 0 exactly).
+    ! Stability: for the 2D checkerboard mode the tangential sums cancel
+    ! (T = 0), so the auto-nsub bound from print_cfl is unchanged; xw can
+    ! exceed w by a few % on skewed faces, covered by the 1.25 slack there.
+    !
+    real (kind=r8) :: xw_ew(0:nc  , 1:nc  ), xt_ew(0:nc  , 1:nc  )
+    real (kind=r8) :: xw_ns(1:nc  , 0:nc  ), xt_ns(1:nc  , 0:nc  )
+    real (kind=r8) :: Gx(0:nc, 1:nc), Gy(1:nc, 0:nc)
+    real (kind=r8) :: v1(3), v2(3), vmid(3)
+    real (kind=r8) :: dp_fw, dp_fe, dp_fs, dp_fn
+    real (kind=r8) :: flux_w, flux_e, flux_s, flux_n
+    real (kind=r8) :: q_new(nc,nc), inv_dp_area, inv_area
+    real (kind=r8) :: cx, cy, mx, my, face_len, dist
+    real (kind=r8) :: dt_sub
+    integer        :: ie, k, q, i, j, kblk, kptr, face_num, isub
+
+    if (cslam_q_filter_gradmask .and. cslam_q_filter_xdiff) then
+       call endrun('cslam_q_filter_xdiff is not wired into the (abandoned) gradmask path; disable one')
+    end if
+
+    q           = ixwv_fvm
+    kblk        = kmax - kmin + 1
+    rearth4_inv = 1.0_r8 / (rearth*rearth*rearth*rearth)
+    dt_sub      = dt_fvm / real(cslam_q_filter_nsub, r8)
+
+    allocate(L(0:nc+1, 0:nc+1, kmin:kmax, nets:nete))
+    L = 0.0_r8
+    if (cslam_q_filter_limiter) then
+       allocate(Fx(0:nc  , 1:nc  , kmin:kmax, nets:nete))
+       allocate(Fy(1:nc  , 0:nc  , kmin:kmax, nets:nete))
+       allocate(Rp(0:nc+1, 0:nc+1, kmin:kmax, nets:nete))
+       allocate(Rm(0:nc+1, 0:nc+1, kmin:kmax, nets:nete))
+       Rp = 1.0_r8
+       Rm = 1.0_r8
+    end if
+    if (cslam_q_filter_gradmask) then
+       allocate(Msk(0:nc+1, 0:nc+1, kmin:kmax, nets:nete))
+       Msk = 0.0_r8
+    end if
+
+    !
+    ! Subcycle loop: cslam_q_filter_nsub is auto-set in print_cfl from the
+    ! 2D del4 stability bound dt_sub*mult*max(nu_p_lev)*(8/A_min)^2 < 2.
+    ! nsub = 1 at 1x with the automatic nu_p scaling (any ne); >1 when
+    ! cslam_q_filter_mult is raised or nu_p_lev ramps (WACCM sponge).
+    ! Both halo exchanges must be inside the loop.
+    !
+    do isub = 1, cslam_q_filter_nsub
+
+    !----- 1. Halo exchange of dp_fvm and Q_wv -----
+    ! ghostBufQfilter is 1-deep: both stencil passes only read halo ring 1.
+    do ie = nets, nete
+       kptr = kmin - 1
+       call ghostpack(ghostBufQfilter, fvm(ie)%dp_fvm(0:nc+1, 0:nc+1, kmin:kmax), kblk, kptr, ie)
+       kptr = kmin - 1 + nlev
+       call ghostpack(ghostBufQfilter, fvm(ie)%c(0:nc+1, 0:nc+1, kmin:kmax, q), kblk, kptr, ie)
+    end do
+    call ghost_exchange(hybrid, ghostBufQfilter, location='cslam_q_filter_del4_passQ')
+    do ie = nets, nete
+       kptr = kmin - 1
+       call ghostunpack(ghostBufQfilter, fvm(ie)%dp_fvm(0:nc+1, 0:nc+1, kmin:kmax), kblk, kptr, ie)
+       kptr = kmin - 1 + nlev
+       call ghostunpack(ghostBufQfilter, fvm(ie)%c(0:nc+1, 0:nc+1, kmin:kmax, q), kblk, kptr, ie)
+    end do
+
+    !----- 1b. Gradient mask: compute own cells + halo exchange (BEFORE pass 1) -----
+    !
+    ! grid-scale oscillation detector: opposing 1D slopes of the pre-filter
+    ! Q in x or y.  Monotone stretches (fronts) -> 0; alternating (noise,
+    ! incl. roundoff-scale seeds on smooth background) -> 1.  Scale-free,
+    ! so the panel-edge seed is detected while still at roundoff amplitude.
+    !
+    ! The mask MUST be applied identically in BOTH del2 passes: the masked
+    ! operator is then (div m grad) applied twice = symmetric positive
+    ! semi-definite squared => provably dissipative for any m >= 0.
+    ! Masking pass 2 alone makes the variance budget sign-indefinite and
+    ! the filter PUMPS grid-scale noise (observed: run11, 2026-07-09).
+    ! Hence the mask needs its own ring-1 exchange before pass 1.
+    !
+    if (cslam_q_filter_gradmask) then
+       do ie = nets, nete
+          do k = kmin, kmax
+             do j = 1, nc
+                do i = 1, nc
+                   dxl = fvm(ie)%c(i  , j, k, q) - fvm(ie)%c(i-1, j, k, q)
+                   dxr = fvm(ie)%c(i+1, j, k, q) - fvm(ie)%c(i  , j, k, q)
+                   dyl = fvm(ie)%c(i, j  , k, q) - fvm(ie)%c(i, j-1, k, q)
+                   dyr = fvm(ie)%c(i, j+1, k, q) - fvm(ie)%c(i, j  , k, q)
+                   Msk(i, j, k, ie) = 0.0_r8
+                   if (dxl*dxr < 0.0_r8 .or. dyl*dyr < 0.0_r8) Msk(i, j, k, ie) = 1.0_r8
+                end do
+             end do
+          end do
+       end do
+       do ie = nets, nete
+          kptr = kmin - 1
+          call ghostpack(ghostBufQfilter, Msk(0:nc+1, 0:nc+1, kmin:kmax, ie), kblk, kptr, ie)
+       end do
+       call ghost_exchange(hybrid, ghostBufQfilter, location='cslam_q_filter_del4_passM')
+       do ie = nets, nete
+          kptr = kmin - 1
+          call ghostunpack(ghostBufQfilter, Msk(0:nc+1, 0:nc+1, kmin:kmax, ie), kblk, kptr, ie)
+       end do
+    end if
+
+    !----- 2. Pass 1: discrete Laplacian L on own cells (1:nc, 1:nc), with metric weights -----
+    do ie = nets, nete
+       face_num = elem(ie)%FaceNum
+       if (cslam_q_filter_xdiff) then
+          call compute_face_weights(fvm(ie), face_num, c3d_own, w_ew, w_ns, &
+                                    xw_ew, xt_ew, xw_ns, xt_ns)
+       else
+          call compute_face_weights(fvm(ie), face_num, c3d_own, w_ew, w_ns)
+       end if
+       do k = kmin, kmax
+          if (cslam_q_filter_gradmask) then
+             ! masked Laplacian: same face mask as pass 2 (see 1b note)
+             do j = 1, nc
+                do i = 1, nc
+                   inv_area = 1.0_r8 / fvm(ie)%area_sphere(i, j)
+                   L(i, j, k, ie) = (                                                       &
+                        max(Msk(i-1, j, k, ie), Msk(i, j, k, ie)) *                          &
+                        w_ew(i-1, j  ) * (fvm(ie)%c(i-1, j  , k, q) - fvm(ie)%c(i, j, k, q)) + &
+                        max(Msk(i+1, j, k, ie), Msk(i, j, k, ie)) *                          &
+                        w_ew(i  , j  ) * (fvm(ie)%c(i+1, j  , k, q) - fvm(ie)%c(i, j, k, q)) + &
+                        max(Msk(i, j-1, k, ie), Msk(i, j, k, ie)) *                          &
+                        w_ns(i  , j-1) * (fvm(ie)%c(i  , j-1, k, q) - fvm(ie)%c(i, j, k, q)) + &
+                        max(Msk(i, j+1, k, ie), Msk(i, j, k, ie)) *                          &
+                        w_ns(i  , j  ) * (fvm(ie)%c(i  , j+1, k, q) - fvm(ie)%c(i, j, k, q))   &
+                        ) * inv_area
+                end do
+             end do
+          else if (cslam_q_filter_xdiff) then
+             ! corrected face fluxes, then divergence per cell
+             do j = 1, nc
+                do i = 0, nc
+                   Gx(i, j) = xw_ew(i, j) * (fvm(ie)%c(i+1, j, k, q) - fvm(ie)%c(i, j, k, q)) + &
+                              xt_ew(i, j) * ( (fvm(ie)%c(i  , j+1, k, q) + fvm(ie)%c(i+1, j+1, k, q))   &
+                                            - (fvm(ie)%c(i  , j-1, k, q) + fvm(ie)%c(i+1, j-1, k, q)) )
+                end do
+             end do
+             do j = 0, nc
+                do i = 1, nc
+                   Gy(i, j) = xw_ns(i, j) * (fvm(ie)%c(i, j+1, k, q) - fvm(ie)%c(i, j, k, q)) + &
+                              xt_ns(i, j) * ( (fvm(ie)%c(i+1, j  , k, q) + fvm(ie)%c(i+1, j+1, k, q))   &
+                                            - (fvm(ie)%c(i-1, j  , k, q) + fvm(ie)%c(i-1, j+1, k, q)) )
+                end do
+             end do
+             do j = 1, nc
+                do i = 1, nc
+                   inv_area = 1.0_r8 / fvm(ie)%area_sphere(i, j)
+                   L(i, j, k, ie) = (Gx(i, j) - Gx(i-1, j) + Gy(i, j) - Gy(i, j-1)) * inv_area
+                end do
+             end do
+          else
+             do j = 1, nc
+                do i = 1, nc
+                   inv_area = 1.0_r8 / fvm(ie)%area_sphere(i, j)
+                   L(i, j, k, ie) = (                                                       &
+                        w_ew(i-1, j  ) * (fvm(ie)%c(i-1, j  , k, q) - fvm(ie)%c(i, j, k, q)) + &
+                        w_ew(i  , j  ) * (fvm(ie)%c(i+1, j  , k, q) - fvm(ie)%c(i, j, k, q)) + &
+                        w_ns(i  , j-1) * (fvm(ie)%c(i  , j-1, k, q) - fvm(ie)%c(i, j, k, q)) + &
+                        w_ns(i  , j  ) * (fvm(ie)%c(i  , j+1, k, q) - fvm(ie)%c(i, j, k, q))   &
+                        ) * inv_area
+                end do
+             end do
+          end if
+       end do
+    end do
+
+    !----- 3. Halo exchange of L -----
+    do ie = nets, nete
+       kptr = kmin - 1
+       call ghostpack(ghostBufQfilter, L(0:nc+1, 0:nc+1, kmin:kmax, ie), kblk, kptr, ie)
+    end do
+    call ghost_exchange(hybrid, ghostBufQfilter, location='cslam_q_filter_del4_passL')
+    do ie = nets, nete
+       kptr = kmin - 1
+       call ghostunpack(ghostBufQfilter, L(0:nc+1, 0:nc+1, kmin:kmax, ie), kblk, kptr, ie)
+    end do
+
+    !----- 4. Pass 2: flux-form del2 of L, dp-weighted with metric, MINUS sign for del4 -----
+    if (.not. cslam_q_filter_limiter) then
+    !
+    ! Unlimited del4 (original path; kept verbatim -- bit-identical to the
+    ! pre-limiter builds when cslam_q_filter_limiter = .false.)
+    !
+    do ie = nets, nete
+       face_num = elem(ie)%FaceNum
+       if (cslam_q_filter_xdiff) then
+          call compute_face_weights(fvm(ie), face_num, c3d_own, w_ew, w_ns, &
+                                    xw_ew, xt_ew, xw_ns, xt_ns)
+       else
+          call compute_face_weights(fvm(ie), face_num, c3d_own, w_ew, w_ns)
+       end if
+
+       do k = kmin, kmax
+          nu4k = cslam_q_filter_mult * nu_p_lev(k) * rearth4_inv   ! mult set in dimensions_mod
+          if (cslam_q_filter_xdiff) then
+             ! corrected dp-weighted face fluxes of L, then divergence per cell
+             do j = 1, nc
+                do i = 0, nc
+                   Gx(i, j) = nu4k * 0.5_r8 * (fvm(ie)%dp_fvm(i, j, k) + fvm(ie)%dp_fvm(i+1, j, k)) * ( &
+                        xw_ew(i, j) * (L(i+1, j, k, ie) - L(i, j, k, ie)) + &
+                        xt_ew(i, j) * ( (L(i  , j+1, k, ie) + L(i+1, j+1, k, ie))   &
+                                      - (L(i  , j-1, k, ie) + L(i+1, j-1, k, ie)) ) )
+                end do
+             end do
+             do j = 0, nc
+                do i = 1, nc
+                   Gy(i, j) = nu4k * 0.5_r8 * (fvm(ie)%dp_fvm(i, j, k) + fvm(ie)%dp_fvm(i, j+1, k)) * ( &
+                        xw_ns(i, j) * (L(i, j+1, k, ie) - L(i, j, k, ie)) + &
+                        xt_ns(i, j) * ( (L(i+1, j  , k, ie) + L(i+1, j+1, k, ie))   &
+                                      - (L(i-1, j  , k, ie) + L(i-1, j+1, k, ie)) ) )
+                end do
+             end do
+             do j = 1, nc
+                do i = 1, nc
+                   inv_dp_area = 1.0_r8 / (fvm(ie)%dp_fvm(i, j, k) * fvm(ie)%area_sphere(i, j))
+                   q_new(i, j) = fvm(ie)%c(i, j, k, q) - &
+                        dt_sub * (Gx(i, j) - Gx(i-1, j) + Gy(i, j) - Gy(i, j-1)) * inv_dp_area
+                end do
+             end do
+          else
+          do j = 1, nc
+             do i = 1, nc
+                dp_fw = 0.5_r8 * (fvm(ie)%dp_fvm(i  , j  , k) + fvm(ie)%dp_fvm(i-1, j  , k))
+                dp_fe = 0.5_r8 * (fvm(ie)%dp_fvm(i  , j  , k) + fvm(ie)%dp_fvm(i+1, j  , k))
+                dp_fs = 0.5_r8 * (fvm(ie)%dp_fvm(i  , j  , k) + fvm(ie)%dp_fvm(i  , j-1, k))
+                dp_fn = 0.5_r8 * (fvm(ie)%dp_fvm(i  , j  , k) + fvm(ie)%dp_fvm(i  , j+1, k))
+
+                flux_w = nu4k * dp_fw * w_ew(i-1, j  ) * (L(i-1, j  , k, ie) - L(i, j, k, ie))
+                flux_e = nu4k * dp_fe * w_ew(i  , j  ) * (L(i+1, j  , k, ie) - L(i, j, k, ie))
+                flux_s = nu4k * dp_fs * w_ns(i  , j-1) * (L(i  , j-1, k, ie) - L(i, j, k, ie))
+                flux_n = nu4k * dp_fn * w_ns(i  , j  ) * (L(i  , j+1, k, ie) - L(i, j, k, ie))
+
+                if (cslam_q_filter_gradmask) then
+                   ! max of the two cells' masks -> identical on both sides of
+                   ! the face -> antisymmetry/conservation preserved
+                   flux_w = max(Msk(i-1, j, k, ie), Msk(i, j, k, ie)) * flux_w
+                   flux_e = max(Msk(i+1, j, k, ie), Msk(i, j, k, ie)) * flux_e
+                   flux_s = max(Msk(i, j-1, k, ie), Msk(i, j, k, ie)) * flux_s
+                   flux_n = max(Msk(i, j+1, k, ie), Msk(i, j, k, ie)) * flux_n
+                end if
+
+                inv_dp_area = 1.0_r8 / (fvm(ie)%dp_fvm(i, j, k) * fvm(ie)%area_sphere(i, j))
+                q_new(i, j) = fvm(ie)%c(i, j, k, q) - &
+                     dt_sub * (flux_w + flux_e + flux_s + flux_n) * inv_dp_area
+             end do
+          end do
+          end if ! cslam_q_filter_xdiff
+          fvm(ie)%c(1:nc, 1:nc, k, q) = q_new(1:nc, 1:nc)
+       end do
+    end do
+
+    else
+    !
+    ! Monotone (Zalesak FCT-type) del4.  Raw face fluxes are scaled by a
+    ! coefficient C in [0,1] so that no cell leaves the [min,max] of its
+    ! pre-filter 5-point neighborhood.  Smooth grid-scale noise (small |dQ|
+    ! against loose bounds) passes unlimited (C=1) and gets full del4
+    ! damping; at resolved sharp fronts the ringing lobes hit the bounds
+    ! and are clipped -> no over/undershoot, no staircasing, positivity
+    ! guaranteed (bounds >= 0).  C is min(Rm_giver, Rp_receiver) with the
+    ! SAME exchanged R values on both sides of a face -> the limited flux
+    ! remains antisymmetric -> exact conservation (up to the documented
+    ! cross-panel ULP caveat).
+    !
+    !--- 4a. Raw face fluxes and per-cell Zalesak ratios ---
+    do ie = nets, nete
+       face_num = elem(ie)%FaceNum
+       if (cslam_q_filter_xdiff) then
+          call compute_face_weights(fvm(ie), face_num, c3d_own, w_ew, w_ns, &
+                                    xw_ew, xt_ew, xw_ns, xt_ns)
+       else
+          call compute_face_weights(fvm(ie), face_num, c3d_own, w_ew, w_ns)
+       end if
+
+       do k = kmin, kmax
+          nu4k = cslam_q_filter_mult * nu_p_lev(k) * rearth4_inv
+          if (cslam_q_filter_xdiff) then
+             ! corrected raw fluxes; the FCT limiter below applies unchanged
+             ! (it only ever reduces fluxes, so bounds/conservation hold)
+             do j = 1, nc
+                do i = 0, nc
+                   Fx(i, j, k, ie) = nu4k * 0.5_r8 * (fvm(ie)%dp_fvm(i, j, k) + fvm(ie)%dp_fvm(i+1, j, k)) * ( &
+                        xw_ew(i, j) * (L(i+1, j, k, ie) - L(i, j, k, ie)) + &
+                        xt_ew(i, j) * ( (L(i  , j+1, k, ie) + L(i+1, j+1, k, ie))   &
+                                      - (L(i  , j-1, k, ie) + L(i+1, j-1, k, ie)) ) )
+                end do
+             end do
+             do j = 0, nc
+                do i = 1, nc
+                   Fy(i, j, k, ie) = nu4k * 0.5_r8 * (fvm(ie)%dp_fvm(i, j, k) + fvm(ie)%dp_fvm(i, j+1, k)) * ( &
+                        xw_ns(i, j) * (L(i, j+1, k, ie) - L(i, j, k, ie)) + &
+                        xt_ns(i, j) * ( (L(i+1, j  , k, ie) + L(i+1, j+1, k, ie))   &
+                                      - (L(i-1, j  , k, ie) + L(i-1, j+1, k, ie)) ) )
+                end do
+             end do
+          else
+          do j = 1, nc
+             do i = 0, nc
+                Fx(i, j, k, ie) = nu4k * 0.5_r8 * (fvm(ie)%dp_fvm(i, j, k) + fvm(ie)%dp_fvm(i+1, j, k)) * &
+                     w_ew(i, j) * (L(i+1, j, k, ie) - L(i, j, k, ie))
+             end do
+          end do
+          do j = 0, nc
+             do i = 1, nc
+                Fy(i, j, k, ie) = nu4k * 0.5_r8 * (fvm(ie)%dp_fvm(i, j, k) + fvm(ie)%dp_fvm(i, j+1, k)) * &
+                     w_ns(i, j) * (L(i, j+1, k, ie) - L(i, j, k, ie))
+             end do
+          end do
+          end if ! cslam_q_filter_xdiff
+          if (cslam_q_filter_gradmask) then
+             ! scale raw fluxes by the face mask BEFORE the limiter sees them
+             ! (R ratios and the limited update then act on the masked fluxes)
+             do j = 1, nc
+                do i = 0, nc
+                   Fx(i, j, k, ie) = max(Msk(i, j, k, ie), Msk(i+1, j, k, ie)) * Fx(i, j, k, ie)
+                end do
+             end do
+             do j = 0, nc
+                do i = 1, nc
+                   Fy(i, j, k, ie) = max(Msk(i, j, k, ie), Msk(i, j+1, k, ie)) * Fy(i, j, k, ie)
+                end do
+             end do
+          end if
+          do j = 1, nc
+             do i = 1, nc
+                inv_dp_area = 1.0_r8 / (fvm(ie)%dp_fvm(i, j, k) * fvm(ie)%area_sphere(i, j))
+                ! signed would-be update contribution of each face to cell (i,j)
+                dqw =  dt_sub * Fx(i-1, j  , k, ie) * inv_dp_area
+                dqe = -dt_sub * Fx(i  , j  , k, ie) * inv_dp_area
+                dqs =  dt_sub * Fy(i  , j-1, k, ie) * inv_dp_area
+                dqn = -dt_sub * Fy(i  , j  , k, ie) * inv_dp_area
+                pp  = max(0.0_r8, dqw) + max(0.0_r8, dqe) + max(0.0_r8, dqs) + max(0.0_r8, dqn)
+                pm  = max(0.0_r8,-dqw) + max(0.0_r8,-dqe) + max(0.0_r8,-dqs) + max(0.0_r8,-dqn)
+                q0  = fvm(ie)%c(i, j, k, q)
+                qmx = max(q0, fvm(ie)%c(i-1, j, k, q), fvm(ie)%c(i+1, j, k, q), &
+                              fvm(ie)%c(i, j-1, k, q), fvm(ie)%c(i, j+1, k, q))
+                qmn = min(q0, fvm(ie)%c(i-1, j, k, q), fvm(ie)%c(i+1, j, k, q), &
+                              fvm(ie)%c(i, j-1, k, q), fvm(ie)%c(i, j+1, k, q))
+                Rp(i, j, k, ie) = 1.0_r8
+                Rm(i, j, k, ie) = 1.0_r8
+                if (pp > 0.0_r8) Rp(i, j, k, ie) = min(1.0_r8, (qmx - q0) / pp)
+                if (pm > 0.0_r8) Rm(i, j, k, ie) = min(1.0_r8, (q0 - qmn) / pm)
+             end do
+          end do
+       end do
+    end do
+
+    !--- 4b. Exchange Zalesak ratios (ring 1) ---
+    do ie = nets, nete
+       kptr = kmin - 1
+       call ghostpack(ghostBufQfilter, Rp(0:nc+1, 0:nc+1, kmin:kmax, ie), kblk, kptr, ie)
+       kptr = kmin - 1 + nlev
+       call ghostpack(ghostBufQfilter, Rm(0:nc+1, 0:nc+1, kmin:kmax, ie), kblk, kptr, ie)
+    end do
+    call ghost_exchange(hybrid, ghostBufQfilter, location='cslam_q_filter_del4_passR')
+    do ie = nets, nete
+       kptr = kmin - 1
+       call ghostunpack(ghostBufQfilter, Rp(0:nc+1, 0:nc+1, kmin:kmax, ie), kblk, kptr, ie)
+       kptr = kmin - 1 + nlev
+       call ghostunpack(ghostBufQfilter, Rm(0:nc+1, 0:nc+1, kmin:kmax, ie), kblk, kptr, ie)
+    end do
+
+    !--- 4c. Limited update ---
+    do ie = nets, nete
+       do k = kmin, kmax
+          do j = 1, nc
+             do i = 1, nc
+                ! per-face coefficient: min(Rm of giving cell, Rp of receiving cell)
+                if (Fx(i-1, j, k, ie) >= 0.0_r8) then      ! west face: (i-1,j) -> (i,j)
+                   c_w = min(Rm(i-1, j, k, ie), Rp(i, j, k, ie))
+                else                                       ! (i,j) -> (i-1,j)
+                   c_w = min(Rp(i-1, j, k, ie), Rm(i, j, k, ie))
+                end if
+                if (Fx(i  , j, k, ie) >= 0.0_r8) then      ! east face: (i,j) -> (i+1,j)
+                   c_e = min(Rm(i, j, k, ie), Rp(i+1, j, k, ie))
+                else
+                   c_e = min(Rp(i, j, k, ie), Rm(i+1, j, k, ie))
+                end if
+                if (Fy(i, j-1, k, ie) >= 0.0_r8) then      ! south face: (i,j-1) -> (i,j)
+                   c_s = min(Rm(i, j-1, k, ie), Rp(i, j, k, ie))
+                else
+                   c_s = min(Rp(i, j-1, k, ie), Rm(i, j, k, ie))
+                end if
+                if (Fy(i, j  , k, ie) >= 0.0_r8) then      ! north face: (i,j) -> (i,j+1)
+                   c_n = min(Rm(i, j, k, ie), Rp(i, j+1, k, ie))
+                else
+                   c_n = min(Rp(i, j, k, ie), Rm(i, j+1, k, ie))
+                end if
+
+                inv_dp_area = 1.0_r8 / (fvm(ie)%dp_fvm(i, j, k) * fvm(ie)%area_sphere(i, j))
+                q_new(i, j) = fvm(ie)%c(i, j, k, q) - dt_sub * ( &
+                     c_w * (-Fx(i-1, j  , k, ie)) + c_e * Fx(i, j, k, ie) + &
+                     c_s * (-Fy(i  , j-1, k, ie)) + c_n * Fy(i, j, k, ie) ) * inv_dp_area
+             end do
+          end do
+          fvm(ie)%c(1:nc, 1:nc, k, q) = q_new(1:nc, 1:nc)
+       end do
+    end do
+    end if ! cslam_q_filter_limiter
+
+    end do ! isub subcycle loop
+
+    deallocate(L)
+    if (cslam_q_filter_limiter) deallocate(Fx, Fy, Rp, Rm)
+    if (cslam_q_filter_gradmask) deallocate(Msk)
+  end subroutine apply_cslam_q_filter_del4
+
+  !
+  ! Compute per-face metric weights w_ew, w_ns for one CSLAM element.
+  ! Face length = arc between the two own-cell vertices bounding the face
+  ! (canonical vertex numbering on own cells).
+  ! Center-to-center distance: arc between the 3D centers of the two cells
+  ! sharing the face, for ALL faces including element-boundary faces.
+  ! Halo-cell centers are computed from halo vtx_cart, which is stored in the
+  ! OWNER's tan-plane frame (vertex order cshift-permuted only), mapped to 3D
+  ! with the owner panel from flux_orient(1,i,j).  The center therefore
+  ! matches the owning element's own computation to summation-order ULP, so
+  ! w_ew/w_ns are antisymmetric across element AND panel boundaries and the
+  ! filter fluxes cancel exactly (conservation).  The previous version used
+  ! dist = 2*arc(own center -> own face midpoint) at boundary faces, which is
+  ! NOT antisymmetric on a non-uniform mesh (largest mismatch at panel edges).
+  ! Cell centers use mean-of-4-vertices in tan-plane; gnomonic projection
+  ! sends tan-plane midpoints to great-circle midpoints, so this is exact.
+  ! Also returns the own-cell centers (c3d_own) as a byproduct.
+  !
+  subroutine compute_face_weights(f, face_num, c3d_own, w_ew, w_ns, &
+                                  xw_ew, xt_ew, xw_ns, xt_ns)
+    implicit none
+    type (fvm_struct), intent(in)  :: f
+    integer          , intent(in)  :: face_num
+    real (kind=r8)   , intent(out) :: c3d_own(3, 1:nc, 1:nc)
+    real (kind=r8)   , intent(out) :: w_ew(0:nc, 1:nc)
+    real (kind=r8)   , intent(out) :: w_ns(1:nc, 0:nc)
+    !
+    ! Optional cross-diffusion (non-orthogonality) correction coefficients
+    ! (cslam_q_filter_xdiff).  The two-point flux w*(Q_j - Q_i) only equals
+    ! the true normal-gradient flux where the center-to-center direction d
+    ! is aligned with the face normal n; on the skewed gnomonic mesh it
+    ! drops the tangential-gradient contribution.  Reconstruct the full
+    ! tangent-plane gradient at the face from two directional derivatives,
+    !   g = q_d * e1 + q_t * e2,
+    ! where q_d = (Q_hi - Q_lo)/dist along d (center-to-center) and
+    ! q_t = (Q_p - Q_m)/arc_t along t (difference of the two-cell means on
+    ! the +tangential / -tangential sides of the face, using the diagonal
+    ! ring-1 halo cells), and {e1, e2} is the dual basis of {d, t} in the
+    ! tangent plane at the face anchor m (e1 = (m x t)/den, e2 = -(m x d)/den,
+    ! den = m . (t x d)).  The corrected face flux is
+    !   F = face_len * (g . n) = xw*(Q_hi - Q_lo) + xt*T,
+    !   xw = face_len*(e1 . n)/dist,  xt = 0.5*face_len*(e2 . n)/arc_t,
+    !   T  = (sum of 2 cells on +t side) - (sum of 2 cells on -t side).
+    ! Orthogonal-mesh limit: e1 = d = n -> xw = w, xt = 0 (recovers TPFA).
+    ! Exact for tangent-plane-linear Q -> consistent spherical Laplacian.
+    !
+    ! Antisymmetry/conservation: all ingredients are 3D-Cartesian and built
+    ! from the same owner-frame points on both sides of a face; under the
+    ! neighbor's view (d -> -d, t -> sigma*t, n -> -n, sigma = +-1 from
+    ! halo orientation) the algebra gives xw' = xw and xt'*T' = -(xt*T)
+    ! exactly (sign flips are exact in IEEE), so F' = -F to the same ULP
+    ! fidelity as the uncorrected weights.  Fallback to pure TPFA
+    ! (xw = w, xt = 0) when the 4-cell tangential stencil touches a
+    ! non-existent cube-vertex wedge cell (f%ifct == 0) or the geometry is
+    ! degenerate -- the stencil cells are the same physical cells on both
+    ! sides of the face, so both sides take the fallback identically.
+    !
+    real (kind=r8)   , intent(out), optional :: xw_ew(0:nc, 1:nc)
+    real (kind=r8)   , intent(out), optional :: xt_ew(0:nc, 1:nc)
+    real (kind=r8)   , intent(out), optional :: xw_ns(1:nc, 0:nc)
+    real (kind=r8)   , intent(out), optional :: xt_ns(1:nc, 0:nc)
+
+    real (kind=r8) :: c3d(3, 0:nc+1, 0:nc+1)
+    real (kind=r8) :: v1(3), v2(3)
+    real (kind=r8) :: cx, cy, face_len, dist
+    integer        :: i, j, ipanel
+    logical        :: do_x
+    ! xdiff work variables
+    real (kind=r8) :: vmid(3), vd(3), vt(3), vp(3), vm(3), vn(3)
+    real (kind=r8) :: e1(3), e2(3), den, arc_t, rnorm
+    ! den is a sine of the angle between the d and t directions; below this
+    ! the dual basis is ill-conditioned (never approached on a sane mesh)
+    real (kind=r8), parameter :: den_min = 0.2_r8
+
+    do_x = present(xw_ew)
+
+    !-- Cell centers in 3D: own cells + face-adjacent ring halo cells --
+    ! (+ diagonal ring corners when the xdiff tangential stencil needs them;
+    !  skip non-existent wedge cells at cube-vertex elements, f%ifct == 0,
+    !  whose vtx_cart/flux_orient halo entries are placeholders)
+    c3d = 0.0_r8
+    do j = 0, nc+1
+       do i = 0, nc+1
+          if ((i==0 .or. i==nc+1) .and. (j==0 .or. j==nc+1)) then
+             if (.not. do_x) cycle
+             if (f%ifct(i,j) == 0) cycle
+          end if
+          cx = 0.25_r8 * ( f%vtx_cart(1,1,i,j) + f%vtx_cart(2,1,i,j) &
+                         + f%vtx_cart(3,1,i,j) + f%vtx_cart(4,1,i,j) )
+          cy = 0.25_r8 * ( f%vtx_cart(1,2,i,j) + f%vtx_cart(2,2,i,j) &
+                         + f%vtx_cart(3,2,i,j) + f%vtx_cart(4,2,i,j) )
+          ipanel = NINT(f%flux_orient(1,i,j))
+          call tan_to_3d(cx, cy, ipanel, c3d(:, i, j))
+       end do
+    end do
+    c3d_own(:,:,:) = c3d(:, 1:nc, 1:nc)
+
+    !-- East-west face weights: index i = face between cell i and cell i+1 --
+    do j = 1, nc
+       do i = 0, nc
+          if (i == 0) then
+             ! West-boundary face of own cell (1, j): vertices 1 & 4 of (1, j)
+             call tan_to_3d(f%vtx_cart(1,1,1,j), f%vtx_cart(1,2,1,j), face_num, v1)
+             call tan_to_3d(f%vtx_cart(4,1,1,j), f%vtx_cart(4,2,1,j), face_num, v2)
+          else
+             ! East face of own cell (i, j): vertices 2 & 3 of (i, j)
+             call tan_to_3d(f%vtx_cart(2,1,i,j), f%vtx_cart(2,2,i,j), face_num, v1)
+             call tan_to_3d(f%vtx_cart(3,1,i,j), f%vtx_cart(3,2,i,j), face_num, v2)
+          end if
+          face_len   = arc_length(v1, v2)
+          dist       = arc_length(c3d(:, i, j), c3d(:, i+1, j))
+          w_ew(i, j) = face_len / dist
+
+          if (do_x) then
+             xw_ew(i, j) = w_ew(i, j)
+             xt_ew(i, j) = 0.0_r8
+             if ( f%ifct(i,j+1) /= 0 .and. f%ifct(i+1,j+1) /= 0 .and. &
+                  f%ifct(i,j-1) /= 0 .and. f%ifct(i+1,j-1) /= 0 ) then
+                ! tangent-plane anchor: normalized mean of the two face cells
+                vmid  = c3d(:, i, j) + c3d(:, i+1, j)
+                vmid  = vmid / sqrt(vmid(1)**2 + vmid(2)**2 + vmid(3)**2)
+                ! primary direction d: center-to-center, projected to tangent plane
+                vd    = c3d(:, i+1, j) - c3d(:, i, j)
+                vd    = vd - (vd(1)*vmid(1) + vd(2)*vmid(2) + vd(3)*vmid(3)) * vmid
+                vd    = vd / sqrt(vd(1)**2 + vd(2)**2 + vd(3)**2)
+                ! tangential direction t: -j-side pair mean -> +j-side pair mean
+                vp    = c3d(:, i, j+1) + c3d(:, i+1, j+1)
+                vp    = vp / sqrt(vp(1)**2 + vp(2)**2 + vp(3)**2)
+                vm    = c3d(:, i, j-1) + c3d(:, i+1, j-1)
+                vm    = vm / sqrt(vm(1)**2 + vm(2)**2 + vm(3)**2)
+                arc_t = arc_length(vp, vm)
+                vt    = vp - vm
+                vt    = vt - (vt(1)*vmid(1) + vt(2)*vmid(2) + vt(3)*vmid(3)) * vmid
+                vt    = vt / sqrt(vt(1)**2 + vt(2)**2 + vt(3)**2)
+                ! unit face normal, oriented with d ((v2-v1) x m is tangent by construction)
+                vn    = cross3(v2 - v1, vmid)
+                vn    = vn / sqrt(vn(1)**2 + vn(2)**2 + vn(3)**2)
+                if (vn(1)*vd(1) + vn(2)*vd(2) + vn(3)*vd(3) < 0.0_r8) vn = -vn
+                den   = vmid(1)*(vt(2)*vd(3) - vt(3)*vd(2)) &
+                      + vmid(2)*(vt(3)*vd(1) - vt(1)*vd(3)) &
+                      + vmid(3)*(vt(1)*vd(2) - vt(2)*vd(1))
+                if (abs(den) > den_min .and. arc_t > 0.0_r8) then
+                   e1 = cross3(vmid, vt) / den
+                   e2 = -cross3(vmid, vd) / den
+                   xw_ew(i, j) = face_len * (e1(1)*vn(1) + e1(2)*vn(2) + e1(3)*vn(3)) / dist
+                   xt_ew(i, j) = 0.5_r8 * face_len * (e2(1)*vn(1) + e2(2)*vn(2) + e2(3)*vn(3)) / arc_t
+                end if
+             end if
+          end if
+       end do
+    end do
+
+    !-- North-south face weights: index j = face between cell j and cell j+1 --
+    do j = 0, nc
+       do i = 1, nc
+          if (j == 0) then
+             ! South-boundary face of own cell (i, 1): vertices 1 & 2 of (i, 1)
+             call tan_to_3d(f%vtx_cart(1,1,i,1), f%vtx_cart(1,2,i,1), face_num, v1)
+             call tan_to_3d(f%vtx_cart(2,1,i,1), f%vtx_cart(2,2,i,1), face_num, v2)
+          else
+             ! North face of own cell (i, j): vertices 4 & 3 of (i, j)
+             call tan_to_3d(f%vtx_cart(4,1,i,j), f%vtx_cart(4,2,i,j), face_num, v1)
+             call tan_to_3d(f%vtx_cart(3,1,i,j), f%vtx_cart(3,2,i,j), face_num, v2)
+          end if
+          face_len   = arc_length(v1, v2)
+          dist       = arc_length(c3d(:, i, j), c3d(:, i, j+1))
+          w_ns(i, j) = face_len / dist
+
+          if (do_x) then
+             xw_ns(i, j) = w_ns(i, j)
+             xt_ns(i, j) = 0.0_r8
+             if ( f%ifct(i+1,j) /= 0 .and. f%ifct(i+1,j+1) /= 0 .and. &
+                  f%ifct(i-1,j) /= 0 .and. f%ifct(i-1,j+1) /= 0 ) then
+                vmid  = c3d(:, i, j) + c3d(:, i, j+1)
+                vmid  = vmid / sqrt(vmid(1)**2 + vmid(2)**2 + vmid(3)**2)
+                vd    = c3d(:, i, j+1) - c3d(:, i, j)
+                vd    = vd - (vd(1)*vmid(1) + vd(2)*vmid(2) + vd(3)*vmid(3)) * vmid
+                vd    = vd / sqrt(vd(1)**2 + vd(2)**2 + vd(3)**2)
+                ! tangential direction t: -i-side pair mean -> +i-side pair mean
+                vp    = c3d(:, i+1, j) + c3d(:, i+1, j+1)
+                vp    = vp / sqrt(vp(1)**2 + vp(2)**2 + vp(3)**2)
+                vm    = c3d(:, i-1, j) + c3d(:, i-1, j+1)
+                vm    = vm / sqrt(vm(1)**2 + vm(2)**2 + vm(3)**2)
+                arc_t = arc_length(vp, vm)
+                vt    = vp - vm
+                vt    = vt - (vt(1)*vmid(1) + vt(2)*vmid(2) + vt(3)*vmid(3)) * vmid
+                vt    = vt / sqrt(vt(1)**2 + vt(2)**2 + vt(3)**2)
+                vn    = cross3(v2 - v1, vmid)
+                vn    = vn / sqrt(vn(1)**2 + vn(2)**2 + vn(3)**2)
+                if (vn(1)*vd(1) + vn(2)*vd(2) + vn(3)*vd(3) < 0.0_r8) vn = -vn
+                den   = vmid(1)*(vt(2)*vd(3) - vt(3)*vd(2)) &
+                      + vmid(2)*(vt(3)*vd(1) - vt(1)*vd(3)) &
+                      + vmid(3)*(vt(1)*vd(2) - vt(2)*vd(1))
+                if (abs(den) > den_min .and. arc_t > 0.0_r8) then
+                   e1 = cross3(vmid, vt) / den
+                   e2 = -cross3(vmid, vd) / den
+                   xw_ns(i, j) = face_len * (e1(1)*vn(1) + e1(2)*vn(2) + e1(3)*vn(3)) / dist
+                   xt_ns(i, j) = 0.5_r8 * face_len * (e2(1)*vn(1) + e2(2)*vn(2) + e2(3)*vn(3)) / arc_t
+                end if
+             end if
+          end if
+       end do
+    end do
+
+  end subroutine compute_face_weights
+
+  function cross3(a, b) result(c)
+    implicit none
+    real(r8), intent(in) :: a(3), b(3)
+    real(r8) :: c(3)
+    c(1) = a(2)*b(3) - a(3)*b(2)
+    c(2) = a(3)*b(1) - a(1)*b(3)
+    c(3) = a(1)*b(2) - a(2)*b(1)
+  end function cross3
+
+  !
+  ! (X, Y) on face `face_no` of the unit-edge-length cube (i.e., X = tan(alpha),
+  ! Y = tan(beta)) => 3D unit vector on the sphere.  Derived from
+  ! coordinate_systems_mod::unit_face_based_cube_to_unit_sphere.
+  !
+  subroutine tan_to_3d(X, Y, face_no, p)
+    implicit none
+    real(r8), intent(in)  :: X, Y
+    integer , intent(in)  :: face_no
+    real(r8), intent(out) :: p(3)
+    real(r8) :: r
+    r = 1.0_r8 / sqrt(1.0_r8 + X*X + Y*Y)
+    select case (face_no)
+    case (1); p(1) =  r    ; p(2) =  X*r  ; p(3) =  Y*r
+    case (2); p(1) = -X*r  ; p(2) =  r    ; p(3) =  Y*r
+    case (3); p(1) = -r    ; p(2) = -X*r  ; p(3) =  Y*r
+    case (4); p(1) =  X*r  ; p(2) = -r    ; p(3) =  Y*r
+    case (5); p(1) =  Y*r  ; p(2) =  X*r  ; p(3) = -r
+    case (6); p(1) = -Y*r  ; p(2) =  X*r  ; p(3) =  r
+    case default; p(:) = 0.0_r8
+    end select
+  end subroutine tan_to_3d
+
+  !
+  ! Great-circle arc-length between two unit vectors on the sphere.
+  ! Uses the 2*asin(|a-b|/2) form for numerical stability at small arcs
+  ! (acos of near-unity dot product loses precision).
+  !
+  function arc_length(a, b) result(arc)
+    implicit none
+    real(r8), intent(in) :: a(3), b(3)
+    real(r8) :: arc, d
+    d = sqrt( (a(1)-b(1))**2 + (a(2)-b(2))**2 + (a(3)-b(3))**2 )
+    arc = 2.0_r8 * asin( min(1.0_r8, 0.5_r8 * d) )
+  end function arc_length
+#endif
 
   subroutine large_courant_number_increment(fvm,ilev)
     implicit none
@@ -1342,6 +2287,7 @@ contains
        if (ib==seast) degenerate(nc+1,1   ) = 1
     end if
 
+    circular_flow = 1
     do j=1,nc+1
        do i=1,nc+1
           do sgn=-1,1,2
@@ -1349,8 +2295,6 @@ contains
                   sgn*flux_sum(i-1,j,1)<0.0_r8.and.sgn*flux_sum(i,j-1,2)>0.0_r8.and.&
                   sgn*flux_sum(i  ,j,1)>0.0_r8.and.sgn*flux_sum(i,j  ,2)<0.0_r8) then
                 circular_flow(i,j) = 0
-             else
-                circular_flow(i,j) = 1
              end if
           end do
        end do

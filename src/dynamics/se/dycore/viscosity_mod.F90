@@ -1,3 +1,4 @@
+#define SE_WV_CONTINUITY  ! RE-ENABLED 2026-07-22 (full-dp + CSLAM hard-overwrite investigation)  ! 2026-07-02: SE evolves water-vapor mass (wvdp) with its own continuity eq. (must match define in element/prim_advance/prim_advection/prim_driver mods)
 module viscosity_mod
 !
 !  This module should be renamed "global_deriv_mod.F90"
@@ -51,7 +52,11 @@ module viscosity_mod
 
 CONTAINS
 
+#ifdef SE_WV_CONTINUITY
+subroutine biharmonic_wk_dp3d(elem,dptens,dpflux,ttens,vtens,deriv,edge3,hybrid,nt,nets,nete,kbeg,kend,wvtens)
+#else
 subroutine biharmonic_wk_dp3d(elem,dptens,dpflux,ttens,vtens,deriv,edge3,hybrid,nt,nets,nete,kbeg,kend)
+#endif
   use derivative_mod, only : subcell_Laplace_fluxes
   use dimensions_mod, only : use_cslam, nu_div_lev,nu_lev
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -67,6 +72,9 @@ subroutine biharmonic_wk_dp3d(elem,dptens,dpflux,ttens,vtens,deriv,edge3,hybrid,
   real (kind=r8), intent(out), dimension(nc,nc,4,nlev,nets:nete) :: dpflux
   real (kind=r8), dimension(np,np,2,nlev,nets:nete)  :: vtens
   real (kind=r8), dimension(np,np,nlev,nets:nete) :: ttens,dptens
+#ifdef SE_WV_CONTINUITY
+  real (kind=r8), dimension(np,np,nlev,nets:nete) :: wvtens
+#endif
   type (EdgeBuffer_t)  , intent(inout) :: edge3
   type (derivative_t)  , intent(in) :: deriv
   ! local
@@ -114,6 +122,15 @@ subroutine biharmonic_wk_dp3d(elem,dptens,dpflux,ttens,vtens,deriv,edge3,hybrid,
       tmp=elem(ie)%state%dp3d(:,:,k,nt)-elem(ie)%derived%dp_ref(:,:,k)
       call laplace_sphere_wk(tmp,deriv,elem(ie),dptens(:,:,k,ie),var_coef=var_coef1)
 
+#ifdef SE_WV_CONTINUITY
+      ! wvdp holds MOIST dp (2026-07-22): subtract the SAME dry reference
+      ! profile as dp3d so the diagnosed q=(wvdp-dp3d)/dp3d is damped
+      ! consistently (dp_ref varies horizontally over topography; the wv
+      ! part carries no reference)
+      tmp=elem(ie)%state%wvdp(:,:,k,nt)-elem(ie)%derived%dp_ref(:,:,k)
+      call laplace_sphere_wk(tmp,deriv,elem(ie),wvtens(:,:,k,ie),var_coef=var_coef1)
+#endif
+
       call vlaplace_sphere_wk(elem(ie)%state%v(:,:,:,k,nt),deriv,elem(ie),.true.,vtens(:,:,:,k,ie), &
            var_coef=var_coef1,nu_ratio=nu_ratio1)
     enddo
@@ -129,6 +146,11 @@ subroutine biharmonic_wk_dp3d(elem,dptens,dpflux,ttens,vtens,deriv,edge3,hybrid,
 
     kptr = kbeg - 1 + 3*nlev
     call edgeVpack(edge3,dptens(:,:,kbeg:kend,ie),kblk,kptr,ie)
+
+#ifdef SE_WV_CONTINUITY
+    kptr = kbeg - 1 + 4*nlev
+    call edgeVpack(edge3,wvtens(:,:,kbeg:kend,ie),kblk,kptr,ie)
+#endif
   enddo
 
   call bndry_exchange(hybrid,edge3,location='biharmonic_wk_dp3d')
@@ -148,6 +170,11 @@ subroutine biharmonic_wk_dp3d(elem,dptens,dpflux,ttens,vtens,deriv,edge3,hybrid,
     kptr = kbeg - 1 + 3*nlev
     call edgeVunpack(edge3,dptens(:,:,kbeg:kend,ie),kblk,kptr,ie)
 
+#ifdef SE_WV_CONTINUITY
+    kptr = kbeg - 1 + 4*nlev
+    call edgeVunpack(edge3,wvtens(:,:,kbeg:kend,ie),kblk,kptr,ie)
+#endif
+
     if (use_cslam) then
       do k=1,nlev
 !CLEAN        tmp(:,:)= rspheremv(:,:)*dptens(:,:,k,ie)
@@ -165,6 +192,10 @@ subroutine biharmonic_wk_dp3d(elem,dptens,dpflux,ttens,vtens,deriv,edge3,hybrid,
 !CLEAN      tmp2(:,:)=rspheremv(:,:)*dptens(:,:,k,ie)
       tmp2(:,:)=elem(ie)%rspheremp(:,:)*dptens(:,:,k,ie)
       call laplace_sphere_wk(tmp2,deriv,elem(ie),dptens(:,:,k,ie),var_coef=.true.)
+#ifdef SE_WV_CONTINUITY
+      tmp2(:,:)=elem(ie)%rspheremp(:,:)*wvtens(:,:,k,ie)
+      call laplace_sphere_wk(tmp2,deriv,elem(ie),wvtens(:,:,k,ie),var_coef=.true.)
+#endif
 !CLEAN      v(:,:,1)=rspheremv(:,:)*vtens(:,:,1,k,ie)
 !CLEAN      v(:,:,2)=rspheremv(:,:)*vtens(:,:,2,k,ie)
 

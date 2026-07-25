@@ -1,3 +1,4 @@
+#define SE_WV_CONTINUITY  ! 2026-07-22: PS_gll diagnostic uses SE-evolved moist dp (wvdp) instead of GLL Qdp (must match define in dycore element/prim_advance/prim_advection/prim_driver/viscosity mods)
 module stepon
 
 use shr_kind_mod,   only: r8 => shr_kind_r8
@@ -67,6 +68,7 @@ subroutine stepon_init(dyn_in, dyn_out )
    call addfld('dp_ref_gll' ,(/ 'lev' /), 'I', '  '  ,'dp dry / dp_ref on gll grid'     ,gridname='GLL')
    call addfld('PSDRY_gll' ,horiz_only , 'I', 'Pa ' ,'psdry on gll grid' ,gridname='GLL')
    call addfld('PS_gll'    ,horiz_only , 'I', 'Pa ' ,'ps on gll grid'    ,gridname='GLL')
+   call addfld('PSWET_gll' ,horiz_only , 'I', 'Pa ' ,'ps incl condensates on gll grid (wvdp + GLL Qdp of non-wv actives)' ,gridname='GLL')
    call addfld('PHIS_gll'  ,horiz_only , 'I', 'Pa ' ,'PHIS on gll grid'  ,gridname='GLL')
 
    ! Fields for initial condition files
@@ -311,6 +313,8 @@ subroutine diag_dynvar_ic(elem, fvm)
    use cam_thermo,             only: get_sum_species, get_dp_ref, get_ps
    use air_composition,        only: thermodynamic_active_species_idx
    use air_composition,        only: thermodynamic_active_species_idx_dycore
+   use air_composition,        only: thermodynamic_active_species_num
+   use dimensions_mod,         only: wv_idx_dycore
    use hycoef,                 only: hyai, hybi, ps0
    ! arguments
    type(element_t) , intent(in)    :: elem(1:nelemd)
@@ -420,8 +424,15 @@ subroutine diag_dynvar_ic(elem, fvm)
    if (hist_fld_active('PS_gll')) then
      allocate(fld_2d(np,np))
      do ie = 1, nelemd
+#ifdef SE_WV_CONTINUITY
+       ! SE-evolved MOIST ps: wvdp holds full moist dp (2026-07-22) -- this
+       ! is the field the SE del4 dp damping acts on.  (GLL Qdp is the
+       ! CSLAM copy; stale when cslam2gll is disabled.)
+       fld_2d = hyai(1)*ps0 + sum(elem(ie)%state%wvdp(:,:,:,tl_f),3)
+#else
        call get_ps(elem(ie)%state%Qdp(:,:,:,:,tl_Qdp),&
             thermodynamic_active_species_idx_dycore,elem(ie)%state%dp3d(:,:,:,tl_f),fld_2d,hyai(1)*ps0)
+#endif
          do j = 1, np
             do i = 1, np
               ftmp(i+(j-1)*np,1,1) = fld_2d(i,j)
@@ -430,6 +441,36 @@ subroutine diag_dynvar_ic(elem, fvm)
          call outfld('PS_gll', ftmp(:,1,1), npsq, ie)
        end do
        deallocate(fld_2d)
+   end if
+
+   if (hist_fld_active('PSWET_gll')) then
+     ! 2026-07-23 (Peter: "shouldn't PS and PS_gll be the same?"): PS_gll
+     ! (from wvdp) counts dry air + water VAPOR only, while physics PS
+     ! includes condensate loading (CLDLIQ, RAINQM).  This apples-to-apples
+     ! diagnostic adds the GLL Qdp columns of the non-wv thermodynamically
+     ! active species (fresh each anchor via cslam2gll).  PS - PSWET_gll
+     ! isolates the true dry+vapor mismatch.
+     allocate(fld_2d(np,np))
+     do ie = 1, nelemd
+#ifdef SE_WV_CONTINUITY
+       fld_2d = hyai(1)*ps0 + sum(elem(ie)%state%wvdp(:,:,:,tl_f),3)
+       do nq = 1, thermodynamic_active_species_num
+         m_cnst = thermodynamic_active_species_idx_dycore(nq)
+         if (m_cnst == wv_idx_dycore) cycle
+         fld_2d = fld_2d + sum(elem(ie)%state%Qdp(:,:,:,m_cnst,tl_Qdp),3)
+       end do
+#else
+       call get_ps(elem(ie)%state%Qdp(:,:,:,:,tl_Qdp),&
+            thermodynamic_active_species_idx_dycore,elem(ie)%state%dp3d(:,:,:,tl_f),fld_2d,hyai(1)*ps0)
+#endif
+       do j = 1, np
+          do i = 1, np
+            ftmp(i+(j-1)*np,1,1) = fld_2d(i,j)
+          end do
+       end do
+       call outfld('PSWET_gll', ftmp(:,1,1), npsq, ie)
+     end do
+     deallocate(fld_2d)
    end if
 
    if (hist_fld_active('PHIS_gll')) then

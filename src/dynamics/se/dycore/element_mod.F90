@@ -1,3 +1,4 @@
+#define SE_WV_CONTINUITY  ! RE-ENABLED 2026-07-22 (full-dp + CSLAM hard-overwrite investigation)  ! 2026-07-02: SE evolves water-vapor mass (wvdp) with its own continuity eq. for dynamics thermodynamics (must match define in prim_advance/prim_advection/prim_driver/viscosity mods)
 module element_mod
 
   use shr_kind_mod,           only: r8=>shr_kind_r8, i8=>shr_kind_i8
@@ -23,8 +24,20 @@ module element_mod
 
     real (kind=r8) :: v     (np,np,2,nlev,timelevels)            ! velocity                           
     real (kind=r8) :: T     (np,np,nlev,timelevels)              ! temperature                        
-    real (kind=r8) :: dp3d  (np,np,nlev,timelevels)              ! dry delta p on levels              
-    real (kind=r8) :: psdry (np,np)                              ! dry surface pressure               
+    real (kind=r8) :: dp3d  (np,np,nlev,timelevels)              ! dry delta p on levels
+    ! wvdp is used ONLY when SE_WV_CONTINUITY is defined (see prim_advance
+    ! etc.); the FIELD itself is declared unconditionally as a workaround
+    ! for an ifx 2025.x internal compiler error (#5623): consumers of this
+    ! module (prim_advance_mod's large routines) ICE when elem_state_t is
+    ! compiled WITHOUT this field.  Verified 2026-07-21 with ifx 2025.2.1
+    ! and 2025.3.2: type with wvdp -> consumers compile; without -> ICE.
+    ! Cost when unused: np*np*nlev*timelevels*8B ~ 22 kB/element, never
+    ! touched.  Remove the workaround when the compiler is fixed.
+    real (kind=r8) :: wvdp  (np,np,nlev,timelevels)              ! MOIST delta p (dry dp3d + wv mass) evolved by SE
+                                                                 ! continuity eq. (2026-07-22; before that: wv mass only);
+                                                                 ! q_wv diagnosed as (wvdp-dp3d)/dp3d for dyn thermodynamics
+                                                                 ! (dynamics-only copy; CSLAM copy in Qdp/fvm%c untouched)
+    real (kind=r8) :: psdry (np,np)                              ! dry surface pressure
     real (kind=r8) :: phis  (np,np)                              ! surface geopotential (prescribed)
     real (kind=r8), allocatable :: Qdp(:,:,:,:,:)                ! Tracer mass
   end type elem_state_t

@@ -1,3 +1,4 @@
+#define SE_WV_CONTINUITY  ! RE-ENABLED 2026-07-22 (full-dp + CSLAM hard-overwrite investigation)  ! 2026-07-02: SE evolves water-vapor mass (wvdp) with its own continuity eq. for dynamics thermodynamics (must match define in element/prim_advection/prim_driver/viscosity mods)
 module prim_advance_mod
   use shr_kind_mod,   only: r8=>shr_kind_r8
   use edgetype_mod,   only: EdgeBuffer_t
@@ -12,28 +13,47 @@ module prim_advance_mod
 
   public :: prim_advance_exp, prim_advance_init, applyCAMforcing, tot_energy_dyn, compute_omega
   public :: hypervis_Qdp
+  public :: hypervis_Qdp_diff, hypervis_Qdp_diff_setref
+  public :: wvdp_nudge_p1
 
   type (EdgeBuffer_t) :: edge3,edgeOmega,edgeSponge
   type (EdgeBuffer_t) :: edgeQdp
   real (kind=r8), allocatable :: ur_weights(:)
+  ! del2_qgll_diff: q(wv) reference = freshly cslam2gll-mapped field, stored
+  ! at each anchor; between anchors only the deviation from it is damped
+  real (kind=r8), allocatable :: qref_diff(:,:,:,:)
+  logical                     :: qref_diff_set = .false.
 contains
 
   subroutine prim_advance_init(par, elem)
     use edge_mod,       only: initEdgeBuffer
     use element_mod,    only: element_t
-    use dimensions_mod, only: nlev,ksponge_end,use_cslam,del4_cslam_qgll
+    use dimensions_mod, only: nlev,ksponge_end,use_cslam,del4_cslam_qgll,wvdp_nudge_scalesel,del2_qgll_diff,np,nelemd
     use control_mod,    only: qsplit
 
     type (parallel_t)                       :: par
     type (element_t), target, intent(inout) :: elem(:)
     integer                                 :: i
 
+#ifdef SE_WV_CONTINUITY
+    ! extra nlev for wvdp (T + 2*v + dp3d + wvdp)
+    call initEdgeBuffer(par,edge3   ,elem,5*nlev   ,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
+#else
     call initEdgeBuffer(par,edge3   ,elem,4*nlev   ,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
+#endif
     ! del4_cslam_qgll operates on water vapor only -> single-tracer edge buffer
-    if (use_cslam.and.del4_cslam_qgll) &
+    ! (also used by wvdp_nudge_p1 for the scale-selective nudge DSS -- the
+    ! missing init here was the SEGV in jobs 6871615/6871681)
+    if (use_cslam.and.(del4_cslam_qgll.or.wvdp_nudge_scalesel.or.del2_qgll_diff)) &
       call initEdgeBuffer(par,edgeQdp,elem,nlev,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
+    if (use_cslam.and.del2_qgll_diff.and..not.allocated(qref_diff)) &
+      allocate(qref_diff(np,np,nlev,nelemd))
     if (ksponge_end>0) then
+#ifdef SE_WV_CONTINUITY
+       call initEdgeBuffer(par,edgeSponge,elem,5*ksponge_end,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
+#else
        call initEdgeBuffer(par,edgeSponge,elem,4*ksponge_end,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
+#endif
     end if
     call initEdgeBuffer(par,edgeOmega ,elem,nlev         ,bndry_type=HME_BNDRY_P2P, nthreads=horz_num_threads)
 
@@ -55,7 +75,7 @@ contains
   subroutine prim_advance_exp(elem, fvm, deriv, hvcoord, hybrid,dt, tl,  nets, nete)
     use control_mod,       only: tstep_type, qsplit
     use derivative_mod,    only: derivative_t
-    use dimensions_mod,    only: np, nlev, use_cslam
+    use dimensions_mod,    only: np, nlev, use_cslam, wv_idx_dycore
     use element_mod,       only: element_t
     use hybvcoord_mod,     only: hvcoord_t
     use hybrid_mod,        only: hybrid_t
@@ -130,6 +150,18 @@ contains
         !
         qwater(:,:,:,nq,ie) = elem(ie)%state%Qdp(:,:,:,m_cnst,qn0)/elem(ie)%state%dp3d(:,:,:,n0)
       end do
+#ifdef SE_WV_CONTINUITY
+      !
+      ! dynamics thermodynamics sees SE-evolved moisture (not CSLAM copy);
+      ! wvdp holds MOIST dp (2026-07-22), so q_wv = (wvdp-dp3d)/dp3d
+      !
+      do nq=1,thermodynamic_active_species_num
+        if (thermodynamic_active_species_idx_dycore(nq) == wv_idx_dycore) then
+          qwater(:,:,:,nq,ie) = (elem(ie)%state%wvdp(:,:,:,n0)-elem(ie)%state%dp3d(:,:,:,n0)) &
+               /elem(ie)%state%dp3d(:,:,:,n0)
+        end if
+      end do
+#endif
     end do
     !
     ! compute Cp and kappa=Rdry/cpdry here and not in RK-stages since Q stays constant
@@ -166,6 +198,10 @@ contains
              + 2*elem(ie)%state%T(:,:,:,np1)/3
         elem(ie)%state%dp3d(:,:,:,np1)= elem(ie)%state%dp3d(:,:,:,n0)/3 &
              + 2*elem(ie)%state%dp3d(:,:,:,np1)/3
+#ifdef SE_WV_CONTINUITY
+        elem(ie)%state%wvdp(:,:,:,np1)= elem(ie)%state%wvdp(:,:,:,n0)/3 &
+             + 2*elem(ie)%state%wvdp(:,:,:,np1)/3
+#endif
       enddo
     else if (tstep_type==2) then
       ! classic RK3  CFL=sqrt(3)
@@ -223,6 +259,10 @@ contains
              - elem(ie)%state%T(:,:,:,n0) )/4
         elem(ie)%state%dp3d(:,:,:,nm1)= (5*elem(ie)%state%dp3d(:,:,:,nm1) &
              - elem(ie)%state%dp3d(:,:,:,n0) )/4
+#ifdef SE_WV_CONTINUITY
+        elem(ie)%state%wvdp(:,:,:,nm1)= (5*elem(ie)%state%wvdp(:,:,:,nm1) &
+             - elem(ie)%state%wvdp(:,:,:,n0) )/4
+#endif
       enddo
       ! u5 = (5*u1/4 - u0/4) + 3dt/4 RHS(u4)
       !
@@ -447,7 +487,7 @@ contains
     use cam_thermo,     only: get_molecular_diff_coef, get_rho_dry
     use dimensions_mod, only: np, nlev, nc, use_cslam, npsq, qsize, ksponge_end
     use dimensions_mod, only: nu_scale_top,nu_lev,kmvis_ref,kmcnd_ref,rho_ref,km_sponge_factor
-    use dimensions_mod, only: nu_t_lev, nu_p_lev
+    use dimensions_mod, only: nu_t_lev, nu_p_lev, se_del4_dp_damp
     use control_mod,    only: nu, nu_t, hypervis_subcycle,hypervis_subcycle_sponge, nu_p, nu_top
     use control_mod,    only: molecular_diff,sponge_del4_lev, min_temperature
     use hybrid_mod,     only: hybrid_t!, get_loop_ranges
@@ -478,6 +518,9 @@ contains
     integer :: kbeg, kend, kblk
     real (kind=r8), dimension(np,np,2,nlev,nets:nete)      :: vtens
     real (kind=r8), dimension(np,np,nlev,nets:nete)        :: ttens, dptens
+#ifdef SE_WV_CONTINUITY
+    real (kind=r8), dimension(np,np,nlev,nets:nete)        :: wvtens
+#endif
     real (kind=r8), dimension(0:np+1,0:np+1,nlev)          :: corners
     real (kind=r8), dimension(2,2,2)                       :: cflux
     real (kind=r8)                                         :: temp      (np,np,nlev)
@@ -486,6 +529,9 @@ contains
     type (EdgeDescriptor_t)                                :: desc
 
     real (kind=r8), dimension(np,np)            :: lap_t,lap_dp
+#ifdef SE_WV_CONTINUITY
+    real (kind=r8), dimension(np,np)            :: lap_wv
+#endif
     real (kind=r8), dimension(np,np,ksponge_end,nets:nete):: kmvis,kmcnd,rho_dry
     real (kind=r8), dimension(np,np,nlev)       :: tmp_kmvis,tmp_kmcnd
     real (kind=r8), dimension(np,np,2)          :: lap_v
@@ -513,11 +559,16 @@ contains
       call tot_energy_dyn(elem,fvm,nets,nete,nt,qn0,'dBH')
 
       rhypervis_subcycle=1.0_r8/real(hypervis_subcycle,kind=r8)
+#ifdef SE_WV_CONTINUITY
+      call biharmonic_wk_dp3d(elem,dptens,dpflux,ttens,vtens,deriv,edge3,hybrid,nt,nets,nete,kbeg,kend,wvtens)
+#else
       call biharmonic_wk_dp3d(elem,dptens,dpflux,ttens,vtens,deriv,edge3,hybrid,nt,nets,nete,kbeg,kend)
+#endif
 
       do ie=nets,nete
         ! compute mean flux
-        if (nu_p>0) then
+        ! (se_del4_dp_damp experiment: only record dp dissipation actually applied)
+        if (nu_p>0 .and. se_del4_dp_damp) then
           do k=kbeg,kend
             !OMP_COLLAPSE_SIMD
             !DIR_VECTOR_ALIGNED
@@ -542,13 +593,22 @@ contains
           do j=1,np
             do i=1,np
               ttens(i,j,k,ie)   = -nu_t_lev(k)*ttens(i,j,k,ie)
-              dptens(i,j,k,ie)  = -nu_p_lev(k)*dptens(i,j,k,ie)
+              if (se_del4_dp_damp) then
+                dptens(i,j,k,ie)  = -nu_p_lev(k)*dptens(i,j,k,ie)
+              else
+                ! EXPERIMENT: no del4 on dp3d; state then passes through the
+                ! spheremp-DSS-rspheremp cycle unchanged (O(ulp) roundoff only)
+                dptens(i,j,k,ie)  = 0.0_r8
+              end if
               vtens(i,j,1,k,ie) = -nu_lev(k)*vtens(i,j,1,k,ie)
               vtens(i,j,2,k,ie) = -nu_lev(k)*vtens(i,j,2,k,ie)
+#ifdef SE_WV_CONTINUITY
+              wvtens(i,j,k,ie)  = -nu_p_lev(k)*wvtens(i,j,k,ie)
+#endif
             enddo
           enddo
 
-          if (use_cslam) then
+          if (use_cslam .and. se_del4_dp_damp) then
             !OMP_COLLAPSE_SIMD
             !DIR_VECTOR_ALIGNED
             do j=1,nc
@@ -569,6 +629,10 @@ contains
             do i=1,np
               elem(ie)%state%dp3d(i,j,k,nt) = elem(ie)%state%dp3d(i,j,k,nt)*elem(ie)%spheremp(i,j)&
                    + dt*dptens(i,j,k,ie)
+#ifdef SE_WV_CONTINUITY
+              elem(ie)%state%wvdp(i,j,k,nt) = elem(ie)%state%wvdp(i,j,k,nt)*elem(ie)%spheremp(i,j)&
+                   + dt*wvtens(i,j,k,ie)
+#endif
             enddo
           enddo
 
@@ -585,6 +649,11 @@ contains
 
         kptr = kbeg - 1 + 3*nlev
         call edgeVpack(edge3,elem(ie)%state%dp3d(:,:,kbeg:kend,nt),kblk,kptr,ie)
+
+#ifdef SE_WV_CONTINUITY
+        kptr = kbeg - 1 + 4*nlev
+        call edgeVpack(edge3,elem(ie)%state%wvdp(:,:,kbeg:kend,nt),kblk,kptr,ie)
+#endif
       enddo
 
       call bndry_exchange(hybrid,edge3,location='advance_hypervis_dp2')
@@ -600,7 +669,7 @@ contains
         kptr = kbeg - 1 + 2*nlev
         call edgeVunpack(edge3,vtens(:,:,2,kbeg:kend,ie),kblk,kptr,ie)
 
-        if (use_cslam) then
+        if (use_cslam .and. se_del4_dp_damp) then
           do k=kbeg,kend
             temp(:,:,k) = elem(ie)%state%dp3d(:,:,k,nt) / elem(ie)%spheremp  ! STATE before DSS
             corners(0:np+1,0:np+1,k) = 0.0_r8
@@ -610,7 +679,12 @@ contains
         kptr = kbeg - 1 + 3*nlev
         call edgeVunpack(edge3,elem(ie)%state%dp3d(:,:,kbeg:kend,nt),kblk,kptr,ie)
 
-        if (use_cslam) then
+#ifdef SE_WV_CONTINUITY
+        kptr = kbeg - 1 + 4*nlev
+        call edgeVunpack(edge3,elem(ie)%state%wvdp(:,:,kbeg:kend,nt),kblk,kptr,ie)
+#endif
+
+        if (use_cslam .and. se_del4_dp_damp) then
           desc = elem(ie)%desc
 
           kptr = kbeg - 1 + 3*nlev
@@ -650,6 +724,9 @@ contains
               vtens(i,j,2,k,ie)=dt*vtens(i,j,2,k,ie)*elem(ie)%rspheremp(i,j)
               ttens(i,j,k,ie)=dt*ttens(i,j,k,ie)*elem(ie)%rspheremp(i,j)
               elem(ie)%state%dp3d(i,j,k,nt)=elem(ie)%state%dp3d(i,j,k,nt)*elem(ie)%rspheremp(i,j)
+#ifdef SE_WV_CONTINUITY
+              elem(ie)%state%wvdp(i,j,k,nt)=elem(ie)%state%wvdp(i,j,k,nt)*elem(ie)%rspheremp(i,j)
+#endif
             enddo
           enddo
         enddo
@@ -786,6 +863,11 @@ contains
       rhypervis_subcycle=1.0_r8/real(hypervis_subcycle_sponge,kind=r8)
       do ie=nets,nete
         do k=1,ksponge_end
+          ! nu_dp is read below (CSLAM mass-flux block) even when the branch
+          ! that assigns it does not execute (nu_top=0, molecular_diff<=1)
+          nu_dp   = 0.0_r8
+          nu_temp = 0.0_r8
+          nu_velo = 0.0_r8
           if (nu_top>0.or.molecular_diff>1) then
             !**************************************************************
             !
@@ -794,6 +876,9 @@ contains
             !**************************************************************
             call laplace_sphere_wk(elem(ie)%state%T(:,:,k,nt),deriv,elem(ie),lap_t,var_coef=.false.)
             call laplace_sphere_wk(elem(ie)%state%dp3d(:,:,k,nt),deriv,elem(ie),lap_dp,var_coef=.false.)
+#ifdef SE_WV_CONTINUITY
+            call laplace_sphere_wk(elem(ie)%state%wvdp(:,:,k,nt),deriv,elem(ie),lap_wv,var_coef=.false.)
+#endif
             nu_ratio1=1.0_r8
             call vlaplace_sphere_wk(elem(ie)%state%v(:,:,:,k,nt),deriv,elem(ie),.true.,lap_v, var_coef=.false.,&
                  nu_ratio=nu_ratio1)
@@ -811,6 +896,9 @@ contains
               do i=1,np
                 ttens(i,j,k,ie)   = nu_temp*lap_t(i,j)
                 dptens(i,j,k,ie)  = nu_dp  *lap_dp(i,j)
+#ifdef SE_WV_CONTINUITY
+                wvtens(i,j,k,ie)  = nu_dp  *lap_wv(i,j)
+#endif
                 vtens(i,j,1,k,ie) = nu_velo*lap_v(i,j,1)
                 vtens(i,j,2,k,ie) = nu_velo*lap_v(i,j,2)
               enddo
@@ -853,6 +941,10 @@ contains
             do i=1,np
               elem(ie)%state%dp3d(i,j,k,nt) = elem(ie)%state%dp3d(i,j,k,nt)*elem(ie)%spheremp(i,j)&
                    + dt*dptens(i,j,k,ie)
+#ifdef SE_WV_CONTINUITY
+              elem(ie)%state%wvdp(i,j,k,nt) = elem(ie)%state%wvdp(i,j,k,nt)*elem(ie)%spheremp(i,j)&
+                   + dt*wvtens(i,j,k,ie)
+#endif
             enddo
           enddo
 
@@ -870,6 +962,11 @@ contains
 
         kptr = 3*ksponge_end
         call edgeVpack(edgeSponge,elem(ie)%state%dp3d(:,:,1:ksponge_end,nt),kblk,kptr,ie)
+
+#ifdef SE_WV_CONTINUITY
+        kptr = 4*ksponge_end
+        call edgeVpack(edgeSponge,elem(ie)%state%wvdp(:,:,1:ksponge_end,nt),kblk,kptr,ie)
+#endif
       enddo
 
       call bndry_exchange(hybrid,edgeSponge,location='advance_hypervis_sponge')
@@ -894,6 +991,11 @@ contains
         endif
         kptr = 3*ksponge_end
         call edgeVunpack(edgeSponge,elem(ie)%state%dp3d(:,:,1:ksponge_end,nt),kblk,kptr,ie)
+
+#ifdef SE_WV_CONTINUITY
+        kptr = 4*ksponge_end
+        call edgeVunpack(edgeSponge,elem(ie)%state%wvdp(:,:,1:ksponge_end,nt),kblk,kptr,ie)
+#endif
 
         if (use_cslam.and.nu_dp>0.0_r8) then
           desc = elem(ie)%desc
@@ -935,6 +1037,9 @@ contains
               vtens(i,j,2,k,ie)=dt*vtens(i,j,2,k,ie)*elem(ie)%rspheremp(i,j)
               ttens(i,j,k,ie)=dt*ttens(i,j,k,ie)*elem(ie)%rspheremp(i,j)
               elem(ie)%state%dp3d(i,j,k,nt)=elem(ie)%state%dp3d(i,j,k,nt)*elem(ie)%rspheremp(i,j)
+#ifdef SE_WV_CONTINUITY
+              elem(ie)%state%wvdp(i,j,k,nt)=elem(ie)%state%wvdp(i,j,k,nt)*elem(ie)%rspheremp(i,j)
+#endif
               ! update v first (gives better results than updating v after heating)
               elem(ie)%state%v(i,j,:,k,nt)=elem(ie)%state%v(i,j,:,k,nt) + vtens(i,j,:,k,ie)
               elem(ie)%state%T(i,j,  k,nt)=elem(ie)%state%T(i,j,  k,nt) + ttens(i,j,  k,ie)
@@ -1028,6 +1133,10 @@ contains
      real (kind=r8), dimension(np,np,nlev)                         :: phi
      real (kind=r8), dimension(np,np,nlev)                         :: omega_full
      real (kind=r8), dimension(np,np,nlev)                         :: divdp_dry
+#ifdef SE_WV_CONTINUITY
+     real (kind=r8), dimension(np,np,nlev)                         :: divwvdp
+     real (kind=r8), dimension(np,np,2,nlev)                       :: vwvdp
+#endif
      real (kind=r8), dimension(np,np,nlev)                         :: divdp_full
      real (kind=r8), dimension(np,np,2)                            :: vtemp
      real (kind=r8), dimension(np,np,2)                            :: grad_kappa_term
@@ -1105,6 +1214,10 @@ contains
              vdp_dry(i,j,2,k) = v2*dp_dry(i,j,k)
              vdp_full(i,j,1,k) = v1*dp_full(i,j,k)
              vdp_full(i,j,2,k) = v2*dp_full(i,j,k)
+#ifdef SE_WV_CONTINUITY
+             vwvdp(i,j,1,k) = v1*elem(ie)%state%wvdp(i,j,k,n0)
+             vwvdp(i,j,2,k) = v2*elem(ie)%state%wvdp(i,j,k,n0)
+#endif
            end do
          end do
          ! ================================
@@ -1126,6 +1239,9 @@ contains
          ! =========================================
          call divergence_sphere(vdp_dry(:,:,:,k),deriv,elem(ie),divdp_dry(:,:,k))
          call divergence_sphere(vdp_full(:,:,:,k),deriv,elem(ie),divdp_full(:,:,k))
+#ifdef SE_WV_CONTINUITY
+         call divergence_sphere(vwvdp(:,:,:,k),deriv,elem(ie),divwvdp(:,:,k))
+#endif
          call vorticity_sphere(elem(ie)%state%v(:,:,:,k,n0),deriv,elem(ie),vort(:,:,k))
        enddo
 
@@ -1277,6 +1393,11 @@ contains
              elem(ie)%state%dp3d(i,j,k,np1) = &
                   elem(ie)%spheremp(i,j) * (elem(ie)%state%dp3d(i,j,k,nm1) - &
                   dt2 * (divdp_dry(i,j,k)))
+#ifdef SE_WV_CONTINUITY
+             elem(ie)%state%wvdp(i,j,k,np1) = &
+                  elem(ie)%spheremp(i,j) * (elem(ie)%state%wvdp(i,j,k,nm1) - &
+                  dt2 * (divwvdp(i,j,k)))
+#endif
            enddo
          enddo
 
@@ -1307,6 +1428,10 @@ contains
 
        kptr=kptr+2*nlev
        call edgeVpack(edge3, elem(ie)%state%dp3d(:,:,:,np1),nlev,kptr, ie)
+#ifdef SE_WV_CONTINUITY
+       kptr=kptr+nlev
+       call edgeVpack(edge3, elem(ie)%state%wvdp(:,:,:,np1),nlev,kptr, ie)
+#endif
      end do
 
      ! =============================================================
@@ -1334,6 +1459,9 @@ contains
        corners(1:np,1:np,:) = elem(ie)%state%dp3d(:,:,:,np1)
        kptr=kptr+2*nlev
        call edgeVunpack(edge3, elem(ie)%state%dp3d(:,:,:,np1),nlev,kptr,ie)
+#ifdef SE_WV_CONTINUITY
+       call edgeVunpack(edge3, elem(ie)%state%wvdp(:,:,:,np1),nlev,4*nlev,ie)
+#endif
 
        if  (use_cslam.and.eta_ave_w.ne.0._r8) then
          desc = elem(ie)%desc
@@ -1381,6 +1509,9 @@ contains
        ! vertically lagrangian: complete dp3d timestep:
        do k=1,nlev
          elem(ie)%state%dp3d(:,:,k,np1)= elem(ie)%rspheremp(:,:)*elem(ie)%state%dp3d(:,:,k,np1)
+#ifdef SE_WV_CONTINUITY
+         elem(ie)%state%wvdp(:,:,k,np1)= elem(ie)%rspheremp(:,:)*elem(ie)%state%wvdp(:,:,k,np1)
+#endif
        enddo
      end do
 
@@ -1916,5 +2047,166 @@ contains
     end do
 
   end subroutine hypervis_Qdp
+
+  subroutine hypervis_Qdp_diff_setref(elem, tl_f, tl_qdp, nets, nete)
+    !
+    ! 2026-07-24 (Peter): store the freshly cslam2gll-mapped q(wv) as the
+    ! deviation reference.  Called at each anchor right after cslam2gll:
+    ! CSLAM rules over GLL Qdp via the anchor overwrite, and the mapped
+    ! field itself is NEVER damped (the old del4_cslam_qgll diffused it).
+    !
+    use dimensions_mod, only: np, nlev, wv_idx_dycore
+    use element_mod,    only: element_t
+
+    type(element_t), intent(in) :: elem(:)
+    integer,         intent(in) :: tl_f, tl_qdp, nets, nete
+
+    integer :: ie, k
+
+    do ie = nets, nete
+      do k = 1, nlev
+        qref_diff(:,:,k,ie) = elem(ie)%state%Qdp(:,:,k,wv_idx_dycore,tl_qdp) &
+                              / elem(ie)%state%dp3d(:,:,k,tl_f)
+      end do
+    end do
+    qref_diff_set = .true.
+  end subroutine hypervis_Qdp_diff_setref
+
+  subroutine hypervis_Qdp_diff(elem, deriv, hybrid, tl_f, tl_qdp, dt_fvm, nets, nete)
+    !
+    ! 2026-07-24 (Peter): "del2 on difference between qdp on GLL and cslam.
+    ! don't apply del2 to cslam itself."  Damp ONLY the deviation
+    !   d = q_gll - qref   (qref = CSLAM-mapped q stored at the last anchor)
+    ! with del2:  Qdp += dt*nu_q_diff*dp3d*del2_wk(d), DSSed.  Where GLL
+    ! still equals the CSLAM-consistent field the tendency is zero, so the
+    ! CSLAM content is never diffused; only deviations accumulated between
+    ! anchors (physics increments, vertical remap) have their grid-scale
+    ! structure damped.
+    !
+    use dimensions_mod, only: np, nlev, wv_idx_dycore, nu_q_diff
+    use element_mod,    only: element_t
+    use hybrid_mod,     only: hybrid_t
+    use derivative_mod, only: derivative_t, laplace_sphere_wk
+    use edge_mod,       only: edgeVpack, edgeVunpack
+    use bndry_mod,      only: bndry_exchange
+
+    type(element_t),    intent(inout) :: elem(:)
+    type(derivative_t), intent(in)    :: deriv
+    type(hybrid_t),     intent(in)    :: hybrid
+    integer,            intent(in)    :: tl_f, tl_qdp, nets, nete
+    real(r8),           intent(in)    :: dt_fvm
+
+    real(r8) :: qtens(np,np,nlev,nets:nete), lap_d(np,np)
+    integer  :: ie, k
+
+    if (.not.qref_diff_set) then
+      ! first call before any anchor (startup): no reference yet -- take the
+      ! current state as reference (zero deviation), no damping this step
+      call hypervis_Qdp_diff_setref(elem, tl_f, tl_qdp, nets, nete)
+      return
+    end if
+
+    ! no subcycling needed: dt*nu_q_diff*k2max ~ 0.1 at ne30
+    do ie = nets, nete
+      do k = 1, nlev
+        lap_d(:,:) = elem(ie)%state%Qdp(:,:,k,wv_idx_dycore,tl_qdp) &
+                     / elem(ie)%state%dp3d(:,:,k,tl_f)              &
+                     - qref_diff(:,:,k,ie)
+        call laplace_sphere_wk(lap_d, deriv, elem(ie), qtens(:,:,k,ie), var_coef=.false.)
+      end do
+      call edgeVpack(edgeQdp, qtens(:,:,:,ie), nlev, 0, ie)
+    end do
+    call bndry_exchange(hybrid, edgeQdp, location='hypervis_Qdp_diff')
+    do ie = nets, nete
+      call edgeVunpack(edgeQdp, qtens(:,:,:,ie), nlev, 0, ie)
+    end do
+
+    ! del2 damping of the deviation: tendency +nu*del2(d) (sponge sign
+    ! convention; the del4 path subtracts its biharmonic instead)
+    do ie = nets, nete
+      do k = 1, nlev
+        elem(ie)%state%Qdp(:,:,k,wv_idx_dycore,tl_qdp) = elem(ie)%state%Qdp(:,:,k,wv_idx_dycore,tl_qdp) &
+             + dt_fvm * nu_q_diff * elem(ie)%state%dp3d(:,:,k,tl_f) &
+             * qtens(:,:,k,ie) * elem(ie)%rspheremp(:,:)
+      end do
+    end do
+
+  end subroutine hypervis_Qdp_diff
+
+  subroutine wvdp_nudge_p1(elem, hybrid, tl_f, tl_qdp, alpha, nets, nete)
+    !
+    ! 2026-07-23 (Peter, "do 2"): SCALE-SELECTIVE wvdp nudging.
+    ! Pointwise nudging at short tau slaves wvdp onto the static grid-scale
+    ! truncation pattern of ANY cell-mean->GLL mapped target (equatorial
+    ! element-row PS stripes: runs 6870585, 6871118, del4-on-target probe).
+    ! The secular PS/PS_gll divergence lives at large scales, so nudge only
+    ! those: the increment  I = (dp3d + Qdp(wv)) - wvdp  is projected onto
+    ! the element-BILINEAR (p=1) subspace with a GLL-weighted least-squares
+    ! fit (removes ALL intra-element p>=2 modes exactly; preserves the
+    ! element-integrated reference-space water mass), DSSed to C0, then
+    !   wvdp += alpha * I_p1.
+    !
+    use dimensions_mod, only: np, nlev, wv_idx_dycore, wvdp_nudge_porder, wvdp_nudge_spheremp
+    use element_mod,    only: element_t
+    use hybrid_mod,     only: hybrid_t
+    use edge_mod,       only: edgeVpack, edgeVunpack
+    use bndry_mod,      only: bndry_exchange
+
+    type(element_t), intent(inout) :: elem(:)
+    type(hybrid_t),  intent(in)    :: hybrid
+    integer,         intent(in)    :: tl_f, tl_qdp, nets, nete
+    real(r8),        intent(in)    :: alpha
+
+    ! 1D GLL-weighted least-squares projection onto {1,x}: nodes
+    ! x = [-1,-a,a,1], a=1/sqrt(5); weights w = [1,5,5,1]/6 (sum 2):
+    !   P(j,i) = w_i/2 + (3/2) x_j w_i x_i
+    ! (rows sum to 1; reproduces x exactly; idempotent; preserves the
+    ! GLL-weighted mean).  2D = tensor product.
+    real(r8), parameter :: a5 = 0.44721359549995793_r8  ! 1/sqrt(5)
+    real(r8) :: P1d(4,4), xg(4), wg(4)
+    real(r8) :: inc(np,np,nlev,nets:nete), tmp(np,np)
+    real(r8) :: c, rsphsum
+    integer  :: ie, i, j, k
+
+    if (np /= 4) call endrun('wvdp_nudge_p1: requires np=4')
+    xg = (/ -1.0_r8, -a5, a5, 1.0_r8 /)
+    wg = (/ 1.0_r8, 5.0_r8, 5.0_r8, 1.0_r8 /)/6.0_r8
+    do j = 1, 4
+      do i = 1, 4
+        ! porder=0: element-mean only (no linear term); porder=1: bilinear
+        P1d(j,i) = 0.5_r8*wg(i) + &
+             real(wvdp_nudge_porder,r8)*1.5_r8*xg(j)*wg(i)*xg(i)
+      end do
+    end do
+
+    do ie = nets, nete
+      rsphsum = 1.0_r8/SUM(elem(ie)%spheremp(:,:))
+      do k = 1, nlev
+        tmp(:,:) = elem(ie)%state%dp3d(:,:,k,tl_f) &
+                 + elem(ie)%state%Qdp(:,:,k,wv_idx_dycore,tl_qdp) &
+                 - elem(ie)%state%wvdp(:,:,k,tl_f)
+        if (wvdp_nudge_spheremp .and. wvdp_nudge_porder == 0) then
+          ! spherical (spheremp-weighted) element mean: the projected
+          ! increment integrates over the element to the increment's TRUE
+          ! spherical water mass (reference-weighted mean does not); DSS
+          ! conserves the global spheremp integral, so global sync is exact
+          c = SUM(tmp*elem(ie)%spheremp(:,:))*rsphsum
+          inc(:,:,k,ie) = c * elem(ie)%spheremp(:,:)
+        else
+          inc(:,:,k,ie) = MATMUL(P1d, MATMUL(tmp, TRANSPOSE(P1d))) &
+                          * elem(ie)%spheremp(:,:)
+        end if
+      end do
+      call edgeVpack(edgeQdp, inc(:,:,:,ie), nlev, 0, ie)
+    end do
+    call bndry_exchange(hybrid, edgeQdp, location='wvdp_nudge_p1')
+    do ie = nets, nete
+      call edgeVunpack(edgeQdp, inc(:,:,:,ie), nlev, 0, ie)
+      do k = 1, nlev
+        elem(ie)%state%wvdp(:,:,k,tl_f) = elem(ie)%state%wvdp(:,:,k,tl_f) &
+             + alpha*inc(:,:,k,ie)*elem(ie)%rspheremp(:,:)
+      end do
+    end do
+  end subroutine wvdp_nudge_p1
 
 end module prim_advance_mod

@@ -1,4 +1,5 @@
 #define OVERLAP 1
+#define SE_WV_CONTINUITY  ! RE-ENABLED 2026-07-22 (full-dp + CSLAM hard-overwrite investigation)  ! 2026-07-02: SE evolves water-vapor mass (wvdp) with its own continuity eq. (must match define in element/prim_advance/prim_driver/viscosity mods)
 module prim_advection_mod
 !
 ! two formulations.  both are conservative
@@ -949,6 +950,9 @@ contains
     use fvm_control_volume_mod, only: fvm_struct
     use dimensions_mod,         only: use_cslam, ntrac
     use dimensions_mod,         only: kord_tr,kord_tr_cslam
+#ifdef SE_WV_CONTINUITY
+    use dimensions_mod,         only: wv_idx_dycore
+#endif
     use cam_logfile,            only: iulog
     use physconst,              only: pi
     use air_composition,        only: thermodynamic_active_species_idx_dycore
@@ -966,6 +970,9 @@ contains
     real (kind=r8), dimension(np,np,nlev)  :: dp_moist,dp_star_moist, dp_dry,dp_star_dry
     real (kind=r8), dimension(np,np,nlev)  :: enthalpy_star
     real (kind=r8), dimension(np,np,nlev,2):: ttmp
+#ifdef SE_WV_CONTINUITY
+    real (kind=r8), dimension(np,np,nlev,qsize) :: qdp_tmp !qdp with SE-evolved wv substituted
+#endif
     real(r8), parameter                    :: rad2deg = 180.0_r8/pi
     integer :: region_num_threads,qbeg,qend,kord_uvT(1)
     type (hybrid_t) :: hybridnew,hybridnew2
@@ -978,20 +985,40 @@ contains
       !
       ! prepare for mapping of temperature
       !
+#ifdef SE_WV_CONTINUITY
+      !
+      ! dynamics thermodynamics sees SE-evolved moisture (not CSLAM copy);
+      ! wvdp holds MOIST dp (2026-07-22): wv mass = wvdp - dp3d
+      ! (dp3d(np1) is still on Lagrangian levels here, matching wvdp(np1))
+      !
+      qdp_tmp = elem(ie)%state%qdp(:,:,:,1:qsize,np1_qdp)
+      qdp_tmp(:,:,:,wv_idx_dycore) = elem(ie)%state%wvdp(:,:,:,np1) - elem(ie)%state%dp3d(:,:,:,np1)
+#endif
       if (vert_remap_uvTq_alg>-20) then
         !
         ! compute enthalpy on Lagrangian levels
         ! (do it here since qdp is overwritten by remap1)
         !
+#ifdef SE_WV_CONTINUITY
+        call get_enthalpy(qdp_tmp, &
+             elem(ie)%state%t(:,:,:,np1), elem(ie)%state%dp3d(:,:,:,np1), enthalpy_star,     &
+             active_species_idx_dycore=thermodynamic_active_species_idx_dycore)
+#else
         call get_enthalpy(elem(ie)%state%qdp(:,:,:,1:qsize,np1_qdp), &
              elem(ie)%state%t(:,:,:,np1), elem(ie)%state%dp3d(:,:,:,np1), enthalpy_star,     &
              active_species_idx_dycore=thermodynamic_active_species_idx_dycore)
+#endif
       else
         !
         ! map Tv over log(p) following FV and FV3
         !
+#ifdef SE_WV_CONTINUITY
+        call get_virtual_temp(qdp_tmp, enthalpy_star, &
+             dp_dry=elem(ie)%state%dp3d(:,:,:,np1), active_species_idx_dycore=thermodynamic_active_species_idx_dycore)
+#else
         call get_virtual_temp(elem(ie)%state%qdp(:,:,:,1:qsize,np1_qdp), enthalpy_star, &
              dp_dry=elem(ie)%state%dp3d(:,:,:,np1), active_species_idx_dycore=thermodynamic_active_species_idx_dycore)
+#endif
         enthalpy_star = enthalpy_star*elem(ie)%state%t(:,:,:,np1)
       end if
       !
@@ -1009,8 +1036,13 @@ contains
         elem(ie)%state%dp3d(:,:,k,np1) = dp_dry(:,:,k)
       enddo
       !
+#ifdef SE_WV_CONTINUITY
+      call get_dp(qdp_tmp, MASS_MIXING_RATIO,&
+         thermodynamic_active_species_idx_dycore, dp_star_dry, dp_star_moist(:,:,:))
+#else
       call get_dp(elem(ie)%state%Qdp(:,:,:,1:qsize,np1_qdp), MASS_MIXING_RATIO,&
          thermodynamic_active_species_idx_dycore, dp_star_dry, dp_star_moist(:,:,:))
+#endif
       !
       ! Check if Lagrangian leves have crossed
       !
@@ -1034,11 +1066,28 @@ contains
       endif
 
       call remap1(elem(ie)%state%Qdp(:,:,:,1:qsize,np1_qdp),np,1,qsize,qsize,dp_star_dry,dp_dry,ptop,0,.true.,kord_tr)
+#ifdef SE_WV_CONTINUITY
+      !
+      ! remap SE-evolved MOIST dp over dry levels (mixing ratio 1+q; the
+      ! remap limiter is shift-invariant so this is consistent with tracer
+      ! remap) and refresh qdp_tmp with post-remap (Eulerian-level) wv mass
+      ! (dp3d(np1) now holds reference dry levels dp_dry)
+      !
+      call remap1(elem(ie)%state%wvdp(:,:,:,np1:np1),np,1,1,1,dp_star_dry,dp_dry,ptop,0,.true.,&
+           kord_tr(wv_idx_dycore:wv_idx_dycore))
+      qdp_tmp = elem(ie)%state%qdp(:,:,:,1:qsize,np1_qdp)
+      qdp_tmp(:,:,:,wv_idx_dycore) = elem(ie)%state%wvdp(:,:,:,np1) - elem(ie)%state%dp3d(:,:,:,np1)
+#endif
       !
       ! compute moist reference pressure level thickness
       !
+#ifdef SE_WV_CONTINUITY
+      call get_dp(qdp_tmp, MASS_MIXING_RATIO,&
+           thermodynamic_active_species_idx_dycore, dp_dry, dp_moist(:,:,:))
+#else
       call get_dp(elem(ie)%state%Qdp(:,:,:,1:qsize,np1_qdp), MASS_MIXING_RATIO,&
            thermodynamic_active_species_idx_dycore, dp_dry, dp_moist(:,:,:))
+#endif
 
       !
       ! Remapping of temperature
@@ -1052,17 +1101,28 @@ contains
         ! compute sum c^(l)_p*m^(l)*dp on arrival (Eulerian) grid
         !
         ttmp(:,:,:,1) = 1.0_r8
+#ifdef SE_WV_CONTINUITY
+        call get_enthalpy(qdp_tmp,   &
+             ttmp(:,:,:,1), dp_dry,ttmp(:,:,:,2), &
+             active_species_idx_dycore=thermodynamic_active_species_idx_dycore)
+#else
         call get_enthalpy(elem(ie)%state%qdp(:,:,:,1:qsize,np1_qdp),   &
              ttmp(:,:,:,1), dp_dry,ttmp(:,:,:,2), &
              active_species_idx_dycore=thermodynamic_active_species_idx_dycore)
+#endif
         elem(ie)%state%t(:,:,:,np1)=enthalpy_star/ttmp(:,:,:,2)
       else
         !
         ! map Tv over log(p); following FV and FV3
         !
         call remap1(enthalpy_star,np,1,1,1,dp_star_moist,dp_moist,ptop,1,.false.,kord_uvT)
+#ifdef SE_WV_CONTINUITY
+        call get_virtual_temp(qdp_tmp, ttmp(:,:,:,1), &
+             dp_dry=dp_dry, active_species_idx_dycore=thermodynamic_active_species_idx_dycore)
+#else
         call get_virtual_temp(elem(ie)%state%qdp(:,:,:,1:qsize,np1_qdp), ttmp(:,:,:,1), &
              dp_dry=dp_dry, active_species_idx_dycore=thermodynamic_active_species_idx_dycore)
+#endif
         !
         ! convert new Tv to T
         !

@@ -225,7 +225,8 @@ contains
 
   subroutine print_cfl(elem,hybrid,nets,nete,dtnu,ptop,pmid,&
        dt_remap_actual,dt_tracer_fvm_actual,dt_tracer_se_actual,&
-       dt_dyn_actual,dt_dyn_visco_actual,dt_dyn_del2_actual,dt_tracer_visco_actual,dt_phys)
+       dt_dyn_actual,dt_dyn_visco_actual,dt_dyn_del2_actual,dt_tracer_visco_actual,dt_phys,&
+       min_area_fvm_loc)
     !
     !   estimate various CFL limits
     !   also, for variable resolution viscosity coefficient, make sure
@@ -236,7 +237,7 @@ contains
     use element_mod,    only: element_t
     use dimensions_mod, only: np,ne,nelem,nc,nhe,use_cslam,nlev,large_Courant_incr
     use dimensions_mod, only: nu_scale_top,nu_div_lev,nu_lev,nu_t_lev,del4_cslam_qgll
-    use dimensions_mod, only: nu_p_lev
+    use dimensions_mod, only: nu_p_lev,nu_omega_del2_lev,del2omega,cslam_q_filter_mult
     use quadrature_mod, only: gausslobatto, quadrature_t
 
     use reduction_mod,  only: ParallelMin,ParallelMax
@@ -244,6 +245,7 @@ contains
     use control_mod,    only: nu, nu_div, nu_q, nu_p, nu_t, nu_top, fine_ne, max_hypervis_courant
     use control_mod,    only: tstep_type, hypervis_power, hypervis_scaling
     use control_mod,    only: sponge_del4_nu_div_fac, sponge_del4_nu_fac, sponge_del4_lev
+    use control_mod,    only: hypervis_subcycle_cslam_q, cslam_q_filter_nsub
     use cam_abortutils, only: endrun
     use parallel_mod,   only: global_shared_buf, global_shared_sum
     use edge_mod,       only: initedgebuffer, FreeEdgeBuffer, edgeVpack, edgeVunpack
@@ -262,6 +264,7 @@ contains
     real (kind=r8), intent(in) :: dt_remap_actual,dt_tracer_fvm_actual,dt_tracer_se_actual,&
                            dt_dyn_actual,dt_dyn_visco_actual,dt_dyn_del2_actual,           &
                            dt_tracer_visco_actual, dt_phys
+    real (kind=r8), intent(in) :: min_area_fvm_loc  ! thread-local min CSLAM cell area (sr)
 
     ! Element statisics
     real (kind=r8) :: max_min_dx,min_min_dx,min_max_dx,max_unif_dx   ! used for normalizing scalar HV
@@ -281,6 +284,8 @@ contains
     real (kind=r8) :: s_laplacian, s_hypervis, s_rk, s_rk_tracer !Stability region
     real (kind=r8) :: dt_max_adv, dt_max_gw, dt_max_tracer_se, dt_max_tracer_fvm
     real (kind=r8) :: dt_max_hypervis, dt_max_hypervis_tracer, dt_max_laplacian_top
+    real (kind=r8) :: dt_max_hypervis_cslam_q
+    real (kind=r8) :: dt_max_cslam_q_filter, min_area_fvm_m2, lam4_fvm
 
     real(kind=r8) :: I_sphere, nu_max, nu_div_max
     real(kind=r8) :: fld(np,np,nets:nete)
@@ -696,6 +701,7 @@ contains
         nu_lev(k)     = (1.0_r8-scale1)*nu    +scale1*nu_max
         nu_t_lev(k)   = (1.0_r8-scale1)*nu_p  +scale1*nu_max
       end if
+      nu_omega_del2_lev(k) = scale1*nu_top
     end do
     !
     ! For WACCM and WACCM-x, apply the same sponge-layer ramp to dp (pressure)
@@ -721,6 +727,13 @@ contains
         do k=1,ksponge_end
            write(iulog,'(i3,4e11.4)') k,pmid(k),z(k),nu_scale_top(k),nu_scale_top(k)*nu_top
         end do
+        if (del2omega) then
+          write(iulog,*) ": del2 omega damping profile (nu_omega_del2_lev)"
+          write(iulog,*) "k, p, z, nu_omega_del2_lev"
+          do k=1,nlev
+             write(iulog,'(i3,3e11.4)') k,pmid(k),z(k),nu_omega_del2_lev(k)
+          end do
+        end if
       end if
     end if
 
@@ -775,6 +788,37 @@ contains
     nu_max = MAX(MAXVAL(nu_div_lev(:)),MAXVAL(nu_lev(:)),MAXVAL(nu_t_lev(:)))
     dt_max_hypervis        = s_hypervis/(nu_max*normDinv_hypervis)
     dt_max_hypervis_tracer = s_hypervis/(nu_q*normDinv_hypervis)
+    !
+    ! auto-set hypervis_subcycle_cslam_q from del4 stability bound for the
+    ! GLL-side water-vapor damping applied after cslam2gll (uses nu_q_cslam,
+    ! stepped with dt_remap = rsplit*qsplit*dt).
+    !
+    if (use_cslam .and. del4_cslam_qgll .and. nu_q_cslam > 0.0_r8) then
+      dt_max_hypervis_cslam_q = s_hypervis/(nu_q_cslam*normDinv_hypervis)
+      hypervis_subcycle_cslam_q = max(1, ceiling(dt_remap_actual/dt_max_hypervis_cslam_q))
+    else
+      dt_max_hypervis_cslam_q = -1.0_r8
+      hypervis_subcycle_cslam_q = 1
+    end if
+    !
+    ! auto-set cslam_q_filter_nsub for the CSLAM-grid del4 Q filter
+    ! (apply_cslam_q_filter_del4 in fvm_consistent_se_cslam.F90).
+    ! 2D von Neumann bound for the two-pass flux-form del4 on a quasi-uniform
+    ! cell grid: worst (checkerboard) laplacian eigenvalue is 8/A per cell, so
+    ! G = 1 - dt*nu*lambda^2 requires dt*nu*(8/A_min)^2 < s_hypervis.
+    ! (NOT the 1D bound 16/h^4 -- that is 4x too optimistic in 2D.)
+    ! The 1.25 factor covers face-weight/aspect distortion of gnomonic cells
+    ! relative to the uniform-square eigenvalue estimate.
+    !
+    if (use_cslam) then
+      min_area_fvm_m2 = ParallelMin(min_area_fvm_loc,hybrid)*rearth*rearth
+      lam4_fvm = 1.25_r8*(8.0_r8/min_area_fvm_m2)**2
+      dt_max_cslam_q_filter = s_hypervis/(cslam_q_filter_mult*MAXVAL(nu_p_lev)*lam4_fvm)
+      cslam_q_filter_nsub = max(1, ceiling(dt_tracer_fvm_actual/dt_max_cslam_q_filter))
+    else
+      dt_max_cslam_q_filter = -1.0_r8
+      cslam_q_filter_nsub = 1
+    end if
 
     max_laplace = MAX(MAXVAL(nu_scale_top(:))*nu_top,MAXVAL(kmvis_ref(:)/rho_ref(:)))
     max_laplace = MAX(max_laplace,MAXVAL(kmcnd_ref(:)/(cpair*rho_ref(:))))
@@ -805,6 +849,13 @@ contains
         write(iulog,'(a,f10.2,a,f10.2,a)') '* dt_tracer_fvm (time-stepping tracers ; q       ) < ',dt_max_tracer_fvm,&
              's ',dt_tracer_fvm_actual
         if (dt_tracer_fvm_actual>dt_max_tracer_fvm) write(iulog,*) 'WARNING: dt_tracer_fvm theortically unstable'
+        if (del4_cslam_qgll .and. nu_q_cslam > 0.0_r8) then
+          write(iulog,'(a,f10.2,a,i4)') '* dt_max_hypervis_cslam_q (del4 q on GLL after cslam2gll) < ',&
+               dt_max_hypervis_cslam_q,'s ; hypervis_subcycle_cslam_q = ',hypervis_subcycle_cslam_q
+        end if
+        write(iulog,'(a,f10.2,a,i4,a,f6.2)') '* dt_max_cslam_q_filter (CSLAM-grid del4 Q filter, if compiled in) < ',&
+             dt_max_cslam_q_filter,'s ; cslam_q_filter_nsub = ',cslam_q_filter_nsub,&
+             ' ; nu multiplier = ',cslam_q_filter_mult
       end if
       write(iulog,'(a,f10.2)') '* dt_remap (vertical remap dt) ',dt_remap_actual
       do k=1,ksponge_end

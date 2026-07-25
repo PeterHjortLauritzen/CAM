@@ -26,7 +26,7 @@ module fvm_control_volume_mod
   type, public :: fvm_struct
     ! fvm tracer mixing ratio: (kg/kg)
     real (kind=r8) :: c(1-nhc:nc+nhc,1-nhc:nc+nhc,nlev,ntrac_d)
-    real (kind=r8) :: se_flux(1-nhe:nc+nhe,1-nhe:nc+nhe,4,nlev) 
+    real (kind=r8) :: se_flux(1-nhe:nc+nhe,1-nhe:nc+nhe,4,nlev)
 
     real (kind=r8) :: dp_fvm(1-nhc:nc+nhc,1-nhc:nc+nhc,nlev)
     real (kind=r8) :: dp_ref(nlev)
