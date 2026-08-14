@@ -21,8 +21,11 @@ module global_norms_mod
   public :: global_integrals_general
   public :: wrap_repro_sum
 
+  public :: nu_q_cslam
+
   private :: global_maximum
   type (EdgeBuffer_t), private :: edgebuf
+  real(r8), save :: nu_q_cslam = -1.0_r8
 
   interface global_integral
      module procedure global_integral_elem
@@ -232,8 +235,8 @@ contains
     use hybrid_mod,     only: hybrid_t
     use element_mod,    only: element_t
     use dimensions_mod, only: np,ne,nelem,nc,nhe,use_cslam,nlev,large_Courant_incr
-    use dimensions_mod, only: nu_scale_top,nu_div_lev,nu_lev,nu_t_lev
-
+    use dimensions_mod, only: nu_scale_top,nu_div_lev,nu_lev,nu_t_lev,del4_cslam_qgll
+    use dimensions_mod, only: nu_p_lev,cslam_q_filter,cslam_q_filter_mult
     use quadrature_mod, only: gausslobatto, quadrature_t
 
     use reduction_mod,  only: ParallelMin,ParallelMax
@@ -241,6 +244,7 @@ contains
     use control_mod,    only: nu, nu_div, nu_q, nu_p, nu_t, nu_top, fine_ne, max_hypervis_courant
     use control_mod,    only: tstep_type, hypervis_power, hypervis_scaling
     use control_mod,    only: sponge_del4_nu_div_fac, sponge_del4_nu_fac, sponge_del4_lev
+    use control_mod,    only: hypervis_subcycle_cslam_q, cslam_q_filter_nsub
     use cam_abortutils, only: endrun
     use parallel_mod,   only: global_shared_buf, global_shared_sum
     use edge_mod,       only: initedgebuffer, FreeEdgeBuffer, edgeVpack, edgeVunpack
@@ -278,6 +282,8 @@ contains
     real (kind=r8) :: s_laplacian, s_hypervis, s_rk, s_rk_tracer !Stability region
     real (kind=r8) :: dt_max_adv, dt_max_gw, dt_max_tracer_se, dt_max_tracer_fvm
     real (kind=r8) :: dt_max_hypervis, dt_max_hypervis_tracer, dt_max_laplacian_top
+    real (kind=r8) :: dt_max_hypervis_cslam_q
+    real (kind=r8) :: dt_max_cslam_q_filter, min_area_fvm_m2, lam4_fvm
 
     real(kind=r8) :: I_sphere, nu_max, nu_div_max
     real(kind=r8) :: fld(np,np,nets:nete)
@@ -581,10 +587,19 @@ contains
 
     if (nu_q<0) nu_q = nu_p ! necessary for consistency
     if (nu_t<0) nu_t = nu_p ! temperature damping is always equal to nu_p
+#ifdef cecile
+    ! cecile config: matches ~/src/for-cecile-cslam-del4q SourceMods
+    nu_q_cslam = 3.0_r8 * nu_p
+#else
+    ! 0.5*nu_p keeps the GLL-side del4-on-qdp within its stability bound in a
+    ! single iteration (hypervis_subcycle_cslam_q auto-computes to 1 at ne120).
+    nu_q_cslam = 0.5_r8 * nu_p
+#endif
 
     nu_div_lev(:) = nu_div
     nu_lev(:)     = nu
     nu_t_lev(:)   = nu_p
+    nu_p_lev(:)   = nu_p
 
     !
     ! sponge layer strength needed for stability depends on model top location
@@ -645,7 +660,7 @@ contains
     else if (top_090_140km.or.top_140_600km) then ! defaults for waccm(x)
       if (sponge_del4_lev       <0) sponge_del4_lev        = 20
       if (sponge_del4_nu_fac    <0) sponge_del4_nu_fac     = 5.0_r8
-      if (sponge_del4_nu_div_fac<0) sponge_del4_nu_div_fac = 10.0_r8
+      if (sponge_del4_nu_div_fac<0) sponge_del4_nu_div_fac = 7.5_r8
     else
       if (sponge_del4_lev       <0) sponge_del4_lev        = 1
       if (sponge_del4_nu_fac    <0) sponge_del4_nu_fac     = 1.0_r8
@@ -692,13 +707,21 @@ contains
         nu_t_lev(k)   = (1.0_r8-scale1)*nu_p  +scale1*nu_max
       end if
     end do
+    !
+    ! For WACCM and WACCM-x, apply the same sponge-layer ramp to dp (pressure)
+    ! damping as is used for temperature damping. For lower-top configurations
+    ! nu_p_lev remains uniform at nu_p (no ramp).
+    !
+    if (top_090_140km .or. top_140_600km) then
+      nu_p_lev(:) = nu_t_lev(:)
+    end if
 
     if (hybrid%masterthread)then
       write(iulog,*) "z computed from barometric formula (using US std atmosphere)"
       call std_atm_height(pmid(:),z(:))
-      write(iulog,*) "k,pmid_ref,z,nu_lev,nu_t_lev,nu_div_lev"
+      write(iulog,*) "k,pmid_ref,z,nu_lev,nu_t_lev,nu_p_lev,nu_div_lev"
       do k=1,nlev
-        write(iulog,'(i3,5e11.4)') k,pmid(k),z(k),nu_lev(k),nu_t_lev(k),nu_div_lev(k)
+        write(iulog,'(i3,6e11.4)') k,pmid(k),z(k),nu_lev(k),nu_t_lev(k),nu_p_lev(k),nu_div_lev(k)
       end do
       if (nu_top>0) then
         write(iulog,*) ": ksponge_end = ",ksponge_end
@@ -762,6 +785,39 @@ contains
     nu_max = MAX(MAXVAL(nu_div_lev(:)),MAXVAL(nu_lev(:)),MAXVAL(nu_t_lev(:)))
     dt_max_hypervis        = s_hypervis/(nu_max*normDinv_hypervis)
     dt_max_hypervis_tracer = s_hypervis/(nu_q*normDinv_hypervis)
+    !
+    ! auto-set hypervis_subcycle_cslam_q from del4 stability bound for the
+    ! GLL-side water-vapor damping applied after cslam2gll (uses nu_q_cslam,
+    ! stepped with dt_remap = rsplit*qsplit*dt).
+    !
+    if (use_cslam .and. del4_cslam_qgll .and. nu_q_cslam > 0.0_r8) then
+      dt_max_hypervis_cslam_q = s_hypervis/(nu_q_cslam*normDinv_hypervis)
+#ifdef cecile
+      ! cecile config: hardcoded 2 iterations (matches for-cecile-cslam-del4q SourceMods)
+      hypervis_subcycle_cslam_q = 2
+#else
+      hypervis_subcycle_cslam_q = max(1, ceiling(dt_remap_actual/dt_max_hypervis_cslam_q))
+#endif
+    else
+      dt_max_hypervis_cslam_q = -1.0_r8
+      hypervis_subcycle_cslam_q = 1
+    end if
+    !
+    ! auto-set cslam_q_filter_nsub for the CSLAM-grid del4 Q filter from
+    ! the 2D von Neumann bound dt*nu*(8/A_min)^2 < s_hypervis (checkerboard
+    ! eigenvalue 8/A; 1.25 covers gnomonic cell distortion).
+    !
+    if (use_cslam .and. cslam_q_filter) then
+      ! min CSLAM cell area ~ 0.83 x mean cell area (smallest cells at
+      ! panel-edge midpoints on the equiangular gnomonic grid)
+      min_area_fvm_m2 = 0.83_r8*4.0_r8*pi/dble(6*ne*ne*nc*nc)*rearth*rearth
+      lam4_fvm = 1.25_r8*(8.0_r8/min_area_fvm_m2)**2
+      dt_max_cslam_q_filter = s_hypervis/(cslam_q_filter_mult*MAXVAL(nu_p_lev)*lam4_fvm)
+      cslam_q_filter_nsub = max(1, ceiling(dt_tracer_fvm_actual/dt_max_cslam_q_filter))
+    else
+      dt_max_cslam_q_filter = -1.0_r8
+      cslam_q_filter_nsub = 1
+    end if
 
     max_laplace = MAX(MAXVAL(nu_scale_top(:))*nu_top,MAXVAL(kmvis_ref(:)/rho_ref(:)))
     max_laplace = MAX(max_laplace,MAXVAL(kmcnd_ref(:)/(cpair*rho_ref(:))))
@@ -792,6 +848,15 @@ contains
         write(iulog,'(a,f10.2,a,f10.2,a)') '* dt_tracer_fvm (time-stepping tracers ; q       ) < ',dt_max_tracer_fvm,&
              's ',dt_tracer_fvm_actual
         if (dt_tracer_fvm_actual>dt_max_tracer_fvm) write(iulog,*) 'WARNING: dt_tracer_fvm theortically unstable'
+        if (del4_cslam_qgll .and. nu_q_cslam > 0.0_r8) then
+          write(iulog,'(a,f10.2,a,i4)') '* dt_max_hypervis_cslam_q (del4 q on GLL after cslam2gll) < ',&
+               dt_max_hypervis_cslam_q,'s ; hypervis_subcycle_cslam_q = ',hypervis_subcycle_cslam_q
+        end if
+        if (cslam_q_filter) then
+          write(iulog,'(a,f10.2,a,i4,a,f6.2)') '* dt_max_cslam_q_filter (CSLAM-grid del4 Q filter) < ',&
+               dt_max_cslam_q_filter,'s ; cslam_q_filter_nsub = ',cslam_q_filter_nsub,&
+               ' ; nu multiplier = ',cslam_q_filter_mult
+        end if
       end if
       write(iulog,'(a,f10.2)') '* dt_remap (vertical remap dt) ',dt_remap_actual
       do k=1,ksponge_end

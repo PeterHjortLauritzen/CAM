@@ -38,6 +38,22 @@ module dimensions_mod
   integer         :: ntrac = 0           !ntrac is set in dyn_comp
   logical, public :: use_cslam = .false. !logical for CSLAM
   integer         :: qsize = 0           !qsize is set in dyn_comp
+  integer, public :: wv_idx_dycore = -1  !water vapor index in dycore Qdp; set in dyn_comp
+  logical, public :: del4_cslam_qgll = .true. !apply del4 hyperviscosity to water vapor on GLL after cslam2gll
+                                           !(with nu_q_cslam = 0.5*nu_p, weak enough to be stable in a
+                                           !single iteration; keeps QNEG3 at 0 where .false. costs ~24)
+#ifdef cecile
+  logical, public :: cslam_q_filter = .false. !cecile config: no CSLAM-grid del4 Q filter
+#else
+  logical, public :: cslam_q_filter = .true. !mass-conservative del4 damping of water vapor on the CSLAM grid
+                                           !(apply_cslam_q_filter_del4); removes the grid-scale Q noise that
+                                           !seeds cube-vertex PS noise.  Limiter/xdiff details are hardcoded
+                                           !at the call site in run_consistent_se_cslam.
+#endif
+  real(r8), public :: cslam_q_filter_mult = 1.0_r8 !multiplier on nu_p for the CSLAM-grid del4 Q filter
+                                           !(apply_cslam_q_filter_del4, constant per level); also used in
+                                           !print_cfl to auto-set cslam_q_filter_nsub (control_mod) from
+                                           !the 2D del4 stability bound
   !
   ! fvm dimensions:
   logical, public :: lprint!for debugging
@@ -64,6 +80,7 @@ module dimensions_mod
   real(r8), public :: nu_scale_top(PLEV)! scaling of del2 viscosity in sopnge layer (initialized in dyn_comp)
   real(r8), public :: nu_lev(PLEV)      ! level dependent del4 (u,v) damping
   real(r8), public :: nu_t_lev(PLEV)    ! level depedendet del4 T damping
+  real(r8), public :: nu_p_lev(PLEV)    ! level depedendet del4 dp damping
   integer,  public :: ksponge_end       ! sponge is active k=1,ksponge_end
   real(r8), public :: nu_div_lev(PLEV) = 1.0_r8 ! scaling of viscosity in sponge layer
                                                       ! (set in prim_state; if applicable)

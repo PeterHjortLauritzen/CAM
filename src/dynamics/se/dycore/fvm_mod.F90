@@ -31,6 +31,7 @@ module fvm_mod
   type (EdgeBuffer_t), public  :: ghostBufQnhc_h
   type (EdgeBuffer_t), public  :: ghostBufQ1_h
   type (EdgeBuffer_t), public  :: ghostBufQ1_vh
+  type (EdgeBuffer_t), public  :: ghostBufQfilter
 !  type (EdgeBuffer_t), private  :: ghostBufFlux_h
   type (EdgeBuffer_t), public  :: ghostBufFlux_vh
   type (EdgeBuffer_t), public  :: ghostBufQnhcJet_h
@@ -97,7 +98,7 @@ contains
        call ghostunpack(cellghostbuf, fvm(ie)%dp_fvm(i1:i2,i1:i2,kmin:kmax),kblk   ,kptr,ie)
        do q=1,ntrac
           kptr = kptr + ksize
-          call ghostunpack(cellghostbuf, fvm(ie)%c(i1:i2,i1:i2,kmin:kmax,:),   kblk,kptr,ie)
+          call ghostunpack(cellghostbuf, fvm(ie)%c(i1:i2,i1:i2,kmin:kmax,q),   kblk,kptr,ie)
        enddo
     enddo
     if(FVM_TIMERS) call t_stopf('FVM:Unpack')
@@ -448,6 +449,7 @@ subroutine fill_halo_fvm_prealloc(cellghostbuf,elem,fvm,hybrid,nets,nete,ndepth,
     use dimensions_mod,         only: nhc_phys, fv_nphys
     use dimensions_mod,         only: fvm_supercycling, fvm_supercycling_jet
     use dimensions_mod,         only: kmin_jet,kmax_jet
+    use dimensions_mod,         only: cslam_q_filter
     use hycoef,                 only: hyai, hybi, ps0
     use derivative_mod,         only: subcell_integration
     use air_composition,        only: thermodynamic_active_species_num
@@ -495,6 +497,13 @@ subroutine fill_halo_fvm_prealloc(cellghostbuf,elem,fvm,hybrid,nets,nete,ndepth,
     klev = kmax_jet-kmin_jet+1
     call initghostbuffer(hybrid%par,ghostBufQ1_h,elem,klev*(ntrac+1),1,nc,nthreads=horz_num_threads)
     call initghostbuffer(hybrid%par,ghostBufQ1_vh,elem,klev*(ntrac+1),1,nc,nthreads=vert_num_threads*horz_num_threads)
+    !
+    ! 1-deep halo buffer for the CSLAM Q filter (its stencils only read
+    ! halo ring 1); 2*nlev layers hold dp_fvm and Q in one exchange.
+    !
+    if (cslam_q_filter) then
+       call initghostbuffer(hybrid%par,ghostBufQfilter,elem,2*nlev,1,nc,nthreads=vert_num_threads*horz_num_threads)
+    end if
 !    call initghostbuffer(hybrid%par,ghostBufFlux_h,elem,4*nlev,nhe,nc,nthreads=horz_num_threads)
     call initghostbuffer(hybrid%par,ghostBufFlux_vh,elem,4*nlev,nhe,nc,nthreads=vert_num_threads*horz_num_threads)
     call initghostbuffer(hybrid%par,ghostBuf_cslam2gll,elem,nlev*thermodynamic_active_species_num,nhc,nc,nthreads=1)
@@ -535,6 +544,7 @@ subroutine fill_halo_fvm_prealloc(cellghostbuf,elem,fvm,hybrid,nets,nete,ndepth,
     integer                 :: ie, ixy, ivertex, i, j,istart,itot,ishft,imin,imax
     integer, dimension(2,4) :: unit_vec
     integer                 :: rot90_matrix(2,2), iside
+    real (kind=r8)          :: displ_ns, displ_ew
 
     type (cartesian2D_t)                :: tmpgnom
     type (cartesian2D_t)                :: gnom
@@ -661,20 +671,27 @@ subroutine fill_halo_fvm_prealloc(cellghostbuf,elem,fvm,hybrid,nets,nete,ndepth,
              ! set flux vector to zero in non-existent cells (corner halo)
              !
              fvm(ie)%flux_vec        (ixy,i,j,1:4) = fvm(ie)%ifct(i,j)*fvm(ie)%flux_vec(ixy,i,j,1:4)
-
-             iside=1
-             fvm(ie)%displ_max(i,j,iside) = fvm(ie)%displ_max(i,j,iside)+&
-                  ABS(fvm(ie)%vtx_cart(4,ixy,i,j)-fvm(ie)%vtx_cart(1,ixy,i,j))
-             iside=2
-             fvm(ie)%displ_max(i,j,iside) = fvm(ie)%displ_max(i,j,iside)+&
-                  ABS(fvm(ie)%vtx_cart(1,ixy,i,j)-fvm(ie)%vtx_cart(2,ixy,i,j))
-             iside=3
-             fvm(ie)%displ_max(i,j,iside) = fvm(ie)%displ_max(i,j,iside)+&
-                  ABS(fvm(ie)%vtx_cart(2,ixy,i,j)-fvm(ie)%vtx_cart(3,ixy,i,j))
-             iside=4
-             fvm(ie)%displ_max(i,j,iside) = fvm(ie)%displ_max(i,j,iside)+&
-                  ABS(fvm(ie)%vtx_cart(2,ixy,i,j)-fvm(ie)%vtx_cart(1,ixy,i,j))
            end do
+           !
+           ! displacement cap per side = cell extent perpendicular to the face
+           ! (L1 length, matching the ABS(SUM(gamma*dgam_vec)) displacement
+           ! convention).  Use MIN of the two parallel cell edges so the cap
+           ! is mirror/rotation symmetric and conservative on trapezoidal
+           ! cells.  Previously side 1 used the west edge, side 3 the east
+           ! edge, and sides 2 AND 4 both the south edge -- asymmetric where
+           ! cells are distorted (panel edges/corners), affecting the
+           ! gamma_max clamp in the swept-area iteration when Courant ~ 1.
+           !
+           displ_ns = MIN( &
+                SUM(ABS(fvm(ie)%vtx_cart(4,:,i,j)-fvm(ie)%vtx_cart(1,:,i,j))), &
+                SUM(ABS(fvm(ie)%vtx_cart(3,:,i,j)-fvm(ie)%vtx_cart(2,:,i,j))) )
+           displ_ew = MIN( &
+                SUM(ABS(fvm(ie)%vtx_cart(2,:,i,j)-fvm(ie)%vtx_cart(1,:,i,j))), &
+                SUM(ABS(fvm(ie)%vtx_cart(3,:,i,j)-fvm(ie)%vtx_cart(4,:,i,j))) )
+           fvm(ie)%displ_max(i,j,1) = displ_ns
+           fvm(ie)%displ_max(i,j,2) = displ_ew
+           fvm(ie)%displ_max(i,j,3) = displ_ns
+           fvm(ie)%displ_max(i,j,4) = displ_ew
          end do
        end do
      end do

@@ -606,6 +606,8 @@ subroutine dyn_init(dyn_in, dyn_out)
    use air_composition,    only: thermodynamic_active_species_liq_idx,thermodynamic_active_species_ice_idx
    use air_composition,    only: thermodynamic_active_species_liq_idx_dycore,thermodynamic_active_species_ice_idx_dycore
    use air_composition,    only: thermodynamic_active_species_liq_num, thermodynamic_active_species_ice_num
+   use air_composition,    only: wv_idx
+   use dimensions_mod,     only: wv_idx_dycore
    use cam_history,        only: addfld, add_default, horiz_only, register_vector_field
    use gravity_waves_sources, only: gws_init
 
@@ -720,6 +722,17 @@ subroutine dyn_init(dyn_in, dyn_out)
        cnst_longname_gll(m)                = cnst_longname(m)
      end if
    end do
+
+   ! map water vapor constituent index (wv_idx) to dycore Qdp index
+   do m=1,thermodynamic_active_species_num
+     if (thermodynamic_active_species_idx(m) == wv_idx) then
+       wv_idx_dycore = thermodynamic_active_species_idx_dycore(m)
+       exit
+     end if
+   end do
+   if (masterproc) then
+     write(iulog,*) sub//": wv_idx_dycore (water vapor index in dycore Qdp) = ",wv_idx_dycore
+   end if
 
    do m=1,thermodynamic_active_species_liq_num
      if (use_cslam) then
@@ -928,9 +941,8 @@ subroutine dyn_init(dyn_in, dyn_out)
           trim(cnst_longname_gll(m_cnst))//' mixing ratio forcing term (q_new-q_old) on GLL grid', gridname='GLL')
    end do
 
-   ! Energy diagnostics and axial angular momentum diagnostics
    call addfld ('ABS_dPSdt',  horiz_only, 'A', 'Pa/s', 'Absolute surface pressure tendency',gridname='GLL')
-
+   call addfld ('ABS_dPSdt_dry',  horiz_only, 'A', 'Pa/s', 'Absolute dry surface pressure tendency',gridname='GLL')
    if (use_cslam) then
 #ifdef waccm_debug
      call addfld ('CSLAM_gamma',  (/ 'lev' /), 'A', '', 'Courant number from CSLAM',     gridname='FVM')
@@ -1033,8 +1045,9 @@ subroutine dyn_run(dyn_state)
    real(r8) :: dtime
    real(r8) :: rec2dt, pdel
 
-   real(r8), allocatable, dimension(:,:,:) :: ps_before
-   real(r8), allocatable, dimension(:,:,:) :: abs_ps_tend
+   real(r8), allocatable, dimension(:,:,:) :: ps_before, psdry_before
+   real(r8), allocatable, dimension(:,:,:) :: ps_after, psdry_after
+   real(r8), allocatable, dimension(:,:,:) :: abs_ps_tend, abs_psdry_tend
    real (kind=r8)                          :: omega_cn(2,nelemd) !min and max of vertical Courant number
    integer                                 :: nets_in,nete_in
    !----------------------------------------------------------------------------
@@ -1049,11 +1062,14 @@ subroutine dyn_run(dyn_state)
    if (iam >= par%nprocs) return
 
    if (.not. use_3dfrc ) then
-   ldiag = hist_fld_active('ABS_dPSdt')
+   ldiag = hist_fld_active('ABS_dPSdt').or.hist_fld_active('ABS_dPSdt_dry')
    if (ldiag) then
       allocate(ps_before(np,np,nelemd))
+      allocate(ps_after(np,np,nelemd))
       allocate(abs_ps_tend(np,np,nelemd))
-
+      allocate(psdry_before(np,np,nelemd))
+      allocate(psdry_after(np,np,nelemd))
+      allocate(abs_psdry_tend(np,np,nelemd))
    end if
 
    !$OMP PARALLEL NUM_THREADS(horz_num_threads), DEFAULT(SHARED), PRIVATE(hybrid,nets,nete,n,ie,m,i,j,k,ftmp)
@@ -1143,17 +1159,19 @@ subroutine dyn_run(dyn_state)
    end if
 
    if (ldiag) then
-      abs_ps_tend(:,:,nets:nete) = 0.0_r8
-   endif
+      do ie = nets, nete
+         ps_before(:,:,ie)    = dyn_state%elem(ie)%state%psdry(:,:)
+         psdry_before(:,:,ie) = dyn_state%elem(ie)%state%psdry(:,:)
+         do nq=dry_air_species_num + 1, thermodynamic_active_species_num
+            m_cnst = thermodynamic_active_species_idx_dycore(nq)
+            do k=1,nlev
+               ps_before(:,:,ie) = ps_before(:,:,ie)+dyn_state%elem(ie)%state%Qdp(:,:,k,m_cnst,n0_qdp)
+            end do
+         end do
+      end do
+   end if
 
    do n = 1, nsplit_local
-
-      if (ldiag) then
-         do ie = nets, nete
-            ps_before(:,:,ie) = dyn_state%elem(ie)%state%psdry(:,:)
-         end do
-      end if
-
       ! forward-in-time RK, with subcycling
       if (single_column) then
          nets_in=ie_scm
@@ -1164,28 +1182,32 @@ subroutine dyn_run(dyn_state)
       end if
       call prim_run_subcycle(dyn_state%elem, dyn_state%fvm, hybrid, nets_in, nete_in, &
                              tstep, TimeLevel, hvcoord, n, single_column, omega_cn)
-
-      if (ldiag) then
-         do ie = nets, nete
-            abs_ps_tend(:,:,ie) = abs_ps_tend(:,:,ie) +                                &
-               ABS(ps_before(:,:,ie)-dyn_state%elem(ie)%state%psdry(:,:)) &
-               /(tstep*qsplit*rsplit)
-         end do
-      end if
-
    end do
 
    if (ldiag) then
+      call TimeLevel_Qdp(TimeLevel, qsplit, n0_qdp)!get n0_qdp for diagnostics call
+      do ie = nets, nete
+         ps_after(:,:,ie)    = dyn_state%elem(ie)%state%psdry(:,:)
+         psdry_after(:,:,ie) = dyn_state%elem(ie)%state%psdry(:,:)
+         do nq=dry_air_species_num+1,thermodynamic_active_species_num
+            m_cnst = thermodynamic_active_species_idx_dycore(nq)
+            do k=1,nlev
+               ps_after(:,:,ie) = ps_after(:,:,ie)+dyn_state%elem(ie)%state%Qdp(:,:,k,m_cnst,n0_qdp)
+            end do
+         end do
+         abs_ps_tend(:,:,ie)     = ABS(ps_before(:,:,ie)-ps_after(:,:,ie))/(tstep*qsplit*rsplit)
+         abs_psdry_tend(:,:,ie)  = ABS(psdry_before(:,:,ie)-psdry_after(:,:,ie))/(tstep*qsplit*rsplit)
+      end do
       do ie=nets,nete
-         abs_ps_tend(:,:,ie)=abs_ps_tend(:,:,ie)/DBLE(nsplit)
-         call outfld('ABS_dPSdt',RESHAPE(abs_ps_tend(:,:,ie),(/npsq/)),npsq,ie)
+         call outfld('ABS_dPSdt'        ,RESHAPE(abs_ps_tend(:,:,ie),    (/npsq/)),npsq,ie)
+         call outfld('ABS_dPSdt_dry'    ,RESHAPE(abs_psdry_tend(:,:,ie), (/npsq/)),npsq,ie)
       end do
    end if
 
    !$OMP END PARALLEL
 
    if (ldiag) then
-      deallocate(ps_before,abs_ps_tend)
+      deallocate(ps_before,abs_ps_tend,psdry_before,abs_psdry_tend,ps_after,psdry_after)
    endif
 
    end if ! not use_3dfrc

@@ -25,7 +25,7 @@ contains
 
   subroutine prim_init2(elem, fvm, hybrid, nets, nete, tl, hvcoord)
     use dimensions_mod,         only: irecons_tracer, fvm_supercycling
-    use dimensions_mod,         only: fv_nphys, nc
+    use dimensions_mod,         only: fv_nphys, nc, use_cslam
     use parallel_mod,           only: syncmp
     use se_dyn_time_mod,        only: timelevel_t, tstep, phys_tscale, nsplit, TimeLevel_Qdp
     use se_dyn_time_mod,        only: nsplit_baseline,rsplit_baseline
@@ -129,7 +129,6 @@ contains
          tstep*qsplit*rsplit,tstep*qsplit*fvm_supercycling,tstep*qsplit,&
          !dt_dyn,dt_dyn_visco,dt_tracer_visco, dt_phys
          tstep,dt_dyn_vis,dt_dyn_del2_sponge,dt_tracer_vis,tstep*nsplit*qsplit*rsplit)
-
     if (hybrid%masterthread) then
        if (phys_tscale/=0) then
           write(iulog,'(a,2f9.2)') "CAM physics timescale:        ",phys_tscale
@@ -222,6 +221,8 @@ contains
     use control_mod,            only: statefreq,qsplit, rsplit, variable_nsplit, dribble_in_rsplit_loop
     use prim_advance_mod,       only: applycamforcing
     use prim_advance_mod,       only: tot_energy_dyn,compute_omega
+    use prim_advance_mod,       only: hypervis_Qdp
+    use dimensions_mod,         only: del4_cslam_qgll
     use prim_state_mod,         only: prim_printstate, adjust_nsplit
     use prim_advection_mod,     only: vertical_remap, deriv
     use thread_mod,             only: omp_get_thread_num
@@ -304,6 +305,8 @@ contains
       if (use_cslam.and.nsubstep==1.and.r==1) then
          call tot_energy_dyn(elem,fvm,nets,nete,tl%n0,n0_qdp,'dAF')
          call cslam2gll(elem, fvm, hybrid,nets,nete, tl%n0, n0_qdp)
+         if (del4_cslam_qgll) &
+            call hypervis_Qdp(elem, deriv, hybrid, tl%n0, n0_qdp, dt_remap, nets, nete)
          call tot_energy_dyn(elem,fvm,nets,nete,tl%n0,n0_qdp,'dBD')
       end if
       call tot_energy_dyn(elem,fvm,nets,nete,tl%n0,n0_qdp,'dBL')
@@ -439,8 +442,9 @@ contains
     use prim_advance_mod,       only: prim_advance_exp
     use prim_advection_mod,     only: prim_advec_tracers_remap, prim_advec_tracers_fvm, deriv
     use derivative_mod,         only: subcell_integration
+    use prim_advance_mod,       only: hypervis_Qdp
     use hybrid_mod,             only: set_region_num_threads, config_thread_region, get_loop_ranges
-    use dimensions_mod,         only: use_cslam,fvm_supercycling,fvm_supercycling_jet
+    use dimensions_mod,         only: use_cslam,fvm_supercycling,fvm_supercycling_jet,del4_cslam_qgll
     use dimensions_mod,         only: kmin_jet, kmax_jet
     use fvm_mod,                only: ghostBufQnhc_vh,ghostBufQ1_vh, ghostBufFlux_vh
     use fvm_mod,                only: ghostBufQ1_h,ghostBufQnhcJet_h, ghostBufFluxJet_h
@@ -612,7 +616,9 @@ contains
           end do
        end do
        call TimeLevel_Qdp( tl, qsplit, n0_qdp, np1_qdp)
-       if (.not.last_step) call cslam2gll(elem, fvm, hybrid,nets,nete, tl%np1, np1_qdp)
+       call cslam2gll(elem, fvm, hybrid,nets,nete, tl%np1, np1_qdp)
+       if (del4_cslam_qgll) &
+            call hypervis_Qdp(elem, deriv, hybrid, tl%np1, np1_qdp, dt_remap, nets, nete)
       else if ((mod(rstep,fvm_supercycling_jet) == 0)) then
         !
         ! shorter fvm time-step in jet region
