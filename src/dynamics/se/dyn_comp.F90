@@ -928,11 +928,6 @@ subroutine dyn_init(dyn_in, dyn_out)
 
    ! Energy diagnostics and axial angular momentum diagnostics
    call addfld ('ABS_dPSdt',  horiz_only, 'A', 'Pa/s', 'Absolute surface pressure tendency',gridname='GLL')
-#ifdef ABS_DPDT_DIAG
-   call addfld ('ABS_dDPdt',  (/ 'lev' /), 'A', '1/s', &
-        'Absolute dp tendency per level, normalized by reference thickness at ps0', gridname='GLL')
-   call addfld ('ABS_dPSDRYdt',  horiz_only, 'A', 'Pa/s', 'Absolute dry surface pressure tendency',gridname='GLL')
-#endif
 
    if (use_cslam) then
 #ifdef waccm_debug
@@ -1038,18 +1033,8 @@ subroutine dyn_run(dyn_state)
 
    real(r8), allocatable, dimension(:,:,:) :: ps_before
    real(r8), allocatable, dimension(:,:,:) :: abs_ps_tend
-#ifdef ABS_DPDT_DIAG
-   real(r8), allocatable, dimension(:,:,:,:) :: dp_before, abs_dp_tend
-   real(r8) :: dp_ref(nlev)
-   logical  :: ldiag_dp
-#endif
    real (kind=r8)                          :: omega_cn(2,nelemd) !min and max of vertical Courant number
    integer                                 :: nets_in,nete_in
-   integer                                 :: n0_qdp_diag       ! ABS_DPDT_DIAG: current qdp timelevel
-   real(r8)                                :: psm_after(np,np)  ! ABS_DPDT_DIAG: moist-ps work array
-#ifdef ABS_DPDT_DIAG
-   real(r8), allocatable, dimension(:,:,:) :: psm_before, abs_psm_tend  ! moist (full) surface pressure
-#endif
    !----------------------------------------------------------------------------
 
 #ifdef debug_coupling
@@ -1063,30 +1048,12 @@ subroutine dyn_run(dyn_state)
 
    if (.not. use_3dfrc ) then
    ldiag = hist_fld_active('ABS_dPSdt')
-#ifdef ABS_DPDT_DIAG
-   ldiag = ldiag .or. hist_fld_active('ABS_dPSDRYdt')
-#endif
    if (ldiag) then
       allocate(ps_before(np,np,nelemd))
       allocate(abs_ps_tend(np,np,nelemd))
-#ifdef ABS_DPDT_DIAG
-      allocate(psm_before(np,np,nelemd))
-      allocate(abs_psm_tend(np,np,nelemd))
-#endif
    end if
-#ifdef ABS_DPDT_DIAG
-   ldiag_dp = hist_fld_active('ABS_dDPdt')
-   if (ldiag_dp) then
-      allocate(dp_before(np,np,nlev,nelemd))
-      allocate(abs_dp_tend(np,np,nlev,nelemd))
-      do k = 1, nlev
-         dp_ref(k) = ((hvcoord%hyai(k+1)-hvcoord%hyai(k)) + &
-                      (hvcoord%hybi(k+1)-hvcoord%hybi(k)))*hvcoord%ps0
-      end do
-   end if
-#endif
 
-   !$OMP PARALLEL NUM_THREADS(horz_num_threads), DEFAULT(SHARED), PRIVATE(hybrid,nets,nete,n,ie,m,i,j,k,ftmp,n0_qdp_diag,psm_after)
+   !$OMP PARALLEL NUM_THREADS(horz_num_threads), DEFAULT(SHARED), PRIVATE(hybrid,nets,nete,n,ie,m,i,j,k,ftmp)
    hybrid = config_thread_region(par,'horizontal')
    call get_loop_ranges(hybrid, ibeg=nets, iend=nete)
 
@@ -1174,15 +1141,7 @@ subroutine dyn_run(dyn_state)
 
    if (ldiag) then
       abs_ps_tend(:,:,nets:nete) = 0.0_r8
-#ifdef ABS_DPDT_DIAG
-      abs_psm_tend(:,:,nets:nete) = 0.0_r8
-#endif
    endif
-#ifdef ABS_DPDT_DIAG
-   if (ldiag_dp) then
-      abs_dp_tend(:,:,:,nets:nete) = 0.0_r8
-   endif
-#endif
 
    do n = 1, nsplit_local
 
@@ -1190,26 +1149,7 @@ subroutine dyn_run(dyn_state)
          do ie = nets, nete
             ps_before(:,:,ie) = dyn_state%elem(ie)%state%psdry(:,:)
          end do
-#ifdef ABS_DPDT_DIAG
-         call TimeLevel_Qdp(TimeLevel, qsplit, n0_qdp_diag)
-         do ie = nets, nete
-            psm_before(:,:,ie) = dyn_state%elem(ie)%state%psdry(:,:)
-            do m = dry_air_species_num+1, thermodynamic_active_species_num
-               do k = 1, nlev
-                  psm_before(:,:,ie) = psm_before(:,:,ie) + &
-                       dyn_state%elem(ie)%state%Qdp(:,:,k,thermodynamic_active_species_idx_dycore(m),n0_qdp_diag)
-               end do
-            end do
-         end do
-#endif
       end if
-#ifdef ABS_DPDT_DIAG
-      if (ldiag_dp) then
-         do ie = nets, nete
-            dp_before(:,:,:,ie) = dyn_state%elem(ie)%state%dp3d(:,:,:,TimeLevel%n0)
-         end do
-      end if
-#endif
 
       ! forward-in-time RK, with subcycling
       if (single_column) then
@@ -1228,69 +1168,22 @@ subroutine dyn_run(dyn_state)
                ABS(ps_before(:,:,ie)-dyn_state%elem(ie)%state%psdry(:,:)) &
                /(tstep*qsplit*rsplit)
          end do
-#ifdef ABS_DPDT_DIAG
-         call TimeLevel_Qdp(TimeLevel, qsplit, n0_qdp_diag)
-         do ie = nets, nete
-            psm_after(:,:) = dyn_state%elem(ie)%state%psdry(:,:)
-            do m = dry_air_species_num+1, thermodynamic_active_species_num
-               do k = 1, nlev
-                  psm_after(:,:) = psm_after(:,:) + &
-                       dyn_state%elem(ie)%state%Qdp(:,:,k,thermodynamic_active_species_idx_dycore(m),n0_qdp_diag)
-               end do
-            end do
-            abs_psm_tend(:,:,ie) = abs_psm_tend(:,:,ie) + &
-               ABS(psm_before(:,:,ie)-psm_after(:,:))/(tstep*qsplit*rsplit)
-         end do
-#endif
       end if
-#ifdef ABS_DPDT_DIAG
-      if (ldiag_dp) then
-         do ie = nets, nete
-            abs_dp_tend(:,:,:,ie) = abs_dp_tend(:,:,:,ie) +                            &
-               ABS(dp_before(:,:,:,ie)-dyn_state%elem(ie)%state%dp3d(:,:,:,TimeLevel%n0)) &
-               /(tstep*qsplit*rsplit)
-         end do
-      end if
-#endif
 
    end do
 
    if (ldiag) then
       do ie=nets,nete
          abs_ps_tend(:,:,ie)=abs_ps_tend(:,:,ie)/DBLE(nsplit)
-#ifdef ABS_DPDT_DIAG
-         call outfld('ABS_dPSDRYdt',RESHAPE(abs_ps_tend(:,:,ie),(/npsq/)),npsq,ie)
-         abs_psm_tend(:,:,ie)=abs_psm_tend(:,:,ie)/DBLE(nsplit)
-         call outfld('ABS_dPSdt',RESHAPE(abs_psm_tend(:,:,ie),(/npsq/)),npsq,ie)
-#else
          call outfld('ABS_dPSdt',RESHAPE(abs_ps_tend(:,:,ie),(/npsq/)),npsq,ie)
-#endif
       end do
    end if
-#ifdef ABS_DPDT_DIAG
-   if (ldiag_dp) then
-      do ie=nets,nete
-         do k=1,nlev
-            abs_dp_tend(:,:,k,ie)=abs_dp_tend(:,:,k,ie)/(DBLE(nsplit)*dp_ref(k))
-         end do
-         call outfld('ABS_dDPdt',RESHAPE(abs_dp_tend(:,:,:,ie),(/npsq,nlev/)),npsq,ie)
-      end do
-   end if
-#endif
 
    !$OMP END PARALLEL
 
    if (ldiag) then
       deallocate(ps_before,abs_ps_tend)
-#ifdef ABS_DPDT_DIAG
-      deallocate(psm_before,abs_psm_tend)
-#endif
    endif
-#ifdef ABS_DPDT_DIAG
-   if (ldiag_dp) then
-      deallocate(dp_before,abs_dp_tend)
-   endif
-#endif
 
    end if ! not use_3dfrc
 
