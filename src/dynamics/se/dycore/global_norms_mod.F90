@@ -753,7 +753,12 @@ contains
     ! limits above. (rsplit=-1 is resolved earlier, in dyn_grid_init via
     ! auto_rsplit)
     !
-    if (hypervis_subcycle==-1)        hypervis_subcycle        = max(1, ceiling(tstep/(1.2_r8*dt_max_hypervis)))
+    ! NB: no safety factor on dt_max_hypervis. The former 1.2 factor
+    ! (tstep/(1.2*dt_max_hypervis)) allowed dt_dyn_visco up to 1.2x the linear del4
+    ! stability limit, which is UNSTABLE (e.g. ne30 LT tstep=300s: it picked subcycle=2
+    ! -> dt_dyn_visco=150s > dt_max_hypervis=135.91s -> surface-pressure noise). Plain
+    ! ceiling(tstep/dt_max_hypervis) keeps dt_dyn_visco <= the stability limit.
+    if (hypervis_subcycle==-1)        hypervis_subcycle        = max(1, ceiling(tstep/dt_max_hypervis))
     if (hypervis_subcycle_sponge==-1) hypervis_subcycle_sponge = max(1, ceiling(tstep/dt_max_laplacian_top))
     !
     ! actual time-steps with final subcycling (printed below)
