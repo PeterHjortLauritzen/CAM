@@ -550,7 +550,7 @@ contains
     Real(r8) :: DiffusivityInWater, SchmidtNumberInWater
     Real(r8) :: SchmidtNumberInWater_CO2ref
 
-    SchmidtNumberInWater_CO2ref = 660.0_r8              ! this is the Schmidt number of CO2 at 20 degC in fresh water
+    SchmidtNumberInWater_CO2ref = 600.0_r8              ! this is the Schmidt number of CO2 at 20 degC in fresh water
     DiffusivityInWater = DiffusivityInWater_cm2_s(SpeciesIndex, T_water_K, Salinity_PartsPerThousand)
     SchmidtNumberInWater = DynamicViscosityWater_g_m_s(T_water_K, Salinity_PartsPerThousand) / 1000.0_r8 &
          / DensityWater_kg_m3(T_water_K,Salinity_PartsPerThousand)/(DiffusivityInWater/10000.0_r8)
