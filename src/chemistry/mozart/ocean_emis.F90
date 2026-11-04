@@ -715,7 +715,7 @@ contains
             (7.33532E-4_r8 + 3.39615E-5_r8 * log(Heff_M_atm_PureWater) &
             - 2.40888E-6_r8 * ((log(Heff_M_atm_PureWater))**2.0_r8) &
             + 1.57114E-7_r8 * ((log(Heff_M_atm_PureWater))**3.0_r8))
-       Heff_M_atm_SaltyWater = Heff_M_atm_PureWater * 10.0_r8**(Setschenow*Salinity_PartsPerThousand)
+       Heff_M_atm_SaltyWater = Heff_M_atm_PureWater * 10.0_r8**(-Setschenow*Salinity_PartsPerThousand)
        Henry_M_atm = Heff_M_atm_SaltyWater
     Endif
 
