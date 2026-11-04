@@ -1495,9 +1495,6 @@ contains
                    endwhere
                 end if
 
-                !  JFL - increase in dry deposition of SO2 to improve bias over US/Europe
-                wrk(:) = wrk(:) * 2._r8
-
              case( 'SO4' )
                 where( fr_lnduse(:ncol,lt) )
                    wrk(:) = wrk(:) + lnd_frc(:)/(dep_ra(:ncol,lt,lchnk) + rds(:,lt))
@@ -1545,6 +1542,12 @@ contains
                 endwhere
              end select
           end do lt_loop
+
+          !  JFL - increase in dry deposition of SO2 to improve bias over US/Europe
+          !  (applied once, after the sum over land types)
+          if( trim(solsym(ispec)) == 'SO2' ) then
+             wrk(:) = wrk(:) * 2._r8
+          end if
 
 ! ========================================================================
 ! WSY: reactive halogen species added (original code from D. Kinnison)
