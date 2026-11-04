@@ -523,8 +523,8 @@ contains
     Real(r8) :: DynamicViscosityAir_kg_m_s, DensityAir_kg_m3, DiffusivityInAir, SchmidtNumberInAir
 
     ! WSY: If local friction velocity is available from the model, might as well use that?
-    ustar_m_s = u10_m_s * sqrt(6.1E-4_r8 + 6.3E-5_r8 * u10_m_s)
-    DragCoeff = (ustar_m_s / u10_m_s)**2.0_r8
+    DragCoeff = 6.1E-4_r8 + 6.3E-5_r8 * u10_m_s
+    ustar_m_s = u10_m_s * sqrt(DragCoeff)
     DynamicViscosityAir_kg_m_s = 1.715747771E-5_r8 + 4.722402075E-8_r8 * (T_air_K-273.15_r8) &
          - 3.663027156E-10_r8 * ((T_air_K-273.15_r8)**2.0_r8) &
          + 1.873236686E-12_r8 * ((T_air_K-273.15_r8)**3.0_r8) &
