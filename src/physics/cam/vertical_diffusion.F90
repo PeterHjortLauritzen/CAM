@@ -1633,6 +1633,7 @@ subroutine vertical_diffusion_tend( &
              cpairv = cpairv(:ncol,:,state%lchnk), &
              zi = state%zi(:ncol,:), &
              tint = tint(:ncol,:), &
+             phis = state%phis(:ncol), &
              dse_top = dse_top(:ncol), &
              errmsg = errmsg, &
              errflg = errflg)
