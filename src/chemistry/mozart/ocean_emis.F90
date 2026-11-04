@@ -602,7 +602,7 @@ contains
     MW_species = MolecularWeight(SpeciesIndex)
     DiffusivityInAir_cm2_s = 0.001_r8 * (T_air_K**1.75_r8) &    ! oh f* me
          * (((MW_air + MW_species)/(MW_air*MW_species))**0.5_r8) &
-         / ((P_atm*(Va**(1.0_r8/3.0_r8)+Vb**(1.0_r8/3.0_r8)))**2.0_r8)
+         / (P_atm*((Va**(1.0_r8/3.0_r8)+Vb**(1.0_r8/3.0_r8))**2.0_r8))
 
   End Function DiffusivityInAir_cm2_s
 
