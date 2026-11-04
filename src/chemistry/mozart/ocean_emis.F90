@@ -690,7 +690,7 @@ contains
     FactorB = - 0.00572466_r8 + 0.00010277_r8*(T_water_K-273.15_r8) - 0.0000016546_r8*((T_water_K-273.15_r8)**2.0_r8)
     FactorC = 0.00048314_r8
     DensityWater_kg_m3 = DensityPureWater_kg_m3 + FactorA*Salinity_PartsPerThousand &
-         + FactorB*(Salinity_PartsPerThousand**(2.0_r8/3.0_r8)) + FactorC*Salinity_PartsPerThousand
+         + FactorB*(Salinity_PartsPerThousand**1.5_r8) + FactorC*(Salinity_PartsPerThousand**2.0_r8)
 
   End Function DensityWater_kg_m3
 
