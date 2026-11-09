@@ -87,6 +87,14 @@
 level_loop : &
       do k = 1,kbot
 !-----------------------------------------------------------------------
+! 	... skip levels with no direct sun: slant_col marks them with
+! 	    its 'largest' sentinel (1.e36), which would otherwise be
+! 	    interpolated as a (often negative) saturated table heating
+!-----------------------------------------------------------------------
+         if( scco2(k) >= 1.e35_r8 ) then
+            cycle level_loop
+         end if
+!-----------------------------------------------------------------------
 ! 	... first setup pressure interpolation
 !-----------------------------------------------------------------------
          pinterp  = pmid(k) * pa2hPa

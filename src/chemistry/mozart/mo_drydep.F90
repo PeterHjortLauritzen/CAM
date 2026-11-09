@@ -435,6 +435,7 @@ contains
     end if
     so2_ndx     = get_spc_ndx( 'SO2' )
     ch3cooh_ndx = get_spc_ndx( 'CH3COOH')
+    hcooh_ndx   = get_spc_ndx( 'HCOOH' )
 
     sogm_ndx   = get_spc_ndx( 'SOGM' )
     sogi_ndx   = get_spc_ndx( 'SOGI' )
