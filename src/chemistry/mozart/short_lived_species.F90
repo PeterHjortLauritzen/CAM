@@ -115,7 +115,7 @@ contains
 
     integer          :: m,n
     integer          :: grid_id
-    character(len=8) :: fieldname
+    character(len=len(solsym)) :: fieldname
     character(len=4) :: dim1name, dim2name
     logical          :: found
     real(r8),pointer :: tmpptr(:,:,:)   ! temporary pointer

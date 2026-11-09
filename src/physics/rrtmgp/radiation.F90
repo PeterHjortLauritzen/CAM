@@ -457,7 +457,7 @@ end function radiation_do
 !================================================================================================
 
 subroutine radiation_init(pbuf2d)
-   use rrtmgp_inputs_cam,         only: rrtmgp_inputs_cam_init
+   use rrtmgp_inputs_cam,         only: rrtmgp_inputs_cam_init, rrtmg_to_rrtmgp_swbands
    use rrtmgp_cloud_optics_setup, only: rrtmgp_cloud_optics_setup_init
    use rrtmgp_sw_solar_var_setup, only: rrtmgp_sw_solar_var_setup_init
    use solar_irrad_data,          only: do_spctrl_scaling, has_spectrum
@@ -487,8 +487,17 @@ subroutine radiation_init(pbuf2d)
    ! Lookup pbuf flds for TUV-x aerosol optics
    call rrtmgp_inputs_cam_init()
 
-   ! Set radconstants module-level index variables that we're setting in CCPP-ized scheme now
-   call radconstants_init(idx_sw_diag, idx_nir_diag, idx_uv_diag, idx_lw_diag)
+   ! Set radconstants module-level index variables that we're setting in CCPP-ized scheme now.
+   ! rrtmgp_inputs_setup computes the diagnostic band indices on the RRTMGP band grid, but the
+   ! consumers of radconstants (aer_rad_props, aerosol_optics_cam, cloud_rad_props, phys_prop)
+   ! apply them to optics arrays kept in the RRTMG band order of the optics datasets; those
+   ! arrays are only reordered to the RRTMGP band order afterwards, in rrtmgp_set_aer_sw.
+   ! Convert the SW indices to the dataset (RRTMG) band order here; RRTMGP band j holds the
+   ! contents of RRTMG band rrtmg_to_rrtmgp_swbands(j).  The LW band order is the same in both.
+   call radconstants_init(rrtmg_to_rrtmgp_swbands(idx_sw_diag), &
+                          rrtmg_to_rrtmgp_swbands(idx_nir_diag), &
+                          rrtmg_to_rrtmgp_swbands(idx_uv_diag), &
+                          idx_lw_diag)
 
    call rrtmgp_sw_solar_var_setup_init(nswbands, do_spctrl_scaling, has_spectrum, errmsg, errflg)
    if (errflg /= 0) then

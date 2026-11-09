@@ -523,8 +523,8 @@ contains
     Real(r8) :: DynamicViscosityAir_kg_m_s, DensityAir_kg_m3, DiffusivityInAir, SchmidtNumberInAir
 
     ! WSY: If local friction velocity is available from the model, might as well use that?
-    ustar_m_s = u10_m_s * sqrt(6.1E-4_r8 + 6.3E-5_r8 * u10_m_s)
-    DragCoeff = (ustar_m_s / u10_m_s)**2.0_r8
+    DragCoeff = 6.1E-4_r8 + 6.3E-5_r8 * u10_m_s
+    ustar_m_s = u10_m_s * sqrt(DragCoeff)
     DynamicViscosityAir_kg_m_s = 1.715747771E-5_r8 + 4.722402075E-8_r8 * (T_air_K-273.15_r8) &
          - 3.663027156E-10_r8 * ((T_air_K-273.15_r8)**2.0_r8) &
          + 1.873236686E-12_r8 * ((T_air_K-273.15_r8)**3.0_r8) &
@@ -550,7 +550,7 @@ contains
     Real(r8) :: DiffusivityInWater, SchmidtNumberInWater
     Real(r8) :: SchmidtNumberInWater_CO2ref
 
-    SchmidtNumberInWater_CO2ref = 660.0_r8              ! this is the Schmidt number of CO2 at 20 degC in fresh water
+    SchmidtNumberInWater_CO2ref = 600.0_r8              ! this is the Schmidt number of CO2 at 20 degC in fresh water
     DiffusivityInWater = DiffusivityInWater_cm2_s(SpeciesIndex, T_water_K, Salinity_PartsPerThousand)
     SchmidtNumberInWater = DynamicViscosityWater_g_m_s(T_water_K, Salinity_PartsPerThousand) / 1000.0_r8 &
          / DensityWater_kg_m3(T_water_K,Salinity_PartsPerThousand)/(DiffusivityInWater/10000.0_r8)
@@ -602,7 +602,7 @@ contains
     MW_species = MolecularWeight(SpeciesIndex)
     DiffusivityInAir_cm2_s = 0.001_r8 * (T_air_K**1.75_r8) &    ! oh f* me
          * (((MW_air + MW_species)/(MW_air*MW_species))**0.5_r8) &
-         / ((P_atm*(Va**(1.0_r8/3.0_r8)+Vb**(1.0_r8/3.0_r8)))**2.0_r8)
+         / (P_atm*((Va**(1.0_r8/3.0_r8)+Vb**(1.0_r8/3.0_r8))**2.0_r8))
 
   End Function DiffusivityInAir_cm2_s
 
@@ -690,7 +690,7 @@ contains
     FactorB = - 0.00572466_r8 + 0.00010277_r8*(T_water_K-273.15_r8) - 0.0000016546_r8*((T_water_K-273.15_r8)**2.0_r8)
     FactorC = 0.00048314_r8
     DensityWater_kg_m3 = DensityPureWater_kg_m3 + FactorA*Salinity_PartsPerThousand &
-         + FactorB*(Salinity_PartsPerThousand**(2.0_r8/3.0_r8)) + FactorC*Salinity_PartsPerThousand
+         + FactorB*(Salinity_PartsPerThousand**1.5_r8) + FactorC*(Salinity_PartsPerThousand**2.0_r8)
 
   End Function DensityWater_kg_m3
 
@@ -715,7 +715,7 @@ contains
             (7.33532E-4_r8 + 3.39615E-5_r8 * log(Heff_M_atm_PureWater) &
             - 2.40888E-6_r8 * ((log(Heff_M_atm_PureWater))**2.0_r8) &
             + 1.57114E-7_r8 * ((log(Heff_M_atm_PureWater))**3.0_r8))
-       Heff_M_atm_SaltyWater = Heff_M_atm_PureWater * 10.0_r8**(Setschenow*Salinity_PartsPerThousand)
+       Heff_M_atm_SaltyWater = Heff_M_atm_PureWater * 10.0_r8**(-Setschenow*Salinity_PartsPerThousand)
        Henry_M_atm = Heff_M_atm_SaltyWater
     Endif
 
