@@ -1,3 +1,60 @@
+===============================================================
+
+Tag name: cam6_4_2xx
+Originator(s): pel
+Date: <merge date>
+One-line Summary: Pass phis to the molecular-diffusion dse top boundary condition
+Github PR URL:
+
+Purpose of changes (include the issue number and title text for each relevant GitHub issue):
+
+  Fix #1772 - Molecular-diffusion dse top boundary condition missing surface
+  geopotential. Pass state%phis to the updated diffusion_solver interface
+  (atmospheric_physics PR #485) so the BC uses the same dse definition
+  as the diffused field.
+
+  Found by an AI code audit of CAM (Claude, claude-fable-5); fix authored
+  with AI assistance and reviewed/confirmed by a human.
+
+Describe any changes made to build system:
+
+  atmos_phys external updated to <tag with companion PR> (interface change).
+
+Describe any changes made to the namelist: none
+
+List any changes to the defaults for the boundary datasets: none
+
+Describe any substantial timing or memory changes: none
+
+Code reviewed by: Hanli Liu
+
+List all files eliminated: none
+
+List all files added and what they do: none
+
+List all existing files that have been modified, and describe the changes:
+
+M src/physics/cam/vertical_diffusion.F90
+  - pass state%phis to diffusion_solver for the dse top BC
+M .gitmodules
+  - atmos_phys fxtag -> <tag with companion PR>
+
+derecho/intel/aux_cam: <fill at merge>
+
+derecho/nvhpc/aux_cam: <fill at merge>
+
+izumi/nag/aux_cam: <fill at merge>
+
+izumi/gnu/aux_cam: <fill at merge>
+
+Summarize any changes to answers:
+- what code configurations: WACCM-type tops with molecular diffusion
+  active (ptop < ~0.001 hPa), excluding WACCM-X (diffuses temperature;
+  this BC unused); cam7 LT/MT bit-for-bit (molecular diffusion off)
+- what platforms/compilers: all
+- nature of change: larger than roundoff near the model top over high
+  terrain; same climate expected
+
 
 ===============================================================
 
