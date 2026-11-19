@@ -277,40 +277,40 @@ contains
             select case (trim(spectype))
             case ('dust')
               if (associated(specrefindex)) then
-                scatdust(icol) = vol(icol)*specrefindex(idx_sw_diag)%re
-                absdust(icol) = -vol(icol)*specrefindex(idx_sw_diag)%im
+                scatdust(icol) = scatdust(icol) + vol(icol)*specrefindex(idx_sw_diag)%re
+                absdust(icol) = absdust(icol) - vol(icol)*specrefindex(idx_sw_diag)%im
               end if
-              hygrodust(icol) = vol(icol)*hygro_aer
+              hygrodust(icol) = hygrodust(icol) + vol(icol)*hygro_aer
             case ('black-c')
               if (associated(specrefindex)) then
-                scatbc(icol) = vol(icol)*specrefindex(idx_sw_diag)%re
-                absbc(icol) = -vol(icol)*specrefindex(idx_sw_diag)%im
+                scatbc(icol) = scatbc(icol) + vol(icol)*specrefindex(idx_sw_diag)%re
+                absbc(icol) = absbc(icol) - vol(icol)*specrefindex(idx_sw_diag)%im
               end if
-              hygrobc(icol) = vol(icol)*hygro_aer
+              hygrobc(icol) = hygrobc(icol) + vol(icol)*hygro_aer
             case ('sulfate')
               if (associated(specrefindex)) then
-                scatsulf(icol) = vol(icol)*specrefindex(idx_sw_diag)%re
-                abssulf(icol) = -vol(icol)*specrefindex(idx_sw_diag)%im
+                scatsulf(icol) = scatsulf(icol) + vol(icol)*specrefindex(idx_sw_diag)%re
+                abssulf(icol) = abssulf(icol) - vol(icol)*specrefindex(idx_sw_diag)%im
               end if
-              hygrosulf(icol) = vol(icol)*hygro_aer
+              hygrosulf(icol) = hygrosulf(icol) + vol(icol)*hygro_aer
             case ('p-organic')
               if (associated(specrefindex)) then
-                scatpom(icol) = vol(icol)*specrefindex(idx_sw_diag)%re
-                abspom(icol) = -vol(icol)*specrefindex(idx_sw_diag)%im
+                scatpom(icol) = scatpom(icol) + vol(icol)*specrefindex(idx_sw_diag)%re
+                abspom(icol) = abspom(icol) - vol(icol)*specrefindex(idx_sw_diag)%im
               end if
-              hygropom(icol) = vol(icol)*hygro_aer
+              hygropom(icol) = hygropom(icol) + vol(icol)*hygro_aer
             case ('s-organic')
               if (associated(specrefindex)) then
-                scatsoa(icol) = vol(icol)*specrefindex(idx_sw_diag)%re
-                abssoa(icol) = -vol(icol)*specrefindex(idx_sw_diag)%im
+                scatsoa(icol) = scatsoa(icol) + vol(icol)*specrefindex(idx_sw_diag)%re
+                abssoa(icol) = abssoa(icol) - vol(icol)*specrefindex(idx_sw_diag)%im
               end if
-              hygrosoa(icol) = vol(icol)*hygro_aer
+              hygrosoa(icol) = hygrosoa(icol) + vol(icol)*hygro_aer
             case ('seasalt')
               if (associated(specrefindex)) then
-                scatsslt(icol) = vol(icol)*specrefindex(idx_sw_diag)%re
-                abssslt(icol) = -vol(icol)*specrefindex(idx_sw_diag)%im
+                scatsslt(icol) = scatsslt(icol) + vol(icol)*specrefindex(idx_sw_diag)%re
+                abssslt(icol) = abssslt(icol) - vol(icol)*specrefindex(idx_sw_diag)%im
               end if
-              hygrosslt(icol) = vol(icol)*hygro_aer
+              hygrosslt(icol) = hygrosslt(icol) + vol(icol)*hygro_aer
             end select
           end do
         end do

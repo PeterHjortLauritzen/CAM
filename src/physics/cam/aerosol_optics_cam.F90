@@ -800,48 +800,48 @@ contains
 
                          select case ( trim(spectype) )
                          case('dust')
-                            dustvol(icol) = vol(icol)
+                            dustvol(icol) = dustvol(icol) + vol(icol)
                             burdendust(icol) = burdendust(icol) + specmmr(icol,ilev)*mass(icol,ilev)
                             if (associated(specrefindex)) then
-                               scatdust(icol) = vol(icol) * specrefindex(iwav)%re
-                               absdust(icol)  =-vol(icol) * specrefindex(iwav)%im
+                               scatdust(icol) = scatdust(icol) + vol(icol) * specrefindex(iwav)%re
+                               absdust(icol)  = absdust(icol)  - vol(icol) * specrefindex(iwav)%im
                             end if
-                            hygrodust(icol)= vol(icol)*hygro_aer
+                            hygrodust(icol) = hygrodust(icol) + vol(icol)*hygro_aer
                          case('black-c')
                             burdenbc(icol) = burdenbc(icol) + specmmr(icol,ilev)*mass(icol,ilev)
                             if (associated(specrefindex)) then
-                               scatbc(icol) = vol(icol) * specrefindex(iwav)%re
-                               absbc(icol)  =-vol(icol) * specrefindex(iwav)%im
+                               scatbc(icol) = scatbc(icol) + vol(icol) * specrefindex(iwav)%re
+                               absbc(icol)  = absbc(icol)  - vol(icol) * specrefindex(iwav)%im
                             end if
-                            hygrobc(icol)= vol(icol)*hygro_aer
+                            hygrobc(icol) = hygrobc(icol) + vol(icol)*hygro_aer
                          case('sulfate')
                             burdenso4(icol) = burdenso4(icol) + specmmr(icol,ilev)*mass(icol,ilev)
                             if (associated(specrefindex)) then
-                               scatsulf(icol) = vol(icol) * specrefindex(iwav)%re
-                               abssulf(icol)  =-vol(icol) * specrefindex(iwav)%im
+                               scatsulf(icol) = scatsulf(icol) + vol(icol) * specrefindex(iwav)%re
+                               abssulf(icol)  = abssulf(icol)  - vol(icol) * specrefindex(iwav)%im
                             end if
-                            hygrosulf(icol)= vol(icol)*hygro_aer
+                            hygrosulf(icol) = hygrosulf(icol) + vol(icol)*hygro_aer
                          case('p-organic')
                             burdenpom(icol) = burdenpom(icol) + specmmr(icol,ilev)*mass(icol,ilev)
                             if (associated(specrefindex)) then
-                               scatpom(icol) = vol(icol) * specrefindex(iwav)%re
-                               abspom(icol)  =-vol(icol) * specrefindex(iwav)%im
+                               scatpom(icol) = scatpom(icol) + vol(icol) * specrefindex(iwav)%re
+                               abspom(icol)  = abspom(icol)  - vol(icol) * specrefindex(iwav)%im
                             end if
-                            hygropom(icol)= vol(icol)*hygro_aer
+                            hygropom(icol) = hygropom(icol) + vol(icol)*hygro_aer
                          case('s-organic')
                             burdensoa(icol) = burdensoa(icol) + specmmr(icol,ilev)*mass(icol,ilev)
                             if (associated(specrefindex)) then
-                               scatsoa(icol) = vol(icol) * specrefindex(iwav)%re
-                               abssoa(icol) = -vol(icol) * specrefindex(iwav)%im
+                               scatsoa(icol) = scatsoa(icol) + vol(icol) * specrefindex(iwav)%re
+                               abssoa(icol)  = abssoa(icol)  - vol(icol) * specrefindex(iwav)%im
                             end if
-                            hygrosoa(icol)= vol(icol)*hygro_aer
+                            hygrosoa(icol) = hygrosoa(icol) + vol(icol)*hygro_aer
                          case('seasalt')
                             burdenseasalt(icol) = burdenseasalt(icol) + specmmr(icol,ilev)*mass(icol,ilev)
                             if (associated(specrefindex)) then
-                               scatsslt(icol) = vol(icol) * specrefindex(iwav)%re
-                               abssslt(icol) = -vol(icol) * specrefindex(iwav)%im
+                               scatsslt(icol) = scatsslt(icol) + vol(icol) * specrefindex(iwav)%re
+                               abssslt(icol)  = abssslt(icol)  - vol(icol) * specrefindex(iwav)%im
                             end if
-                            hygrosslt(icol)= vol(icol)*hygro_aer
+                            hygrosslt(icol) = hygrosslt(icol) + vol(icol)*hygro_aer
                          end select
                       end do
 

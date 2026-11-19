@@ -287,7 +287,7 @@ contains
 
     use phys_control,      only : cam_physpkg_is
     use chem_mods,         only : nabscol, nfs, indexm, clscnt4
-    use physconst,         only : rga, gravit
+    use physconst,         only : rga, gravit, zvir
     use mo_photo,          only : set_ub_col, setcol, table_photo
     use mo_tuvx,           only : tuvx_get_photo_rates, tuvx_active
     use mo_exp_sol,        only : exp_sol
@@ -1157,7 +1157,7 @@ contains
        end if
     end do
 
-    tvs(:ncol) = tfld(:ncol,pver) * (1._r8 + qh2o(:ncol,pver))
+    tvs(:ncol) = tfld(:ncol,pver) * (1._r8 + zvir*qh2o(:ncol,pver))
 
     sflx(:,:) = 0._r8
     wind_speed(:ncol) = sqrt( ufld(:ncol,pver)*ufld(:ncol,pver) + vfld(:ncol,pver)*vfld(:ncol,pver) )

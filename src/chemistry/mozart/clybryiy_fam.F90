@@ -67,6 +67,9 @@ contains
     id_hcl    = get_spc_ndx('HCL')
     id_clono2 = get_spc_ndx('CLONO2')
     id_clno2  = get_spc_ndx('CLNO2')
+    id_cocl2   = get_spc_ndx('COCL2')
+    id_chcl2o2 = get_spc_ndx('CHCL2O2')
+    id_cofcl   = get_spc_ndx('COFCL')
 
     id_br     = get_spc_ndx('BR')
     id_bro    = get_spc_ndx('BRO')
